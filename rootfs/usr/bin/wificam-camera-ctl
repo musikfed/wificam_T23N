@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+CONF=/etc/wificam/wificam.conf
+[ -f "$CONF" ] && . "$CONF"
+
+run_cfg() {
+    NAME="$1"
+    eval "CMD=\${$NAME:-}"
+    [ -n "$CMD" ] || {
+        echo "not-configured:$NAME"
+        exit 3
+    }
+    sh -c "$CMD"
+}
+
+case "${1:-}" in
+  start) run_cfg CAMERA_START_CMD ;;
+  stop) run_cfg CAMERA_STOP_CMD ;;
+  snapshot) run_cfg CAMERA_SNAPSHOT_CMD ;;
+  record-start) run_cfg RECORD_START_CMD ;;
+  record-stop) run_cfg RECORD_STOP_CMD ;;
+  status)
+    if pidof majestic >/dev/null 2>&1; then
+        echo "running:majestic"
+    else
+        echo "unknown"
+    fi
+    ;;
+  *) echo "Usage: $0 {start|stop|snapshot|record-start|record-stop|status}"; exit 2 ;;
+esac
