@@ -1,0 +1,21 @@
+#!/bin/sh
+
+case "${1:-start}" in
+  start)
+    # Disabled services consume no persistent userspace CPU because they are not started.
+    wificam-service-ctl boot
+    ;;
+  stop)
+    wificam-service-ctl stop amneziawg 2>/dev/null || true
+    wificam-service-ctl stop wireguard 2>/dev/null || true
+    wificam-service-ctl stop ssh 2>/dev/null || true
+    ;;
+  restart)
+    "$0" stop
+    "$0" start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 2
+    ;;
+esac
