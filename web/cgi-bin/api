@@ -7,6 +7,12 @@ WIFI_IFACE="${WIFI_IFACE:-wlan0}"
 WPA_CONF="${WPA_CONF:-/data/wpa_supplicant.conf}"
 WPA_BACKUP="${WPA_BACKUP:-/data/wpa_supplicant.conf.last-good}"
 RECORDINGS="${RECORDINGS:-/mnt/sdcard/recordings}"
+ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
+
+REQUEST_DATA=""
+if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
+    IFS= read -r REQUEST_DATA || true
+fi
 
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s///g; :a;N;$!ba;s/\n/\\n/g'
@@ -19,9 +25,7 @@ urldecode() {
 param() {
     key="$1"
     data="${QUERY_STRING:-}"
-    if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
-        IFS= read -r data || true
-    fi
+    [ -z "$REQUEST_DATA" ] || data="$data&$REQUEST_DATA"
     printf '%s' "$data" | tr '&' '\n' | while IFS='=' read -r k v; do
         [ "$k" = "$key" ] && { urldecode "$v"; break; }
     done
@@ -35,12 +39,12 @@ header() {
 
 ok() {
     header
-    echo "{"ok":true$1}"
+    printf '{"ok":true%s}\n' "$1"
 }
 
 fail() {
     header
-    echo "{"ok":false,"error":"$(json_escape "$1")"}"
+    printf '{"ok":false,"error":"%s"}\n' "$(json_escape "$1")"
     exit 0
 }
 
@@ -49,7 +53,7 @@ status() {
     kernel="$(uname -r 2>/dev/null || echo unknown)"
     uptime_s="$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)"
     ip="$(ip -4 addr show "$WIFI_IFACE" 2>/dev/null | awk '/inet /{print $2; exit}')"
-    ssid="$(iw dev "$WIFI_IFACE" link 2>/dev/null | sed -n 's/^\s*SSID: //p' | head -n1)"
+    ssid="$(iw dev "$WIFI_IFACE" link 2>/dev/null | sed -n 's/^[[:space:]]*SSID:[[:space:]]*//p' | head -n1)"
     signal="$(iw dev "$WIFI_IFACE" link 2>/dev/null | awk '/signal:/{print $2; exit}')"
     disk="$(df -k "$RECORDINGS" 2>/dev/null | awk 'NR==2{print $2","$3","$4","$5}')"
     header
@@ -58,7 +62,7 @@ status() {
 
 wifi_scan() {
     header
-    echo '{"ok":true,"networks":['
+    printf '{"ok":true,"networks":['
     first=1
     if command -v iw >/dev/null 2>&1; then
         iw dev "$WIFI_IFACE" scan 2>/dev/null |
@@ -74,7 +78,7 @@ wifi_scan() {
             printf '{"ssid":"%s","signal":"%s"}' "$(json_escape "$ss")" "$(json_escape "$sig")"
         done
     fi
-    echo ']}'
+    printf ']}\n'
 }
 
 wifi_apply() {
@@ -126,14 +130,13 @@ camera_action() {
     out="$(wificam-camera-ctl "$action" 2>&1)"
     rc=$?
     if [ "$rc" -eq 0 ]; then
-        ok ',"message":"'"$(json_escape "$out")"'"'
+        ok ",\"message\":\"$(json_escape "$out")\""
     else
         fail "$out"
     fi
 }
 
 op="$(param op)"
-[ -n "$op" ] || op="$(printf '%s' "${QUERY_STRING:-}" | sed -n 's/.*op=\([^&]*\).*/\1/p')"
 
 case "$op" in
   status) status ;;
@@ -145,6 +148,7 @@ case "$op" in
   record_start) camera_action record-start ;;
   record_stop) camera_action record-stop ;;
   reboot)
+    [ "$ALLOW_REBOOT" = "1" ] || fail "reboot disabled; set ALLOW_REBOOT=1 after enabling web authentication"
     ok ',"message":"rebooting"'
     (sleep 1; reboot) >/dev/null 2>&1 &
     ;;
