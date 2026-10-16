@@ -7,6 +7,7 @@ WIFI_IFACE="${WIFI_IFACE:-wlan0}"
 WPA_CONF="${WPA_CONF:-/data/wpa_supplicant.conf}"
 WPA_BACKUP="${WPA_BACKUP:-/data/wpa_supplicant.conf.last-good}"
 RECORDINGS="${RECORDINGS:-/mnt/sdcard/recordings}"
+CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
 
 REQUEST_DATA=""
@@ -48,6 +49,20 @@ fail() {
     exit 0
 }
 
+require_post() {
+    [ "${REQUEST_METHOD:-GET}" = "POST" ] || fail "POST required"
+}
+
+require_csrf() {
+    expected="$(cat "$CSRF_FILE" 2>/dev/null || true)"
+    supplied="$(param csrf)"
+    [ -n "$expected" ] && [ "$supplied" = "$expected" ] || fail "CSRF check failed"
+}
+
+require_auth() {
+    [ -n "${REMOTE_USER:-}" ] || fail "web authentication required"
+}
+
 status() {
     host="$(hostname 2>/dev/null || echo wificam)"
     kernel="$(uname -r 2>/dev/null || echo unknown)"
@@ -56,8 +71,9 @@ status() {
     ssid="$(iw dev "$WIFI_IFACE" link 2>/dev/null | sed -n 's/^[[:space:]]*SSID:[[:space:]]*//p' | head -n1)"
     signal="$(iw dev "$WIFI_IFACE" link 2>/dev/null | awk '/signal:/{print $2; exit}')"
     disk="$(df -k "$RECORDINGS" 2>/dev/null | awk 'NR==2{print $2","$3","$4","$5}')"
+    csrf="$(cat "$CSRF_FILE" 2>/dev/null || true)"
     header
-    printf '{"ok":true,"host":"%s","kernel":"%s","uptime":%s,"ip":"%s","ssid":"%s","signal":"%s","disk":"%s"}\n'       "$(json_escape "$host")" "$(json_escape "$kernel")" "$uptime_s"       "$(json_escape "$ip")" "$(json_escape "$ssid")" "$(json_escape "$signal")" "$(json_escape "$disk")"
+    printf '{"ok":true,"host":"%s","kernel":"%s","uptime":%s,"ip":"%s","ssid":"%s","signal":"%s","disk":"%s","csrf":"%s","user":"%s"}\n'       "$(json_escape "$host")" "$(json_escape "$kernel")" "$uptime_s"       "$(json_escape "$ip")" "$(json_escape "$ssid")" "$(json_escape "$signal")" "$(json_escape "$disk")"       "$(json_escape "$csrf")" "$(json_escape "${REMOTE_USER:-}")"
 }
 
 wifi_scan() {
@@ -82,6 +98,8 @@ wifi_scan() {
 }
 
 wifi_apply() {
+    require_post
+    require_csrf
     ssid="$(param ssid)"
     password="$(param password)"
     [ -n "$ssid" ] || fail "SSID is required"
@@ -126,6 +144,8 @@ storage() {
 }
 
 camera_action() {
+    require_post
+    require_csrf
     action="$1"
     out="$(wificam-camera-ctl "$action" 2>&1)"
     rc=$?
@@ -134,6 +154,17 @@ camera_action() {
     else
         fail "$out"
     fi
+}
+
+web_password() {
+    require_post
+    require_auth
+    require_csrf
+    password="$(param new_password)"
+    [ "${#password}" -ge 10 ] || fail "new web password must be at least 10 characters"
+    out="$(printf '%s' "$password" | wificam-set-web-password admin 2>&1)" || fail "$out"
+    ok ',"message":"web password changed; authentication will restart"'
+    (sleep 1; /etc/init.d/S90wificam restart) >/dev/null 2>&1 &
 }
 
 op="$(param op)"
@@ -147,8 +178,11 @@ case "$op" in
   camera_stop) camera_action stop ;;
   record_start) camera_action record-start ;;
   record_stop) camera_action record-stop ;;
+  web_password) web_password ;;
   reboot)
-    [ "$ALLOW_REBOOT" = "1" ] || fail "reboot disabled; set ALLOW_REBOOT=1 after enabling web authentication"
+    require_post
+    require_csrf
+    [ "$ALLOW_REBOOT" = "1" ] || fail "reboot disabled; set ALLOW_REBOOT=1 after validation"
     ok ',"message":"rebooting"'
     (sleep 1; reboot) >/dev/null 2>&1 &
     ;;
