@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+<rect width="1440" height="900" fill="#0f172a"/>
+<rect x="0" y="0" width="260" height="900" fill="#111827"/>
+<text x="34" y="62" fill="#ffffff" font-family="Arial" font-size="26" font-weight="700">WIFICAM T23N</text>
+<text x="34" y="105" fill="#94a3b8" font-family="Arial" font-size="14">Camera Control</text>
+<g font-family="Arial" font-size="18" fill="#cbd5e1">
+<text x="38" y="180">● Dashboard</text>
+<text x="38" y="235">◉ Live view</text>
+<text x="38" y="290">▣ Recording</text>
+<text x="38" y="345">◎ Image</text>
+<text x="38" y="400">≋ Network</text>
+<text x="65" y="440" fill="#ffffff">Wi‑Fi</text>
+<text x="38" y="495">▤ Storage / SD</text>
+<text x="38" y="550">⚙ System</text>
+<text x="38" y="605">⇧ Firmware update</text>
+<text x="38" y="660">⌁ Logs</text>
+</g>
+<rect x="290" y="35" width="1110" height="830" rx="18" fill="#f8fafc"/>
+<text x="330" y="90" fill="#0f172a" font-family="Arial" font-size="30" font-weight="700">Network / Wi‑Fi</text>
+<text x="330" y="122" fill="#64748b" font-family="Arial" font-size="15">Change wireless network without losing access to the camera</text>
+<rect x="330" y="160" width="1030" height="105" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="360" y="200" fill="#334155" font-family="Arial" font-size="14">CURRENT CONNECTION</text>
+<text x="360" y="235" fill="#0f172a" font-family="Arial" font-size="22" font-weight="700">HomeWiFi_5G</text>
+<text x="1050" y="220" fill="#166534" font-family="Arial" font-size="16" font-weight="700">Connected • -51 dBm</text>
+<text x="330" y="315" fill="#0f172a" font-family="Arial" font-size="20" font-weight="700">Available networks</text>
+<g font-family="Arial">
+<rect x="330" y="345" width="1030" height="80" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="360" y="380" fill="#0f172a" font-size="18" font-weight="700">Workshop</text><text x="360" y="405" fill="#64748b" font-size="14">WPA2 • -47 dBm</text>
+<rect x="330" y="440" width="1030" height="80" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="360" y="475" fill="#0f172a" font-size="18" font-weight="700">CameraLab</text><text x="360" y="500" fill="#64748b" font-size="14">WPA2/WPA3 • -63 dBm</text>
+</g>
+<text x="330" y="575" fill="#0f172a" font-family="Arial" font-size="20" font-weight="700">Connect to network</text>
+<text x="330" y="615" fill="#475569" font-family="Arial" font-size="15">SSID</text>
+<rect x="330" y="630" width="475" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="350" y="662" fill="#0f172a" font-family="Arial" font-size="16">Workshop</text>
+<text x="835" y="615" fill="#475569" font-family="Arial" font-size="15">Password</text>
+<rect x="835" y="630" width="525" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="855" y="662" fill="#0f172a" font-family="Arial" font-size="18">••••••••••••</text>
+<rect x="330" y="720" width="205" height="52" rx="10" fill="#2563eb"/>
+<text x="365" y="753" fill="#ffffff" font-family="Arial" font-size="16" font-weight="700">Test &amp; switch</text>
+<rect x="555" y="720" width="190" height="52" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="590" y="753" fill="#334155" font-family="Arial" font-size="16" font-weight="700">Recovery AP</text>
+<text x="330" y="820" fill="#64748b" font-family="Arial" font-size="14">New settings are committed only after successful association + DHCP. Failure triggers automatic rollback.</text>
+</svg>
