@@ -1,66 +1,63 @@
-# Wi-Fi architecture and network switching
-
-## Layers
+# Wi-Fi, IP and network service architecture
 
 ```text
 Web UI
   |
   v
-HTTP/JSON API
+CGI JSON API
   |
-  +--> Network service
-  |      |
-  |      +--> wpa_supplicant
-  |      +--> udhcpc/DHCP client
-  |      +--> wlan0
+  +--> wlan0 / wpa_supplicant / udhcpc
+  |        └--> SSID, IPv4, gateway, DNS
   |
-  +--> Camera service
-  +--> Storage service
-  +--> System/update service
+  +--> SSH              (on demand)
+  +--> WireGuard wg0    (on demand)
+  +--> AmneziaWG awg0   (on demand)
+  |
+  +--> Camera service   (OS managed)
+  +--> MEDIA storage
 ```
 
-The web UI must not edit `wpa_supplicant.conf` directly. It sends requests to the backend API. The backend validates the settings, tests them temporarily and persists them only after a successful connection.
+## Wi-Fi switching
 
-## Recommended Wi-Fi change flow
+1. Web UI scans SSIDs.
+2. User selects a network and enters its password.
+3. Backend builds a new `wpa_supplicant` profile.
+4. Association + DHCP are attempted.
+5. If IPv4 is obtained, keep the new profile.
+6. Otherwise restore `wpa_supplicant.conf.last-good`.
 
-1. Open **Network → Wi-Fi**.
-2. Scan available SSIDs.
-3. Select a network and enter its password.
-4. Backend creates a temporary profile.
-5. Camera attempts association.
-6. After DHCP, local connectivity is checked.
-7. On success, persist the new profile.
-8. On failure, roll back to the previous known-good network.
+Passwords are never returned in plaintext by the API.
 
-This avoids locking the user out because of a mistyped Wi-Fi password.
+## IP
 
-## API
+The Web UI displays current:
+
+- SSID;
+- IPv4/CIDR;
+- default gateway;
+- DNS.
+
+The current implementation uses DHCP. Static IP configuration can be added later with the same rollback-safe principle after the first successful SD boot.
+
+## SSH / WireGuard / AmneziaWG
+
+Main rule: **disabled means not started**.
+
+Marker files:
 
 ```text
-GET  /api/network/status
-GET  /api/network/wifi/scan
-POST /api/network/wifi/test
-POST /api/network/wifi/apply
-POST /api/network/wifi/rollback
-POST /api/network/ap/enable
+/data/services/ssh.enabled
+/data/services/wireguard.enabled
+/data/services/amneziawg.enabled
 ```
 
-Wi-Fi passwords must never be returned in plaintext by the API or written to normal web/server logs.
+Without a marker, `S91wificam-services` does not start that feature after reboot.
 
-## Recovery AP
-
-If the camera repeatedly fails to join its saved network, it can start a temporary recovery access point such as:
+VPN configs:
 
 ```text
-WIFICAM-T23N-XXXX
+/data/vpn/wg0.conf
+/data/vpn/awg0.conf
 ```
 
-The user can reconnect to the web UI and configure a new network.
-
-## Administrator password change
-
-```text
-POST /api/auth/password
-```
-
-The backend verifies the current password and the new password requirements, stores only a strong password hash, and invalidates previous web sessions.
+`wificam-service-ctl` performs the action and the Web UI accesses it through POST + CSRF.
