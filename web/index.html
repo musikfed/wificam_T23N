@@ -33,7 +33,7 @@
         <article><small data-i18n="model">Модель</small><strong>T23/T23N</strong><span>Ingenic XBurst</span></article>
         <article><small>Kernel</small><strong id="kernel">—</strong><span>Linux</span></article>
         <article><small>Wi‑Fi</small><strong id="ssid">—</strong><span id="ip">—</span></article>
-        <article><small>SD</small><strong id="diskUse">—</strong><span id="diskFree">—</span></article>
+        <article><small>MEDIA</small><strong id="diskUse">—</strong><span id="diskFree">—</span></article>
       </div>
       <div class="panel">
         <h2 data-i18n="architecture">Архитектура</h2>
@@ -41,15 +41,21 @@
       </div>
     </section>
 
-    <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2><div class="video">LIVE VIEW<br><small>RTSP/HLS endpoint will be connected after sensor/ISP userspace validation</small></div><div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div></div></section>
+    <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2><div class="video">LIVE VIEW<br><small data-i18n="cameraOsHint">Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.</small></div><div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div></div></section>
 
-    <section id="recording" class="page"><div class="panel"><h2 data-i18n="recording">Запись</h2><p>Recordings: <code>/mnt/sdcard/recordings</code></p><div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div></section>
+    <section id="recording" class="page"><div class="panel"><h2 data-i18n="recording">Запись</h2><p>Video: <code>/mnt/media/recordings</code></p><p>Photos: <code>/mnt/media/snapshots</code></p><div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div></section>
 
-    <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Параметры сенсора/ISP будут подключены через camera service.</p></div></section>
+    <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Web UI использует camera service, который ОС подняла при загрузке.</p></div></section>
 
     <section id="network" class="page">
       <div class="panel">
         <h2 data-i18n="network">Сеть / Wi‑Fi</h2>
+        <div class="kv">
+          <div><small>SSID</small><b id="netSsid">—</b></div>
+          <div><small>IPv4</small><b id="netIp">—</b></div>
+          <div><small data-i18n="gateway">Шлюз</small><b id="netGateway">—</b></div>
+          <div><small>DNS</small><b id="netDns">—</b></div>
+        </div>
         <p data-i18n="wifiSafe">Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.</p>
         <div class="actions"><button id="scanBtn" data-i18n="scan">Сканировать сети</button></div>
         <div id="networks" class="networks"></div>
@@ -59,12 +65,22 @@
           <button type="submit" data-i18n="testSwitch">Проверить и переключить</button>
         </form>
       </div>
+
+      <div class="panel">
+        <h2 data-i18n="optionalServices">Дополнительные сервисы</h2>
+        <p class="muted" data-i18n="servicesHint">Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.</p>
+        <div class="service-grid">
+          <article class="service-card"><div><h3>SSH</h3><p>Remote shell • TCP 22</p><span id="sshState" class="service-state">—</span></div><button id="sshToggle" onclick="toggleService('ssh')">—</button></article>
+          <article class="service-card"><div><h3>WireGuard</h3><p><code>/data/vpn/wg0.conf</code></p><span id="wireguardState" class="service-state">—</span></div><button id="wireguardToggle" onclick="toggleService('wireguard')">—</button></article>
+          <article class="service-card"><div><h3>AmneziaWG</h3><p><code>/data/vpn/awg0.conf</code></p><span id="amneziawgState" class="service-state">—</span></div><button id="amneziawgToggle" onclick="toggleService('amneziawg')">—</button></article>
+        </div>
+      </div>
     </section>
 
-    <section id="storage" class="page"><div class="panel"><h2 data-i18n="storage">SD-карта</h2><div id="storageInfo">—</div><button onclick="loadStorage()">Refresh</button></div></section>
+    <section id="storage" class="page"><div class="panel"><h2 data-i18n="storage">SD-карта</h2><p data-i18n="storageLayout">MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.</p><div id="storageInfo">—</div><button onclick="loadStorage()">Refresh</button></div></section>
 
     <section id="system" class="page">
-      <div class="panel"><h2 data-i18n="system">Система</h2><p>Uptime: <span id="uptime">—</span></p><p>Web user: <b id="webUser">—</b></p><button class="danger" id="rebootBtn" data-i18n="reboot">Перезагрузить</button></div>
+      <div class="panel"><h2 data-i18n="system">Система</h2><p>Camera: <b id="cameraState">—</b></p><p>Uptime: <span id="uptime">—</span></p><p>Web user: <b id="webUser">—</b></p><button class="danger" id="rebootBtn" data-i18n="reboot">Перезагрузить</button></div>
       <div class="panel"><h2 data-i18n="webPassword">Пароль администратора Web UI</h2><form id="webPasswordForm"><label><span data-i18n="newPassword">Новый пароль</span><input id="newWebPassword" type="password" minlength="10" required></label><label><span data-i18n="repeatPassword">Повторить пароль</span><input id="repeatWebPassword" type="password" minlength="10" required></label><button type="submit" data-i18n="changePassword">Сменить пароль</button></form><p class="muted" data-i18n="authHint">После смены пароля HTTP-аутентификация перезапустится.</p></div>
     </section>
 
