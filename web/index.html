@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WIFICAM T23N</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">WIFICAM <b>T23N</b></div>
+    <div class="sub">Ingenic camera control</div>
+    <nav id="nav">
+      <button data-page="dashboard" class="active">⌂ <span data-i18n="dashboard">Главная</span></button>
+      <button data-page="live">▶ <span data-i18n="live">Видео</span></button>
+      <button data-page="recording">● <span data-i18n="recording">Запись</span></button>
+      <button data-page="image">◫ <span data-i18n="image">Изображение</span></button>
+      <button data-page="network">≋ <span data-i18n="network">Сеть / Wi‑Fi</span></button>
+      <button data-page="storage">▤ <span data-i18n="storage">SD-карта</span></button>
+      <button data-page="system">⚙ <span data-i18n="system">Система</span></button>
+      <button data-page="firmware">⇧ <span data-i18n="firmware">Обновление</span></button>
+      <button data-page="logs">⌁ <span data-i18n="logs">Логи</span></button>
+    </nav>
+    <div class="lang"><button id="langBtn">RU / EN</button></div>
+  </aside>
+
+  <main>
+    <header><div><h1 id="pageTitle">Главная</h1><p id="pageHint">Состояние камеры</p></div><div id="online" class="pill">● …</div></header>
+
+    <section id="dashboard" class="page active">
+      <div class="grid cards">
+        <article><small data-i18n="model">Модель</small><strong>T23/T23N</strong><span>Ingenic XBurst</span></article>
+        <article><small>Kernel</small><strong id="kernel">—</strong><span>Linux</span></article>
+        <article><small>Wi‑Fi</small><strong id="ssid">—</strong><span id="ip">—</span></article>
+        <article><small>SD</small><strong id="diskUse">—</strong><span id="diskFree">—</span></article>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="architecture">Архитектура</h2>
+        <div class="flow"><b>Web UI</b><i>→</i><b>HTTP/JSON API</b><i>→</i><b>Camera / Network / Storage</b><i>→</i><b>Linux kernel</b></div>
+      </div>
+    </section>
+
+    <section id="live" class="page">
+      <div class="panel">
+        <h2 data-i18n="live">Видео</h2>
+        <div class="video">LIVE VIEW<br><small>RTSP/HLS endpoint will be connected after sensor/ISP userspace validation</small></div>
+        <div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div>
+      </div>
+    </section>
+
+    <section id="recording" class="page">
+      <div class="panel"><h2 data-i18n="recording">Запись</h2><p>Recordings: <code>/mnt/sdcard/recordings</code></p>
+      <div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div>
+    </section>
+
+    <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Параметры сенсора/ISP будут подключены через camera service.</p></div></section>
+
+    <section id="network" class="page">
+      <div class="panel">
+        <h2 data-i18n="network">Сеть / Wi‑Fi</h2>
+        <p data-i18n="wifiSafe">Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.</p>
+        <div class="actions"><button id="scanBtn" data-i18n="scan">Сканировать сети</button></div>
+        <div id="networks" class="networks"></div>
+        <form id="wifiForm">
+          <label>SSID<input id="wifiSsid" name="ssid" maxlength="32" required></label>
+          <label data-i18n="password">Пароль<input id="wifiPassword" name="password" type="password" minlength="8" required></label>
+          <button type="submit" data-i18n="testSwitch">Проверить и переключить</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="storage" class="page"><div class="panel"><h2 data-i18n="storage">SD-карта</h2><div id="storageInfo">—</div><button onclick="loadStorage()">Refresh</button></div></section>
+    <section id="system" class="page"><div class="panel"><h2 data-i18n="system">Система</h2><p>Uptime: <span id="uptime">—</span></p><button class="danger" id="rebootBtn" data-i18n="reboot">Перезагрузить</button></div></section>
+    <section id="firmware" class="page"><div class="panel"><h2 data-i18n="firmware">Обновление</h2><p data-i18n="fwHint">Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.</p></div></section>
+    <section id="logs" class="page"><div class="panel"><h2 data-i18n="logs">Логи</h2><pre id="logBox">UI ready.</pre></div></section>
+
+    <div id="toast"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
