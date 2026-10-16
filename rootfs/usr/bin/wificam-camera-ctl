@@ -7,24 +7,62 @@ CONF=/etc/wificam/wificam.conf
 run_cfg() {
     NAME="$1"
     eval "CMD=\${$NAME:-}"
-    [ -n "$CMD" ] || {
-        echo "not-configured:$NAME"
-        exit 3
-    }
+    [ -n "$CMD" ] || return 3
     sh -c "$CMD"
 }
 
+camera_running() {
+    for proc in majestic camera-daemon impstreamer; do
+        pidof "$proc" >/dev/null 2>&1 && return 0
+    done
+    return 1
+}
+
+os_camera_service() {
+    for svc in /etc/init.d/S95majestic /etc/init.d/majestic /etc/init.d/S95camera /etc/init.d/camera; do
+        [ -x "$svc" ] && { echo "$svc"; return 0; }
+    done
+    return 1
+}
+
+start_camera() {
+    if run_cfg CAMERA_START_CMD; then
+        return 0
+    fi
+    camera_running && { echo "already-running"; return 0; }
+    svc="$(os_camera_service 2>/dev/null || true)"
+    [ -n "$svc" ] || { echo "OS camera service hook not found; camera discovery remains owned by the OS"; return 3; }
+    "$svc" start
+}
+
+stop_camera() {
+    if run_cfg CAMERA_STOP_CMD; then
+        return 0
+    fi
+    svc="$(os_camera_service 2>/dev/null || true)"
+    [ -n "$svc" ] || { echo "OS camera service hook not found"; return 3; }
+    "$svc" stop
+}
+
 case "${1:-}" in
-  start) run_cfg CAMERA_START_CMD ;;
-  stop) run_cfg CAMERA_STOP_CMD ;;
-  snapshot) run_cfg CAMERA_SNAPSHOT_CMD ;;
-  record-start) run_cfg RECORD_START_CMD ;;
-  record-stop) run_cfg RECORD_STOP_CMD ;;
+  start) start_camera ;;
+  stop) stop_camera ;;
+  snapshot)
+    run_cfg CAMERA_SNAPSHOT_CMD || { echo "snapshot hook not exposed by OS camera service"; exit 3; }
+    ;;
+  record-start)
+    run_cfg RECORD_START_CMD || { echo "record-start hook not exposed by OS camera service"; exit 3; }
+    ;;
+  record-stop)
+    run_cfg RECORD_STOP_CMD || { echo "record-stop hook not exposed by OS camera service"; exit 3; }
+    ;;
   status)
-    if pidof majestic >/dev/null 2>&1; then
-        echo "running:majestic"
+    if camera_running; then
+        echo "running"
+    elif os_camera_service >/dev/null 2>&1; then
+        echo "service-present"
     else
-        echo "unknown"
+        echo "os-managed"
     fi
     ;;
   *) echo "Usage: $0 {start|stop|snapshot|record-start|record-stop|status}"; exit 2 ;;
