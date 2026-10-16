@@ -2,8 +2,9 @@
 set -eu
 
 usage() {
-    echo "Usage: sudo $0 /dev/sdX --yes [uImage] [rootfs-overlay.tar.gz]"
+    echo "Usage: sudo $0 /dev/sdX --yes [uImage] [FULL-rootfs.tar.gz]"
     echo "DESTROYS ALL DATA on the selected device."
+    echo "The rootfs archive must be a COMPLETE bootable userspace, not only the WIFICAM overlay."
     exit 2
 }
 
@@ -76,6 +77,11 @@ if [ -n "$ROOTFS_TAR" ]; then
     [ -f "$ROOTFS_TAR" ] || { echo "rootfs archive not found: $ROOTFS_TAR" >&2; exit 1; }
     mount "$(part 2)" "$MNT"
     tar -C "$MNT" -xzf "$ROOTFS_TAR"
+    [ -x "$MNT/bin/sh" ] || {
+        umount "$MNT"
+        echo "REFUSING: archive does not look like a complete rootfs (/bin/sh missing)" >&2
+        exit 1
+    }
     sync
     umount "$MNT"
 fi
