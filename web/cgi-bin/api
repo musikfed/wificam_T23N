@@ -6,7 +6,7 @@ CONF=/etc/wificam/wificam.conf
 WIFI_IFACE="${WIFI_IFACE:-wlan0}"
 WPA_CONF="${WPA_CONF:-/data/wpa_supplicant.conf}"
 WPA_BACKUP="${WPA_BACKUP:-/data/wpa_supplicant.conf.last-good}"
-RECORDINGS="${RECORDINGS:-/mnt/sdcard/recordings}"
+RECORDINGS="${RECORDINGS:-/mnt/media/recordings}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
 
@@ -67,13 +67,16 @@ status() {
     host="$(hostname 2>/dev/null || echo wificam)"
     kernel="$(uname -r 2>/dev/null || echo unknown)"
     uptime_s="$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)"
-    ip="$(ip -4 addr show "$WIFI_IFACE" 2>/dev/null | awk '/inet /{print $2; exit}')"
+    ip_addr="$(ip -4 addr show "$WIFI_IFACE" 2>/dev/null | awk '/inet /{print $2; exit}')"
+    gateway="$(ip route 2>/dev/null | awk '/^default /{print $3; exit}')"
+    dns="$(awk '/^nameserver /{print $2; exit}' /etc/resolv.conf 2>/dev/null || true)"
     ssid="$(iw dev "$WIFI_IFACE" link 2>/dev/null | sed -n 's/^[[:space:]]*SSID:[[:space:]]*//p' | head -n1)"
     signal="$(iw dev "$WIFI_IFACE" link 2>/dev/null | awk '/signal:/{print $2; exit}')"
     disk="$(df -k "$RECORDINGS" 2>/dev/null | awk 'NR==2{print $2","$3","$4","$5}')"
     csrf="$(cat "$CSRF_FILE" 2>/dev/null || true)"
+    camera="$(wificam-camera-ctl status 2>/dev/null || echo unknown)"
     header
-    printf '{"ok":true,"host":"%s","kernel":"%s","uptime":%s,"ip":"%s","ssid":"%s","signal":"%s","disk":"%s","csrf":"%s","user":"%s"}\n'       "$(json_escape "$host")" "$(json_escape "$kernel")" "$uptime_s"       "$(json_escape "$ip")" "$(json_escape "$ssid")" "$(json_escape "$signal")" "$(json_escape "$disk")"       "$(json_escape "$csrf")" "$(json_escape "${REMOTE_USER:-}")"
+    printf '{"ok":true,"host":"%s","kernel":"%s","uptime":%s,"ip":"%s","gateway":"%s","dns":"%s","ssid":"%s","signal":"%s","disk":"%s","camera":"%s","csrf":"%s","user":"%s"}\n'       "$(json_escape "$host")" "$(json_escape "$kernel")" "$uptime_s"       "$(json_escape "$ip_addr")" "$(json_escape "$gateway")" "$(json_escape "$dns")"       "$(json_escape "$ssid")" "$(json_escape "$signal")" "$(json_escape "$disk")"       "$(json_escape "$camera")" "$(json_escape "$csrf")" "$(json_escape "${REMOTE_USER:-}")"
 }
 
 wifi_scan() {
@@ -143,6 +146,48 @@ storage() {
     printf '{"ok":true,"total_kb":%s,"used_kb":%s,"free_kb":%s,"use":"%s","path":"%s"}\n'       "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0%}" "$(json_escape "$RECORDINGS")"
 }
 
+service_status_one() {
+    svc="$1"
+    raw="$(wificam-service-ctl status "$svc" 2>/dev/null || echo 'unavailable enabled=0')"
+    state="$(printf '%s' "$raw" | awk '{print $1}')"
+    enabled="$(printf '%s' "$raw" | sed -n 's/.*enabled=\([01]\).*/\1/p')"
+    [ -n "$enabled" ] || enabled=0
+    printf '"%s":{"state":"%s","enabled":%s}' "$svc" "$(json_escape "$state")" "$enabled"
+}
+
+services() {
+    header
+    printf '{"ok":true,"services":{'
+    service_status_one ssh
+    printf ','
+    service_status_one wireguard
+    printf ','
+    service_status_one amneziawg
+    printf '}}\n'
+}
+
+service_toggle() {
+    require_post
+    require_csrf
+    svc="$(param service)"
+    enabled="$(param enabled)"
+    case "$svc" in
+      ssh|wireguard|amneziawg) ;;
+      *) fail "unknown service" ;;
+    esac
+    case "$enabled" in
+      1)
+        out="$(wificam-service-ctl enable "$svc" 2>&1)" || fail "$out"
+        ok ',"message":"service enabled"'
+        ;;
+      0)
+        out="$(wificam-service-ctl disable "$svc" 2>&1)" || fail "$out"
+        ok ',"message":"service disabled"'
+        ;;
+      *) fail "enabled must be 0 or 1" ;;
+    esac
+}
+
 camera_action() {
     require_post
     require_csrf
@@ -174,6 +219,8 @@ case "$op" in
   wifi_scan) wifi_scan ;;
   wifi_apply) wifi_apply ;;
   storage) storage ;;
+  services) services ;;
+  service_toggle) service_toggle ;;
   camera_start) camera_action start ;;
   camera_stop) camera_action stop ;;
   record_start) camera_action record-start ;;
