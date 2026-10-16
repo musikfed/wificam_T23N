@@ -1,36 +1,36 @@
 # Web UI и API — русский
 
-Это минимальный рабочий каркас web-интерфейса для T23/T23N.
+Минимальный embedded web-стек для T23/T23N:
 
-## Что входит
+```text
+BusyBox httpd
+  └─ HTML/CSS/JS
+      └─ CGI JSON API
+          ├─ Wi-Fi/IP
+          ├─ Camera service
+          ├─ MEDIA storage
+          └─ SSH/WireGuard/AmneziaWG toggles
+```
+
+## Файлы
 
 ```text
 web/index.html
 web/styles.css
 web/app.js
 web/cgi-bin/api
+
 rootfs/etc/init.d/S90wificam
+rootfs/etc/init.d/S91wificam-services
 rootfs/etc/wificam/wificam.conf
 rootfs/usr/bin/wificam-camera-ctl
+rootfs/usr/bin/wificam-service-ctl
 rootfs/usr/bin/wificam-set-web-password
-scripts/build_kernel.sh
-scripts/package_rootfs_overlay.sh
-scripts/prepare_sd.sh
-scripts/build_all.sh
 ```
 
-## Запуск Web UI
+## Камера
 
-По умолчанию интерфейс **не стартует без пароля**. После загрузки по UART/console:
-
-```sh
-printf '%s' 'МОЙ_НОВЫЙ_ПАРОЛЬ' | wificam-set-web-password admin
-/etc/init.d/S90wificam start
-```
-
-BusyBox `httpd` запускается с `/data/httpd.conf`. После этого браузер запросит Basic Auth пользователя `admin`.
-
-Для разового лабораторного теста можно установить `ALLOW_UNAUTHENTICATED_WEB=1`, но это не рекомендуется.
+Определение сенсора выполняет ОС при загрузке. `wificam-camera-ctl` не определяет модель сенсора; он только использует уже поднятый системный camera service либо его init hook.
 
 ## API
 
@@ -39,6 +39,8 @@ GET  /cgi-bin/api?op=status
 GET  /cgi-bin/api?op=wifi_scan
 POST /cgi-bin/api?op=wifi_apply
 GET  /cgi-bin/api?op=storage
+GET  /cgi-bin/api?op=services
+POST /cgi-bin/api?op=service_toggle
 POST /cgi-bin/api?op=camera_start
 POST /cgi-bin/api?op=camera_stop
 POST /cgi-bin/api?op=record_start
@@ -47,20 +49,19 @@ POST /cgi-bin/api?op=web_password
 POST /cgi-bin/api?op=reboot
 ```
 
-Все изменяющие POST-запросы используют per-boot CSRF token, который UI получает из `status`.
+Изменяющие операции используют POST + per-boot CSRF token.
 
-## Wi‑Fi
+## Web password
 
-Новая сеть сначала записывается во временно применяемый профиль. После запуска `wpa_supplicant` выполняется DHCP. Если IPv4 не получен, backend возвращает `wpa_supplicant.conf.last-good`.
+По умолчанию Web UI не стартует без пароля:
 
-`wpa_passphrase` используется для получения PSK; строка-комментарий с исходным паролем удаляется перед сохранением.
+```sh
+printf '%s' 'МОЙ_НОВЫЙ_ПАРОЛЬ' | wificam-set-web-password admin
+/etc/init.d/S90wificam start
+```
 
-## Камера и ISP
+## Дополнительные сервисы
 
-`wificam-camera-ctl` — слой между web API и конкретным camera userspace. Команды сенсора/ISP/encoder задаются в `/etc/wificam/wificam.conf` после определения точного сенсора.
+SSH, WireGuard и AmneziaWG выключены по умолчанию. Web UI может включить их сейчас и оставить marker для следующей загрузки. При выключении процесс/интерфейс останавливается.
 
-## Пароль Web UI
-
-В меню **Система** можно сменить пароль администратора. Операция разрешается только уже аутентифицированному пользователю и после CSRF-проверки. После изменения `httpd` перезапускается.
-
-Текущая защита BusyBox Basic Auth/MD5-crypt предназначена для локальной сети камеры. Для публикации устройства в Интернет потребуется более современный auth/session backend, TLS и полноценная hardening-модель.
+Это рассчитано на локальную сеть камеры. Публичный Интернет требует дополнительного TLS/auth hardening.
