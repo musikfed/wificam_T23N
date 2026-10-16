@@ -41,18 +41,9 @@
       </div>
     </section>
 
-    <section id="live" class="page">
-      <div class="panel">
-        <h2 data-i18n="live">Видео</h2>
-        <div class="video">LIVE VIEW<br><small>RTSP/HLS endpoint will be connected after sensor/ISP userspace validation</small></div>
-        <div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div>
-      </div>
-    </section>
+    <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2><div class="video">LIVE VIEW<br><small>RTSP/HLS endpoint will be connected after sensor/ISP userspace validation</small></div><div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div></div></section>
 
-    <section id="recording" class="page">
-      <div class="panel"><h2 data-i18n="recording">Запись</h2><p>Recordings: <code>/mnt/sdcard/recordings</code></p>
-      <div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div>
-    </section>
+    <section id="recording" class="page"><div class="panel"><h2 data-i18n="recording">Запись</h2><p>Recordings: <code>/mnt/sdcard/recordings</code></p><div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div></section>
 
     <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Параметры сенсора/ISP будут подключены через camera service.</p></div></section>
 
@@ -64,14 +55,19 @@
         <div id="networks" class="networks"></div>
         <form id="wifiForm">
           <label>SSID<input id="wifiSsid" name="ssid" maxlength="32" required></label>
-          <label data-i18n="password">Пароль<input id="wifiPassword" name="password" type="password" minlength="8" required></label>
+          <label><span data-i18n="password">Пароль</span><input id="wifiPassword" name="password" type="password" minlength="8" required></label>
           <button type="submit" data-i18n="testSwitch">Проверить и переключить</button>
         </form>
       </div>
     </section>
 
     <section id="storage" class="page"><div class="panel"><h2 data-i18n="storage">SD-карта</h2><div id="storageInfo">—</div><button onclick="loadStorage()">Refresh</button></div></section>
-    <section id="system" class="page"><div class="panel"><h2 data-i18n="system">Система</h2><p>Uptime: <span id="uptime">—</span></p><button class="danger" id="rebootBtn" data-i18n="reboot">Перезагрузить</button></div></section>
+
+    <section id="system" class="page">
+      <div class="panel"><h2 data-i18n="system">Система</h2><p>Uptime: <span id="uptime">—</span></p><p>Web user: <b id="webUser">—</b></p><button class="danger" id="rebootBtn" data-i18n="reboot">Перезагрузить</button></div>
+      <div class="panel"><h2 data-i18n="webPassword">Пароль администратора Web UI</h2><form id="webPasswordForm"><label><span data-i18n="newPassword">Новый пароль</span><input id="newWebPassword" type="password" minlength="10" required></label><label><span data-i18n="repeatPassword">Повторить пароль</span><input id="repeatWebPassword" type="password" minlength="10" required></label><button type="submit" data-i18n="changePassword">Сменить пароль</button></form><p class="muted" data-i18n="authHint">После смены пароля HTTP-аутентификация перезапустится.</p></div>
+    </section>
+
     <section id="firmware" class="page"><div class="panel"><h2 data-i18n="firmware">Обновление</h2><p data-i18n="fwHint">Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.</p></div></section>
     <section id="logs" class="page"><div class="panel"><h2 data-i18n="logs">Логи</h2><pre id="logBox">UI ready.</pre></div></section>
 
