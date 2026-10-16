@@ -1,0 +1,190 @@
+#!/bin/sh
+set -eu
+
+CONF=/etc/wificam/wificam.conf
+[ -f "$CONF" ] && . "$CONF"
+
+STATE_DIR="${SERVICE_STATE_DIR:-/data/services}"
+VPN_DIR="${VPN_DIR:-/data/vpn}"
+SSH_PORT="${SSH_PORT:-22}"
+WG_CONF="${WIREGUARD_CONF:-$VPN_DIR/wg0.conf}"
+AWG_CONF="${AMNEZIAWG_CONF:-$VPN_DIR/awg0.conf}"
+
+mkdir -p "$STATE_DIR" "$VPN_DIR"
+
+enabled_file() {
+    printf '%s/%s.enabled\n' "$STATE_DIR" "$1"
+}
+
+is_enabled() {
+    [ -f "$(enabled_file "$1")" ]
+}
+
+iface_up() {
+    ip link show "$1" >/dev/null 2>&1
+}
+
+ssh_status() {
+    if pidof dropbear >/dev/null 2>&1 || pidof sshd >/dev/null 2>&1; then
+        echo running
+    elif command -v dropbear >/dev/null 2>&1 || command -v sshd >/dev/null 2>&1; then
+        echo stopped
+    else
+        echo unavailable
+    fi
+}
+
+wg_status() {
+    if iface_up wg0; then
+        echo running
+    elif command -v wg >/dev/null 2>&1 || command -v wg-quick >/dev/null 2>&1; then
+        echo stopped
+    else
+        echo unavailable
+    fi
+}
+
+awg_status() {
+    if iface_up awg0; then
+        echo running
+    elif command -v awg >/dev/null 2>&1 || command -v awg-quick >/dev/null 2>&1; then
+        echo stopped
+    else
+        echo unavailable
+    fi
+}
+
+start_ssh() {
+    [ "$(ssh_status)" = running ] && return 0
+    if [ -n "${SSH_START_CMD:-}" ]; then
+        sh -c "$SSH_START_CMD"
+    elif command -v dropbear >/dev/null 2>&1; then
+        dropbear -R -p "$SSH_PORT"
+    elif command -v sshd >/dev/null 2>&1; then
+        sshd
+    else
+        echo "SSH server is not installed" >&2
+        return 3
+    fi
+}
+
+stop_ssh() {
+    if [ -n "${SSH_STOP_CMD:-}" ]; then
+        sh -c "$SSH_STOP_CMD"
+    else
+        killall dropbear 2>/dev/null || true
+        killall sshd 2>/dev/null || true
+    fi
+}
+
+start_wg() {
+    [ "$(wg_status)" = running ] && return 0
+    [ -f "$WG_CONF" ] || { echo "WireGuard config missing: $WG_CONF" >&2; return 4; }
+    if [ -n "${WIREGUARD_START_CMD:-}" ]; then
+        sh -c "$WIREGUARD_START_CMD"
+    elif command -v wg-quick >/dev/null 2>&1; then
+        wg-quick up "$WG_CONF"
+    else
+        echo "wg-quick is not installed; configure WIREGUARD_START_CMD" >&2
+        return 3
+    fi
+}
+
+stop_wg() {
+    if [ -n "${WIREGUARD_STOP_CMD:-}" ]; then
+        sh -c "$WIREGUARD_STOP_CMD"
+    elif command -v wg-quick >/dev/null 2>&1 && [ -f "$WG_CONF" ]; then
+        wg-quick down "$WG_CONF" 2>/dev/null || true
+    else
+        ip link delete wg0 2>/dev/null || true
+    fi
+}
+
+start_awg() {
+    [ "$(awg_status)" = running ] && return 0
+    [ -f "$AWG_CONF" ] || { echo "AmneziaWG config missing: $AWG_CONF" >&2; return 4; }
+    if [ -n "${AMNEZIAWG_START_CMD:-}" ]; then
+        sh -c "$AMNEZIAWG_START_CMD"
+    elif command -v awg-quick >/dev/null 2>&1; then
+        awg-quick up "$AWG_CONF"
+    else
+        echo "awg-quick is not installed; configure AMNEZIAWG_START_CMD" >&2
+        return 3
+    fi
+}
+
+stop_awg() {
+    if [ -n "${AMNEZIAWG_STOP_CMD:-}" ]; then
+        sh -c "$AMNEZIAWG_STOP_CMD"
+    elif command -v awg-quick >/dev/null 2>&1 && [ -f "$AWG_CONF" ]; then
+        awg-quick down "$AWG_CONF" 2>/dev/null || true
+    else
+        ip link delete awg0 2>/dev/null || true
+    fi
+}
+
+status_one() {
+    case "$1" in
+      ssh) ssh_status ;;
+      wireguard) wg_status ;;
+      amneziawg) awg_status ;;
+      *) echo unknown ;;
+    esac
+}
+
+start_one() {
+    case "$1" in
+      ssh) start_ssh ;;
+      wireguard) start_wg ;;
+      amneziawg) start_awg ;;
+      *) echo "unknown service: $1" >&2; return 2 ;;
+    esac
+}
+
+stop_one() {
+    case "$1" in
+      ssh) stop_ssh ;;
+      wireguard) stop_wg ;;
+      amneziawg) stop_awg ;;
+      *) echo "unknown service: $1" >&2; return 2 ;;
+    esac
+}
+
+boot_enabled() {
+    for svc in ssh wireguard amneziawg; do
+        if is_enabled "$svc"; then
+            start_one "$svc" || echo "failed to start enabled service: $svc" >&2
+        fi
+    done
+}
+
+cmd="${1:-}"
+svc="${2:-}"
+
+case "$cmd" in
+  status)
+    [ -n "$svc" ] || { echo "service name required" >&2; exit 2; }
+    printf '%s enabled=%s\n' "$(status_one "$svc")" "$(is_enabled "$svc" && echo 1 || echo 0)"
+    ;;
+  start)
+    start_one "$svc"
+    ;;
+  stop)
+    stop_one "$svc"
+    ;;
+  enable)
+    start_one "$svc"
+    : > "$(enabled_file "$svc")"
+    ;;
+  disable)
+    stop_one "$svc"
+    rm -f "$(enabled_file "$svc")"
+    ;;
+  boot)
+    boot_enabled
+    ;;
+  *)
+    echo "Usage: $0 {status|start|stop|enable|disable|boot} {ssh|wireguard|amneziawg}" >&2
+    exit 2
+    ;;
+esac
