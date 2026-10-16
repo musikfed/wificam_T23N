@@ -1,0 +1,35 @@
+#!/bin/sh
+
+WEBROOT=/usr/share/wificam-web
+PIDFILE=/var/run/wificam-httpd.pid
+LOG=/var/log/wificam-httpd.log
+
+start() {
+    mkdir -p /var/run /var/log /mnt/sdcard /data
+    mountpoint -q /mnt/sdcard 2>/dev/null || mount -L RECORDINGS /mnt/sdcard 2>/dev/null || true
+    mountpoint -q /data 2>/dev/null || mount -L DATA /data 2>/dev/null || true
+
+    [ -x "$WEBROOT/cgi-bin/api" ] || chmod 0755 "$WEBROOT/cgi-bin/api" 2>/dev/null || true
+
+    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        return 0
+    fi
+
+    echo "Starting WIFICAM web interface..."
+    httpd -f -p 80 -h "$WEBROOT" >>"$LOG" 2>&1 &
+    echo $! > "$PIDFILE"
+}
+
+stop() {
+    if [ -f "$PIDFILE" ]; then
+        kill "$(cat "$PIDFILE")" 2>/dev/null || true
+        rm -f "$PIDFILE"
+    fi
+}
+
+case "${1:-start}" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop; sleep 1; start ;;
+  *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
+esac
