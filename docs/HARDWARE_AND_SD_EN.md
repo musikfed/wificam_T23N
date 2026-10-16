@@ -2,32 +2,21 @@
 
 ## Target hardware
 
-This build targets cameras based on the **Ingenic T23/T23N** SoC family using MIPS/XBurst and Linux 3.10.x.
+This build targets **Ingenic T23/T23N** cameras using MIPS/XBurst and Linux 3.10.x.
 
-At this stage only the kernel build itself is confirmed. A particular board is considered compatible only after checking:
-
-- SoC marking;
-- RAM type and size;
-- SPI NOR/NAND flash;
-- UART boot log;
-- image sensor;
-- Wi-Fi chipset;
-- GPIO/reset/power-enable wiring;
-- U-Boot boot path.
+A board is finally validated only after UART/U-Boot boot testing plus RAM, flash, Wi-Fi and GPIO checks. Sensor identification is not a manual Web UI step: the OS drivers/camera userspace should discover and initialize the camera during boot.
 
 ## Before removing or disabling SPI flash
 
-Prefer a reversible UART + SD test first.
+Prefer reversible UART/SD boot first.
 
-1. Read a full dump of the original flash.
-2. Store multiple copies and SHA-256 hashes.
-3. Record the exact flash part number and supply voltage.
-4. Save U-Boot `printenv` and the complete boot log.
-5. Do not erase or overwrite the factory flash before SD boot works.
+1. Dump the original flash.
+2. Store copies and SHA-256 hashes.
+3. Record flash marking and voltage.
+4. Save U-Boot `printenv` and boot log.
+5. Do not erase factory flash until SD/RAM boot succeeds.
 
-Physically removing the flash chip should be treated as a diagnostic option only when the board cannot select an alternate boot source in another way. After removal, verify whether BootROM/U-Boot falls back to SD. Without the board schematic this must not be assumed.
-
-## U-Boot information to collect
+## U-Boot
 
 ```text
 version
@@ -40,17 +29,27 @@ help ext4load
 help bootm
 ```
 
-## Proposed SD layout
+## Current SD layout
 
 | Partition | Size | FS | Purpose |
 |---|---:|---|---|
-| p1 BOOT | 128 MiB | FAT32 | uImage, boot config |
-| p2 ROOTFS | 1 GiB | ext4 | Linux root filesystem |
-| p3 DATA | 256 MiB | ext4 | settings, update, persistent data |
-| p4 RECORDINGS | remaining | ext4 | video, events, snapshots |
+| p1 BOOT | 128 MiB | FAT32 | `uImage`, boot files |
+| p2 ROOTFS | all remaining space | ext4 | Linux, applications, settings, VPN, SSH, logs |
+| p3 MEDIA | 20 GiB | ext4 | camera video, photos and events |
 
-Actual offsets and boot arguments must be derived from the camera's own U-Boot environment.
+`scripts/prepare_sd.sh` computes ROOTFS automatically from card size minus BOOT, 20 GiB MEDIA and a small alignment reserve.
+
+MEDIA:
+
+```text
+/mnt/media/
+├── recordings/
+├── snapshots/
+└── events/
+```
+
+Wi-Fi, web authentication, VPN configs and service marker files live under `/data` inside the large ROOTFS.
 
 ## First boot
 
-The first test should load `uImage` from SD into RAM and execute `bootm` without modifying the original flash.
+Load `uImage` from SD into RAM and execute `bootm` without modifying the factory flash.
