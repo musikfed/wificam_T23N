@@ -1,0 +1,152 @@
+#!/bin/sh
+set -u
+
+CONF=/etc/wificam/wificam.conf
+[ -f "$CONF" ] && . "$CONF"
+WIFI_IFACE="${WIFI_IFACE:-wlan0}"
+WPA_CONF="${WPA_CONF:-/data/wpa_supplicant.conf}"
+WPA_BACKUP="${WPA_BACKUP:-/data/wpa_supplicant.conf.last-good}"
+RECORDINGS="${RECORDINGS:-/mnt/sdcard/recordings}"
+
+json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s///g; :a;N;$!ba;s/\n/\\n/g'
+}
+
+urldecode() {
+    printf '%b' "$(printf '%s' "$1" | sed 's/+/ /g; s/%/\\x/g')"
+}
+
+param() {
+    key="$1"
+    data="${QUERY_STRING:-}"
+    if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
+        IFS= read -r data || true
+    fi
+    printf '%s' "$data" | tr '&' '\n' | while IFS='=' read -r k v; do
+        [ "$k" = "$key" ] && { urldecode "$v"; break; }
+    done
+}
+
+header() {
+    echo "Content-Type: application/json; charset=utf-8"
+    echo "Cache-Control: no-store"
+    echo
+}
+
+ok() {
+    header
+    echo "{"ok":true$1}"
+}
+
+fail() {
+    header
+    echo "{"ok":false,"error":"$(json_escape "$1")"}"
+    exit 0
+}
+
+status() {
+    host="$(hostname 2>/dev/null || echo wificam)"
+    kernel="$(uname -r 2>/dev/null || echo unknown)"
+    uptime_s="$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)"
+    ip="$(ip -4 addr show "$WIFI_IFACE" 2>/dev/null | awk '/inet /{print $2; exit}')"
+    ssid="$(iw dev "$WIFI_IFACE" link 2>/dev/null | sed -n 's/^\s*SSID: //p' | head -n1)"
+    signal="$(iw dev "$WIFI_IFACE" link 2>/dev/null | awk '/signal:/{print $2; exit}')"
+    disk="$(df -k "$RECORDINGS" 2>/dev/null | awk 'NR==2{print $2","$3","$4","$5}')"
+    header
+    printf '{"ok":true,"host":"%s","kernel":"%s","uptime":%s,"ip":"%s","ssid":"%s","signal":"%s","disk":"%s"}\n'       "$(json_escape "$host")" "$(json_escape "$kernel")" "$uptime_s"       "$(json_escape "$ip")" "$(json_escape "$ssid")" "$(json_escape "$signal")" "$(json_escape "$disk")"
+}
+
+wifi_scan() {
+    header
+    echo '{"ok":true,"networks":['
+    first=1
+    if command -v iw >/dev/null 2>&1; then
+        iw dev "$WIFI_IFACE" scan 2>/dev/null |
+        awk '
+          /^BSS / { if (ssid!="") print ssid "|" sig; ssid=""; sig="" }
+          /^[[:space:]]*SSID:/ { sub(/^[[:space:]]*SSID:[[:space:]]*/, ""); ssid=$0 }
+          /^[[:space:]]*signal:/ { sig=$2 }
+          END { if (ssid!="") print ssid "|" sig }
+        ' | sort -u | while IFS='|' read -r ss sig; do
+            [ -n "$ss" ] || continue
+            [ "$first" -eq 1 ] || printf ','
+            first=0
+            printf '{"ssid":"%s","signal":"%s"}' "$(json_escape "$ss")" "$(json_escape "$sig")"
+        done
+    fi
+    echo ']}'
+}
+
+wifi_apply() {
+    ssid="$(param ssid)"
+    password="$(param password)"
+    [ -n "$ssid" ] || fail "SSID is required"
+    [ "${#ssid}" -le 32 ] || fail "SSID is too long"
+    [ "${#password}" -ge 8 ] || fail "Wi-Fi password must be at least 8 characters"
+    command -v wpa_passphrase >/dev/null 2>&1 || fail "wpa_passphrase is not installed"
+
+    mkdir -p "$(dirname "$WPA_CONF")"
+    [ -f "$WPA_CONF" ] && cp "$WPA_CONF" "$WPA_BACKUP"
+
+    tmp="/tmp/wificam-wpa.$$"
+    wpa_passphrase "$ssid" "$password" | sed '/^[[:space:]]*#psk=/d' > "$tmp" || fail "cannot create Wi-Fi profile"
+    chmod 600 "$tmp"
+    mv "$tmp" "$WPA_CONF"
+
+    killall wpa_supplicant 2>/dev/null || true
+    wpa_supplicant -B -i "$WIFI_IFACE" -c "$WPA_CONF" >/tmp/wificam-wpa.log 2>&1 || true
+    killall udhcpc 2>/dev/null || true
+    udhcpc -i "$WIFI_IFACE" -q -n -t 5 >/tmp/wificam-dhcp.log 2>&1 || true
+
+    sleep 2
+    if ip -4 addr show "$WIFI_IFACE" 2>/dev/null | grep -q 'inet '; then
+        ok ',"message":"Wi-Fi profile applied"'
+        exit 0
+    fi
+
+    if [ -f "$WPA_BACKUP" ]; then
+        cp "$WPA_BACKUP" "$WPA_CONF"
+        killall wpa_supplicant 2>/dev/null || true
+        wpa_supplicant -B -i "$WIFI_IFACE" -c "$WPA_CONF" >/tmp/wificam-wpa.log 2>&1 || true
+        udhcpc -i "$WIFI_IFACE" -q -n -t 5 >/tmp/wificam-dhcp.log 2>&1 || true
+    fi
+    fail "new network failed; rolled back to last known profile"
+}
+
+storage() {
+    mkdir -p "$RECORDINGS"
+    line="$(df -k "$RECORDINGS" 2>/dev/null | awk 'NR==2{print $2" "$3" "$4" "$5}')"
+    set -- $line
+    header
+    printf '{"ok":true,"total_kb":%s,"used_kb":%s,"free_kb":%s,"use":"%s","path":"%s"}\n'       "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0%}" "$(json_escape "$RECORDINGS")"
+}
+
+camera_action() {
+    action="$1"
+    out="$(wificam-camera-ctl "$action" 2>&1)"
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        ok ',"message":"'"$(json_escape "$out")"'"'
+    else
+        fail "$out"
+    fi
+}
+
+op="$(param op)"
+[ -n "$op" ] || op="$(printf '%s' "${QUERY_STRING:-}" | sed -n 's/.*op=\([^&]*\).*/\1/p')"
+
+case "$op" in
+  status) status ;;
+  wifi_scan) wifi_scan ;;
+  wifi_apply) wifi_apply ;;
+  storage) storage ;;
+  camera_start) camera_action start ;;
+  camera_stop) camera_action stop ;;
+  record_start) camera_action record-start ;;
+  record_stop) camera_action record-stop ;;
+  reboot)
+    ok ',"message":"rebooting"'
+    (sleep 1; reboot) >/dev/null 2>&1 &
+    ;;
+  *) fail "unknown operation" ;;
+esac
