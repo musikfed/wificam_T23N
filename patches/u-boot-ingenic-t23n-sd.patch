@@ -6,6 +6,7 @@ diff --git a/boards.cfg b/boards.cfg
  isvp_t23_sfcnor              mips        xburst      isvp_t23            ingenic        t23         isvp_t23:SPL_SFC_SUPPORT,ENV_IS_IN_SPI_FLASH,SPL_SFC_NOR,JZ_MMC_MSC0,T23N
 +isvp_t23_msc0                mips        xburst      isvp_t23            ingenic        t23         isvp_t23:SPL_MMC_SUPPORT,ENV_IS_IN_MMC,GPT_CREATOR,JZ_MMC_MSC0,SFC_COMMAND,T23N
  isvp_t30_sfcnor              mips        xburst      isvp_t30            ingenic        t30         isvp_t30:SPL_SFC_SUPPORT,ENV_IS_IN_SPI_FLASH,SPL_SFC_NOR,JZ_MMC_MSC0
+
 diff --git a/include/configs/isvp_t23.h b/include/configs/isvp_t23.h
 --- a/include/configs/isvp_t23.h
 +++ b/include/configs/isvp_t23.h
@@ -19,3 +20,35 @@ diff --git a/include/configs/isvp_t23.h b/include/configs/isvp_t23.h
 -#define CONFIG_BOOTCOMMAND "mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"
 +#define CONFIG_BOOTCOMMAND "if test \"$sd_env_initialized\" != \"1\"; then setenv sd_env_initialized 1; saveenv; fi; mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"
  #endif
+
+diff --git a/include/configs/isvp_common.h b/include/configs/isvp_common.h
+--- a/include/configs/isvp_common.h
++++ b/include/configs/isvp_common.h
+@@ -86,3 +86,29 @@
+ #define CONFIG_NETMASK 255.255.255.0
+ #define CONFIG_ETHADDR 00:00:23:34:45:66
++
++/*
++ * WIFICAM T23N autonomous-SD effective override.
++ *
++ * isvp_t23.h includes this common header last.  OpenIPC's common header
++ * resets bootargs/bootcmd/env for its normal SPI/NOR firmware, so the MMC
++ * values must be re-asserted here after those definitions.
++ */
++#ifdef CONFIG_SPL_MMC_SUPPORT
++#undef CONFIG_BOOTARGS
++#undef CONFIG_BOOTCOMMAND
++#undef CONFIG_ENV_OFFSET
++#undef CONFIG_ENV_SIZE
++#undef CONFIG_ENV_SECT_SIZE
++#undef CONFIG_SYS_MONITOR_LEN
++
++#define CONFIG_BOOTARGS BOOTARGS_COMMON " root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init"
++#define CONFIG_BOOTCOMMAND "if test \"$sd_env_initialized\" != \"1\"; then setenv sd_env_initialized 1; saveenv; fi; mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"
++
++/* SPL sector 34, U-Boot sector 86, environment sector 514. */
++#define CONFIG_SYS_MONITOR_LEN (214 * 1024)
++#define CONFIG_ENV_OFFSET      0x40400
++#define CONFIG_ENV_SIZE        (32 << 10)
++#define CONFIG_ENV_SECT_SIZE   (32 << 10)
++#endif
