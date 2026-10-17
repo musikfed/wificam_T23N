@@ -1,64 +1,79 @@
-# Kernel build — Ingenic T23/T23N
+# T23/T23N autonomous-SD build
 
-## Current result
+## Kernel
 
-Linux 3.10.14 for MIPS/Ingenic builds successfully:
+The old pre-SD-only kernel image is not the final deployable reference. Direct
+`root=/dev/mmcblk0p2` requires the MMC host driver and EXT4 to be built into
+the kernel.
 
-```text
-Image Name:   Linux-3.10.14__isvp_pike_1.0__
-Image Type:   MIPS Linux Kernel Image (lzma compressed)
-Data Size:    1739320 Bytes
-Load Address: 80010000
-Entry Point:  803c7960
+Build:
+
+```sh
+sh scripts/build_kernel.sh
 ```
 
-Resulting image:
+The script forces and verifies:
+
+```text
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_JZMMC_V12=y
+CONFIG_JZMMC_V12_MMC0=y
+CONFIG_EXT4_FS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+```
+
+Result:
 
 ```text
 ~/myipcam/build/kernel/arch/mips/boot/uImage
 ```
 
-Known-good SHA-256:
+The kernel must fit the 6 MiB raw slot read by U-Boot:
 
 ```text
-7ba1c4b0a3ea28d3a7a89cd14330fe1968a0ac63166b08c2d9e715541432565f
+mmc read 0x80600000 0x1800 0x3000
 ```
 
-## Build
+Use the SHA-256 printed by the new build. The previous pre-SD-root hash is not a
+deployment readiness check.
 
-Kernel sources:
+## SD SPL/U-Boot
+
+A normal SPI/SFC U-Boot image is not suitable.
+
+```sh
+sh scripts/build_sd_bootloader.sh
+```
+
+The script pins OpenIPC `u-boot-ingenic`, creates a T23N MMC target with
+`SPL_MMC_SUPPORT`, `ENV_IS_IN_MMC`, `JZ_MMC_MSC0` and `T23N`, and uses:
 
 ```text
-~/myipcam/kernel/openipc-linux
+root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
 ```
 
-After configuring the MIPS cross-toolchain and kernel configuration, run the project's build script or the equivalent `make` command.
-
-A successful build ends with:
+Result:
 
 ```text
-LD      vmlinux
-OBJCOPY arch/mips/boot/vmlinux.bin
-LZMA    arch/mips/boot/vmlinux.bin.lzma
-UIMAGE  arch/mips/boot/uImage.lzma
-Image arch/mips/boot/uImage is ready
+out/u-boot-t23n-sd.bin
 ```
 
-## Preserve a known-good build
+The build validates the MMC SPL magic and that the combined image does not
+overlap its SD environment area.
 
-```bash
-mkdir -p ~/myipcam/deploy/t23-kernel-known-good
-cp -L ~/myipcam/build/kernel/arch/mips/boot/uImage ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/vmlinux ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/System.map ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/.config ~/myipcam/deploy/t23-kernel-known-good/kernel.config
-sha256sum ~/myipcam/deploy/t23-kernel-known-good/*
+## Build everything
+
+```sh
+sh scripts/build_all.sh
 ```
 
-## Verify uImage
+This builds the autonomous-SD kernel, T23N MMC SPL/U-Boot and WIFICAM/PegineLab
+overlay.
 
-```bash
-mkimage -l ~/myipcam/build/kernel/arch/mips/boot/uImage
+Write the complete card with:
+
+```sh
+sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 ```
-
-Do not write this image to SPI/NOR/NAND until UART and a non-destructive SD/RAM boot have been validated.
