@@ -39,7 +39,19 @@ fi
 # With the SPI/NOR physically absent, the kernel must be able to mount the SD
 # root filesystem without loading a module from that same filesystem first.
 CFG="$KERNEL_SRC/scripts/config"
-bash "$CFG" --file "$BUILD_DIR/.config"     --enable MMC     --enable MMC_BLOCK     --enable JZMMC_V12     --enable JZMMC_V12_SDMA     --enable JZMMC_V12_MMC0     --enable JZMMC_V12_MMC0_PB_4BIT     --enable EXT4_FS     --enable DEVTMPFS     --enable DEVTMPFS_MOUNT     --enable TMPFS
+bash "$CFG" --file "$BUILD_DIR/.config" \
+    --enable MMC \
+    --enable MMC_BLOCK \
+    --enable JZMMC_V12 \
+    --enable JZMMC_V12_SDMA \
+    --enable JZMMC_V12_MMC0 \
+    --enable JZMMC_V12_MMC0_PB_4BIT \
+    --enable EXT4_FS \
+    --enable PARTITION_ADVANCED \
+    --enable MSDOS_PARTITION \
+    --enable DEVTMPFS \
+    --enable DEVTMPFS_MOUNT \
+    --enable TMPFS
 
 make -C "$KERNEL_SRC" O="$BUILD_DIR" ARCH=mips CROSS_COMPILE="$CROSS_COMPILE" olddefconfig
 
