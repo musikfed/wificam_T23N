@@ -70,6 +70,7 @@ require_kernel_y CONFIG_MMC_BLOCK
 require_kernel_y CONFIG_JZMMC_V12
 require_kernel_y CONFIG_JZMMC_V12_MMC0
 require_kernel_y CONFIG_EXT4_FS
+require_kernel_y CONFIG_MSDOS_PARTITION
 require_kernel_y CONFIG_DEVTMPFS
 require_kernel_y CONFIG_DEVTMPFS_MOUNT
 
