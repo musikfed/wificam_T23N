@@ -3,14 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>WIFICAM T23N</title>
+  <title>PegineLab WIFICAM T23N</title>
+  <link rel="icon" href="assets/peginelab-avatar.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand">WIFICAM <b>T23N</b></div>
-    <div class="sub">Ingenic camera control</div>
+    <div class="brand-lockup">
+      <img src="assets/peginelab-logo.png" alt="PegineLab">
+      <div><div class="brand">WIFICAM <b>T23N</b></div><div class="sub">PegineLab • Ingenic camera control</div></div>
+    </div>
     <nav id="nav">
       <button data-page="dashboard" class="active">⌂ <span data-i18n="dashboard">Главная</span></button>
       <button data-page="live">▶ <span data-i18n="live">Видео</span></button>
@@ -26,9 +29,13 @@
   </aside>
 
   <main>
-    <header><div><h1 id="pageTitle">Главная</h1><p id="pageHint">Состояние камеры</p></div><div id="online" class="pill">● …</div></header>
+    <header><div><h1 id="pageTitle">Главная</h1><p id="pageHint">PegineLab WIFICAM • состояние камеры</p></div><div id="online" class="pill">● …</div></header>
 
     <section id="dashboard" class="page active">
+      <div class="brand-panel">
+        <img src="assets/peginelab-logo.png" alt="PegineLab PL">
+        <div><strong>PegineLab WIFICAM T23N</strong><span>Embedded camera firmware • MIPS / Ingenic</span></div>
+      </div>
       <div class="grid cards">
         <article><small data-i18n="model">Модель</small><strong>T23/T23N</strong><span>Ingenic XBurst</span></article>
         <article><small>Kernel</small><strong id="kernel">—</strong><span>Linux</span></article>
