@@ -8,7 +8,8 @@ WPA_CONF="${WPA_CONF:-/data/wpa_supplicant.conf}"
 WPA_BACKUP="${WPA_BACKUP:-/data/wpa_supplicant.conf.last-good}"
 RECORDINGS="${RECORDINGS:-/mnt/media/recordings}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
-ALLOW_REBOOT="${ALLOW_REBOOT:-0}"\nAUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
+ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
+AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
 
 REQUEST_DATA=""
 if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
