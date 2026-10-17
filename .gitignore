@@ -6,3 +6,4 @@ out/
 uImage
 vmlinux
 System.map
+web/assets/boot-jingle.wav
