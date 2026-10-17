@@ -15,7 +15,7 @@ TOOLCHAIN_COMMIT="81cb9f1e63d1abebf8a9a51efb95b6b3a78d9924"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-for cmd in git make gcc python3 od sha256sum; do
+for cmd in git make gcc python3 od sha256sum strings; do
     command -v "$cmd" >/dev/null 2>&1 || die "$cmd not installed"
 done
 
@@ -90,11 +90,58 @@ if new_cmd not in header_text:
     header_text = header_text.replace(old_cmd, new_cmd, 1)
 
 header.write_text(header_text)
+
+PY
+
+# OpenIPC's isvp_t23.h includes isvp_common.h last.  That common header
+# undefines/redefines bootargs, bootcmd and env for the normal SPI/NOR layout.
+# Re-assert the SD-only settings at the END of isvp_common.h, otherwise a
+# nominal SPL_MMC_SUPPORT build silently boots with the SPI defaults.
+python3 - "$UBOOT_SRC" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+common = root / "include/configs/isvp_common.h"
+s = common.read_text()
+marker = "/* WIFICAM_T23N_SD_ONLY_EFFECTIVE_CONFIG */"
+if marker not in s:
+    s = s.rstrip() + r"""
+
+/* WIFICAM_T23N_SD_ONLY_EFFECTIVE_CONFIG */
+#ifdef CONFIG_SPL_MMC_SUPPORT
+#undef CONFIG_BOOTARGS
+#undef CONFIG_BOOTCOMMAND
+#undef CONFIG_ENV_OFFSET
+#undef CONFIG_ENV_SIZE
+#undef CONFIG_ENV_SECT_SIZE
+#undef CONFIG_SYS_MONITOR_LEN
+
+#define CONFIG_BOOTARGS BOOTARGS_COMMON " root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init"
+#define CONFIG_BOOTCOMMAND "if test \"$sd_env_initialized\" != \"1\"; then setenv sd_env_initialized 1; saveenv; fi; mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"
+
+/* T23N autonomous SD raw layout:
+ *   SPL             sector 34
+ *   U-Boot proper   sector 86
+ *   env             0x40400 bytes = sector 514
+ *   env size        32 KiB
+ */
+#define CONFIG_SYS_MONITOR_LEN (214 * 1024)
+#define CONFIG_ENV_OFFSET      0x40400
+#define CONFIG_ENV_SIZE        (32 << 10)
+#define CONFIG_ENV_SECT_SIZE   (32 << 10)
+#endif
+"""
+    common.write_text(s)
 PY
 
 grep -q '^isvp_t23_msc0 .*SPL_MMC_SUPPORT.*ENV_IS_IN_MMC.*JZ_MMC_MSC0.*T23N'     "$UBOOT_SRC/boards.cfg" || die "T23N MMC target verification failed"
 grep -q 'root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init'     "$UBOOT_SRC/include/configs/isvp_t23.h" || die "T23N SD bootargs verification failed"
 grep -q 'sd_env_initialized.*saveenv.*mmc read 0x80600000 0x1800 0x3000'     "$UBOOT_SRC/include/configs/isvp_t23.h" || die "T23N SD first-boot env initialization missing"
+grep -q 'WIFICAM_T23N_SD_ONLY_EFFECTIVE_CONFIG' "$UBOOT_SRC/include/configs/isvp_common.h" || die "effective MMC override missing"
+grep -q 'root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init' "$UBOOT_SRC/include/configs/isvp_common.h" || die "effective SD root bootargs missing"
+grep -Eq 'CONFIG_ENV_OFFSET[[:space:]]+0x40400' "$UBOOT_SRC/include/configs/isvp_common.h" || die "effective SD env offset missing"
+grep -q 'sd_env_initialized.*saveenv.*mmc read 0x80600000 0x1800 0x3000' "$UBOOT_SRC/include/configs/isvp_common.h" || die "effective SD bootcmd missing"
 
 echo "[4/4] Building T23N U-Boot for direct SD BootROM boot..."
 make -C "$UBOOT_SRC" distclean
@@ -102,6 +149,12 @@ make -C "$UBOOT_SRC" CROSS_COMPILE="$CROSS_COMPILE" -j"$JOBS" isvp_t23_msc0
 
 IMAGE="$UBOOT_SRC/u-boot-with-spl.bin"
 [ -f "$IMAGE" ] || die "u-boot-with-spl.bin was not produced"
+
+VERIFY_BIN="$UBOOT_SRC/u-boot"
+[ -f "$VERIFY_BIN" ] || VERIFY_BIN="$UBOOT_SRC/u-boot.bin"
+[ -f "$VERIFY_BIN" ] || die "compiled U-Boot verification binary missing"
+strings "$VERIFY_BIN" | grep -F 'root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init' >/dev/null || die "compiled U-Boot lacks SD root bootargs"
+strings "$VERIFY_BIN" | grep -F 'mmc read 0x80600000 0x1800 0x3000' >/dev/null || die "compiled U-Boot lacks SD kernel bootcmd"
 
 # T23 MMC SPL starts with the MSPL word. The complete image is written to
 # SD sector 34, exactly as the Ingenic/OpenIPC raw MMC boot path expects.
