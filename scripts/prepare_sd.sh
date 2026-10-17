@@ -3,27 +3,38 @@ set -eu
 
 REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 MEDIA_GIB="${MEDIA_GIB:-20}"
+
+# T23 BootROM/U-Boot raw SD layout.
+RAW_RESERVE_MIB=16
+SD_UBOOT_SECTOR=34
+SD_UBOOT_ENV_SECTOR=514
+KERNEL_SECTOR=$((0x1800))
+KERNEL_SLOT_SECTORS=$((0x3000))
+
 BOOT_MIB=128
 MEDIA_MIB=$((MEDIA_GIB * 1024))
-RESERVE_MIB=8
+END_RESERVE_MIB=8
 MIN_ROOTFS_MIB=2048
 
 usage() {
-    echo "Usage: sudo $0 /dev/sdX --yes [uImage] [FULL-rootfs.tar.gz]"
-    echo "DESTROYS ALL DATA on the selected device."
-    echo "Layout: BOOT 128 MiB + ROOTFS all remaining space + MEDIA ${MEDIA_GIB} GiB."
-    echo "The rootfs archive must be a COMPLETE bootable userspace."
+    echo "Usage: sudo $0 /dev/sdX --yes T23N-SD-u-boot.bin uImage [FULL-rootfs.tar.gz]" >&2
+    echo "DESTROYS ALL DATA on the selected SD card." >&2
+    echo "This layout is for a T23/T23N camera with NO SPI/NOR boot flash." >&2
     exit 2
 }
 
-[ "$#" -ge 2 ] || usage
+[ "$#" -ge 4 ] || usage
 DEV="$1"
 CONFIRM="$2"
-IMAGE="${3:-}"
-ROOTFS_TAR="${4:-}"
+BOOTLOADER="$3"
+IMAGE="$4"
+ROOTFS_TAR="${5:-}"
 
 [ "$CONFIRM" = "--yes" ] || usage
+[ "$(id -u)" -eq 0 ] || { echo "Run as root/sudo" >&2; exit 1; }
 [ -b "$DEV" ] || { echo "Not a block device: $DEV" >&2; exit 1; }
+[ -f "$BOOTLOADER" ] || { echo "SD U-Boot not found: $BOOTLOADER" >&2; exit 1; }
+[ -f "$IMAGE" ] || { echo "uImage not found: $IMAGE" >&2; exit 1; }
 
 case "$DEV" in
   /dev/sd[a-z]|/dev/mmcblk[0-9]) ;;
@@ -34,6 +45,10 @@ ROOT_SRC="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
 case "$ROOT_SRC" in
   "$DEV"*) echo "REFUSING: $DEV contains the running root filesystem" >&2; exit 1 ;;
 esac
+
+for cmd in blockdev sfdisk wipefs mkfs.vfat mkfs.ext4 dd od sha256sum stat mount umount lsblk; do
+    command -v "$cmd" >/dev/null 2>&1 || { echo "Missing host tool: $cmd" >&2; exit 1; }
+done
 
 part() {
     case "$DEV" in
@@ -46,22 +61,20 @@ BYTES="$(blockdev --getsize64 "$DEV")"
 SECTOR_SIZE="$(blockdev --getss "$DEV")"
 TOTAL_SECTORS=$((BYTES / SECTOR_SIZE))
 
-# Keep every partition aligned to 1 MiB. sfdisk on current util-linux reliably
-# accepts sector units; older "unit: MiB" syntax is not portable.
-[ $((1024 * 1024 % SECTOR_SIZE)) -eq 0 ] || {
-    echo "REFUSING: logical sector size $SECTOR_SIZE does not divide 1 MiB." >&2
+[ "$SECTOR_SIZE" -eq 512 ] || {
+    echo "REFUSING: T23 raw SD boot layout is defined for 512-byte sectors; got $SECTOR_SIZE" >&2
     exit 1
 }
-SECTORS_PER_MIB=$((1024 * 1024 / SECTOR_SIZE))
 
-BOOT_START=$SECTORS_PER_MIB
+SECTORS_PER_MIB=2048
+RAW_RESERVE_SECTORS=$((RAW_RESERVE_MIB * SECTORS_PER_MIB))
+BOOT_START=$RAW_RESERVE_SECTORS
 BOOT_SECTORS=$((BOOT_MIB * SECTORS_PER_MIB))
 MEDIA_SECTORS=$((MEDIA_MIB * SECTORS_PER_MIB))
-RESERVE_SECTORS=$((RESERVE_MIB * SECTORS_PER_MIB))
+END_RESERVE_SECTORS=$((END_RESERVE_MIB * SECTORS_PER_MIB))
 
 ROOTFS_START=$((BOOT_START + BOOT_SECTORS))
-ROOTFS_SECTORS=$((TOTAL_SECTORS - ROOTFS_START - MEDIA_SECTORS - RESERVE_SECTORS))
-# Align ROOTFS size down to a whole MiB so MEDIA also starts on 1 MiB boundary.
+ROOTFS_SECTORS=$((TOTAL_SECTORS - ROOTFS_START - MEDIA_SECTORS - END_RESERVE_SECTORS))
 ROOTFS_SECTORS=$((ROOTFS_SECTORS / SECTORS_PER_MIB * SECTORS_PER_MIB))
 MEDIA_START=$((ROOTFS_START + ROOTFS_SECTORS))
 
@@ -70,31 +83,55 @@ TOTAL_MIB=$((BYTES / 1024 / 1024))
 
 [ "$ROOTFS_MIB" -ge "$MIN_ROOTFS_MIB" ] || {
     echo "REFUSING: card is too small." >&2
-    echo "Total: ${TOTAL_MIB} MiB; requested MEDIA: ${MEDIA_MIB} MiB; ROOTFS would be only ${ROOTFS_MIB} MiB." >&2
+    echo "Total: ${TOTAL_MIB} MiB; ROOTFS would be only ${ROOTFS_MIB} MiB." >&2
     exit 1
 }
 
-# Generate the 7-second original chiptune locally if it is not present yet.
+# Validate the specially built MMC SPL/U-Boot image.
+UBOOT_MAGIC="$(od -An -tx4 -N4 "$BOOTLOADER" | tr -d ' \n')"
+[ "$UBOOT_MAGIC" = "4d53504c" ] || {
+    echo "REFUSING: $BOOTLOADER is not a T23 MMC SPL image (magic=$UBOOT_MAGIC)" >&2
+    exit 1
+}
+UBOOT_SIZE="$(stat -c '%s' "$BOOTLOADER")"
+UBOOT_MAX=$(((SD_UBOOT_ENV_SECTOR - SD_UBOOT_SECTOR) * 512))
+[ "$UBOOT_SIZE" -le "$UBOOT_MAX" ] || {
+    echo "REFUSING: bootloader overlaps the SD U-Boot environment area." >&2
+    exit 1
+}
+
+KERNEL_SIZE="$(stat -c '%s' "$IMAGE")"
+KERNEL_SLOT_BYTES=$((KERNEL_SLOT_SECTORS * 512))
+[ "$KERNEL_SIZE" -le "$KERNEL_SLOT_BYTES" ] || {
+    echo "REFUSING: uImage is $KERNEL_SIZE bytes, raw kernel slot is $KERNEL_SLOT_BYTES bytes." >&2
+    exit 1
+}
+
+# Generate PegineLab jingle if needed.
 if [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && command -v python3 >/dev/null 2>&1; then
     python3 "$REPO_DIR/tools/generate_boot_jingle.py"
 fi
 
 echo "WARNING: ALL DATA ON $DEV WILL BE DESTROYED"
 echo
-echo "Planned layout:"
-echo "  BOOT   : ${BOOT_MIB} MiB FAT32"
-echo "  ROOTFS : ${ROOTFS_MIB} MiB ext4"
-echo "  MEDIA  : ${MEDIA_MIB} MiB ext4 (${MEDIA_GIB} GiB)"
-echo "  sector : ${SECTOR_SIZE} bytes; alignment: 1 MiB"
+echo "AUTONOMOUS T23N SD layout (no SPI/NOR):"
+echo "  raw 0..16 MiB : BootROM/SPL/U-Boot/env + raw uImage slot"
+echo "  SPL/U-Boot    : sector $SD_UBOOT_SECTOR (17 KiB)"
+echo "  kernel        : sector 0x1800 (3 MiB), slot 6 MiB"
+echo "  BOOT          : ${BOOT_MIB} MiB FAT32, starts at ${RAW_RESERVE_MIB} MiB"
+echo "  ROOTFS        : ${ROOTFS_MIB} MiB ext4 (/dev/mmcblk0p2)"
+echo "  MEDIA         : ${MEDIA_MIB} MiB ext4 (${MEDIA_GIB} GiB)"
 echo
-lsblk "$DEV"
+lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS "$DEV"
 sleep 2
 
 for n in 1 2 3; do
     umount "$(part "$n")" 2>/dev/null || true
 done
 
-wipefs -a "$DEV"
+# Clear the complete raw boot area first. Partition filesystems start at 16 MiB.
+dd if=/dev/zero of="$DEV" bs=1M count="$RAW_RESERVE_MIB" conv=fsync status=none
+wipefs -a "$DEV" >/dev/null 2>&1 || true
 
 sfdisk "$DEV" <<EOF
 label: dos
@@ -109,58 +146,97 @@ sync
 partprobe "$DEV" 2>/dev/null || true
 sleep 2
 
-[ -b "$(part 1)" ] && [ -b "$(part 2)" ] && [ -b "$(part 3)" ] || {
-    echo "Partition nodes did not appear after sfdisk: $(part 1) $(part 2) $(part 3)" >&2
+P1="$(part 1)"
+P2="$(part 2)"
+P3="$(part 3)"
+[ -b "$P1" ] && [ -b "$P2" ] && [ -b "$P3" ] || {
+    echo "Partition nodes did not appear: $P1 $P2 $P3" >&2
     exit 1
 }
 
-mkfs.vfat -F 32 -n BOOT "$(part 1)"
-mkfs.ext4 -F -L ROOTFS "$(part 2)"
-mkfs.ext4 -F -L MEDIA "$(part 3)"
+mkfs.vfat -F 32 -n BOOT "$P1"
+mkfs.ext4 -F -L ROOTFS "$P2"
+mkfs.ext4 -F -L MEDIA "$P3"
 
+echo "Writing T23N SD SPL/U-Boot at sector $SD_UBOOT_SECTOR ..."
+dd if="$BOOTLOADER" of="$DEV" bs=512 seek="$SD_UBOOT_SECTOR" conv=notrunc,fsync status=none
+
+DISK_MAGIC="$(dd if="$DEV" bs=512 skip="$SD_UBOOT_SECTOR" count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
+[ "$DISK_MAGIC" = "4d53504c" ] || {
+    echo "REFUSING: SPL readback magic mismatch: $DISK_MAGIC" >&2
+    exit 1
+}
+
+echo "Writing raw uImage at sector 0x1800 ..."
+dd if=/dev/zero of="$DEV" bs=512 seek="$KERNEL_SECTOR" count="$KERNEL_SLOT_SECTORS" conv=notrunc status=none
+dd if="$IMAGE" of="$DEV" bs=512 seek="$KERNEL_SECTOR" conv=notrunc,fsync status=none
+
+VERIFY="$(mktemp)"
 MNT="$(mktemp -d)"
-trap 'umount "$MNT" 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true' EXIT
+cleanup() {
+    umount "$MNT" 2>/dev/null || true
+    rm -f "$VERIFY"
+    rmdir "$MNT" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
-mount "$(part 1)" "$MNT"
+KERNEL_BLOCKS=$(((KERNEL_SIZE + 511) / 512))
+dd if="$DEV" of="$VERIFY" bs=512 skip="$KERNEL_SECTOR" count="$KERNEL_BLOCKS" status=none
+EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE" | awk '{print $1}')"
+READBACK_KERNEL_SHA="$(head -c "$KERNEL_SIZE" "$VERIFY" | sha256sum | awk '{print $1}')"
+[ "$EXPECTED_KERNEL_SHA" = "$READBACK_KERNEL_SHA" ] || {
+    echo "REFUSING: raw kernel readback SHA-256 mismatch" >&2
+    exit 1
+}
 
-if [ -n "$IMAGE" ]; then
-    [ -f "$IMAGE" ] || { umount "$MNT"; echo "uImage not found: $IMAGE" >&2; exit 1; }
-    cp "$IMAGE" "$MNT/uImage"
-fi
-
+mount "$P1" "$MNT"
+cp "$IMAGE" "$MNT/uImage"
+cp "$BOOTLOADER" "$MNT/u-boot-t23n-sd.bin"
 if [ -f "$REPO_DIR/branding/peginelab-logo.png.b64" ]; then
     base64 -d "$REPO_DIR/branding/peginelab-logo.png.b64" > "$MNT/peginelab-logo.png"
 fi
-[ -f "$REPO_DIR/web/assets/boot-jingle.wav" ] &&     cp "$REPO_DIR/web/assets/boot-jingle.wav" "$MNT/boot-jingle.wav"
-
+[ -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && cp "$REPO_DIR/web/assets/boot-jingle.wav" "$MNT/boot-jingle.wav"
+cat > "$MNT/SD-BOOT-MAP.txt" <<EOF
+T23N autonomous SD boot map
+SPI/NOR required: NO
+SPL/U-Boot raw start: sector 34 (17 KiB)
+U-Boot proper raw start: sector 86
+U-Boot environment raw start: sector 514
+Kernel raw start: sector 0x1800 (3 MiB)
+Kernel raw slot: 0x3000 sectors (6 MiB)
+Root filesystem: /dev/mmcblk0p2, ext4
+BOOT partition: p1, FAT32, starts at 16 MiB
+MEDIA partition: p3, ext4
+uImage SHA256: $EXPECTED_KERNEL_SHA
+EOF
 sync
 umount "$MNT"
 
 if [ -n "$ROOTFS_TAR" ]; then
     [ -f "$ROOTFS_TAR" ] || { echo "rootfs archive not found: $ROOTFS_TAR" >&2; exit 1; }
-    mount "$(part 2)" "$MNT"
+    mount "$P2" "$MNT"
     tar -C "$MNT" -xzf "$ROOTFS_TAR"
-    [ -x "$MNT/bin/sh" ] || {
-        umount "$MNT"
-        echo "REFUSING: archive does not look like a complete rootfs (/bin/sh missing)" >&2
-        exit 1
-    }
+    [ -x "$MNT/bin/sh" ] || { echo "REFUSING: rootfs missing /bin/sh" >&2; exit 1; }
+    [ -x "$MNT/init" ] || { echo "REFUSING: rootfs missing /init" >&2; exit 1; }
     mkdir -p "$MNT/data" "$MNT/mnt/media"
     sync
     umount "$MNT"
 fi
 
-mount "$(part 3)" "$MNT"
+mount "$P3" "$MNT"
 mkdir -p "$MNT/recordings" "$MNT/snapshots" "$MNT/events"
 sync
 umount "$MNT"
 
+sync
+
 echo
-echo "SD card prepared:"
+echo "AUTONOMOUS SD CARD PREPARED:"
 lsblk -f "$DEV"
 echo
-echo "MEDIA contains: recordings/ snapshots/ events/"
-echo "ROOTFS gets every remaining aligned MiB outside BOOT and MEDIA."
-echo "BOOT contains PegineLab logo and generated boot jingle when available."
-echo "Next: validate U-Boot printenv and load uImage from BOOT into RAM."
-echo "Do NOT erase the factory SPI/NOR/NAND yet."
+echo "SPL/U-Boot raw boot: OK (sector 34)"
+echo "Raw kernel readback: OK ($EXPECTED_KERNEL_SHA)"
+echo "ROOTFS: $P2"
+echo "MEDIA: recordings/ snapshots/ events/"
+echo
+echo "This card is intended to boot the T23N with the SPI/NOR flash physically absent."
