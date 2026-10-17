@@ -9,7 +9,16 @@ LOG=/var/log/wificam-httpd.log
 AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_UNAUTHENTICATED_WEB="${ALLOW_UNAUTHENTICATED_WEB:-0}"
+WEB_PORT="${WEB_PORT:-8080}"
 MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
+
+httpd_run() {
+    if command -v httpd >/dev/null 2>&1; then
+        httpd "$@"
+    else
+        busybox httpd "$@"
+    fi
+}
 
 make_csrf() {
     [ -s "$CSRF_FILE" ] && return 0
@@ -34,11 +43,11 @@ start() {
     fi
 
     if [ -s "$AUTH_CONF" ]; then
-        echo "Starting authenticated WIFICAM web interface..."
-        httpd -f -p 80 -h "$WEBROOT" -c "$AUTH_CONF" -r "WIFICAM T23N" >>"$LOG" 2>&1 &
+        echo "Starting authenticated WIFICAM web interface on port $WEB_PORT..."
+        httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" -c "$AUTH_CONF" -r "WIFICAM T23N" >>"$LOG" 2>&1 &
     elif [ "$ALLOW_UNAUTHENTICATED_WEB" = "1" ]; then
-        echo "WARNING: starting WIFICAM web interface WITHOUT authentication"
-        httpd -f -p 80 -h "$WEBROOT" >>"$LOG" 2>&1 &
+        echo "WARNING: starting WIFICAM bootstrap UI WITHOUT authentication on port $WEB_PORT"
+        httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" >>"$LOG" 2>&1 &
     else
         echo "WIFICAM web UI not started: no $AUTH_CONF"
         echo "Provision over UART:"
