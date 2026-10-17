@@ -43,8 +43,30 @@ part() {
 }
 
 BYTES="$(blockdev --getsize64 "$DEV")"
+SECTOR_SIZE="$(blockdev --getss "$DEV")"
+TOTAL_SECTORS=$((BYTES / SECTOR_SIZE))
+
+# Keep every partition aligned to 1 MiB. sfdisk on current util-linux reliably
+# accepts sector units; older "unit: MiB" syntax is not portable.
+[ $((1024 * 1024 % SECTOR_SIZE)) -eq 0 ] || {
+    echo "REFUSING: logical sector size $SECTOR_SIZE does not divide 1 MiB." >&2
+    exit 1
+}
+SECTORS_PER_MIB=$((1024 * 1024 / SECTOR_SIZE))
+
+BOOT_START=$SECTORS_PER_MIB
+BOOT_SECTORS=$((BOOT_MIB * SECTORS_PER_MIB))
+MEDIA_SECTORS=$((MEDIA_MIB * SECTORS_PER_MIB))
+RESERVE_SECTORS=$((RESERVE_MIB * SECTORS_PER_MIB))
+
+ROOTFS_START=$((BOOT_START + BOOT_SECTORS))
+ROOTFS_SECTORS=$((TOTAL_SECTORS - ROOTFS_START - MEDIA_SECTORS - RESERVE_SECTORS))
+# Align ROOTFS size down to a whole MiB so MEDIA also starts on 1 MiB boundary.
+ROOTFS_SECTORS=$((ROOTFS_SECTORS / SECTORS_PER_MIB * SECTORS_PER_MIB))
+MEDIA_START=$((ROOTFS_START + ROOTFS_SECTORS))
+
+ROOTFS_MIB=$((ROOTFS_SECTORS / SECTORS_PER_MIB))
 TOTAL_MIB=$((BYTES / 1024 / 1024))
-ROOTFS_MIB=$((TOTAL_MIB - 1 - BOOT_MIB - MEDIA_MIB - RESERVE_MIB))
 
 [ "$ROOTFS_MIB" -ge "$MIN_ROOTFS_MIB" ] || {
     echo "REFUSING: card is too small." >&2
@@ -63,6 +85,7 @@ echo "Planned layout:"
 echo "  BOOT   : ${BOOT_MIB} MiB FAT32"
 echo "  ROOTFS : ${ROOTFS_MIB} MiB ext4"
 echo "  MEDIA  : ${MEDIA_MIB} MiB ext4 (${MEDIA_GIB} GiB)"
+echo "  sector : ${SECTOR_SIZE} bytes; alignment: 1 MiB"
 echo
 lsblk "$DEV"
 sleep 2
@@ -75,16 +98,21 @@ wipefs -a "$DEV"
 
 sfdisk "$DEV" <<EOF
 label: dos
-unit: MiB
+unit: sectors
 
-start=1, size=$BOOT_MIB, type=c, bootable
-         size=$ROOTFS_MIB, type=83
-         size=$MEDIA_MIB, type=83
+start=$BOOT_START, size=$BOOT_SECTORS, type=0c, bootable
+start=$ROOTFS_START, size=$ROOTFS_SECTORS, type=83
+start=$MEDIA_START, size=$MEDIA_SECTORS, type=83
 EOF
 
 sync
 partprobe "$DEV" 2>/dev/null || true
 sleep 2
+
+[ -b "$(part 1)" ] && [ -b "$(part 2)" ] && [ -b "$(part 3)" ] || {
+    echo "Partition nodes did not appear after sfdisk: $(part 1) $(part 2) $(part 3)" >&2
+    exit 1
+}
 
 mkfs.vfat -F 32 -n BOOT "$(part 1)"
 mkfs.ext4 -F -L ROOTFS "$(part 2)"
@@ -132,7 +160,7 @@ echo "SD card prepared:"
 lsblk -f "$DEV"
 echo
 echo "MEDIA contains: recordings/ snapshots/ events/"
-echo "ROOTFS gets every remaining MiB outside BOOT and MEDIA."
+echo "ROOTFS gets every remaining aligned MiB outside BOOT and MEDIA."
 echo "BOOT contains PegineLab logo and generated boot jingle when available."
 echo "Next: validate U-Boot printenv and load uImage from BOOT into RAM."
 echo "Do NOT erase the factory SPI/NOR/NAND yet."
