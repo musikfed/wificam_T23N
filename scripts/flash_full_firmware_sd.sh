@@ -118,8 +118,13 @@ trap cleanup EXIT INT TERM
 echo "Extracting OpenIPC release..."
 tar -xzf "$BUNDLE" -C "$WORK"
 ROOTFS_IMG="$(find "$WORK" -type f -name 'rootfs.squashfs.t23' -print -quit)"
+OPENIPC_KERNEL="$(find "$WORK" -type f -name 'uImage.t23' -print -quit)"
 [ -n "$ROOTFS_IMG" ] || {
     echo "REFUSING: rootfs.squashfs.t23 not found in OpenIPC bundle" >&2
+    exit 1
+}
+[ -n "$OPENIPC_KERNEL" ] || {
+    echo "REFUSING: uImage.t23 not found in OpenIPC bundle" >&2
     exit 1
 }
 
@@ -176,6 +181,9 @@ mount "$P1" "$BOOT_MNT"
 if [ -f "$KERNEL" ]; then
     cp "$KERNEL" "$BOOT_MNT/uImage"
 fi
+# Keep the matching official OpenIPC kernel as a UART/U-Boot fallback. The
+# custom known-good build remains the primary /uImage.
+cp "$OPENIPC_KERNEL" "$BOOT_MNT/uImage.openipc.t23"
 if [ -f "$REPO_DIR/branding/peginelab-logo.png.b64" ]; then
     base64 -d "$REPO_DIR/branding/peginelab-logo.png.b64" > "$BOOT_MNT/peginelab-logo.png"
 fi
@@ -190,7 +198,7 @@ sync
 echo
 echo "FULL ROOTFS INSTALLED:"
 du -sh "$ROOT_MNT" 2>/dev/null || true
-ls -lh "$BOOT_MNT/uImage" "$BOOT_MNT/peginelab-logo.png" "$BOOT_MNT/boot-jingle.wav" 2>/dev/null || true
+ls -lh "$BOOT_MNT/uImage" "$BOOT_MNT/uImage.openipc.t23" "$BOOT_MNT/peginelab-logo.png" "$BOOT_MNT/boot-jingle.wav" 2>/dev/null || true
 echo
 echo "Rootfs sanity:"
 ls -l "$ROOT_MNT/bin/sh" "$ROOT_MNT/init" "$ROOT_MNT/etc/init.d/S90wificam"
