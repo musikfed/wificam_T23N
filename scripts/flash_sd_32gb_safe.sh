@@ -29,8 +29,9 @@ printf "Type the exact Linux device path (%s) to ERASE it: " "$DEV"
 read confirm
 [ "$confirm" = "$DEV" ] || { echo "Cancelled."; exit 1; }
 
+# Run through /bin/sh so the repository file does not need an executable bit.
 if [ -n "$ROOTFS" ]; then
-  exec "$HERE/prepare_sd.sh" "$DEV" --yes "$KERNEL" "$ROOTFS"
+  exec sh "$HERE/prepare_sd.sh" "$DEV" --yes "$KERNEL" "$ROOTFS"
 else
-  exec "$HERE/prepare_sd.sh" "$DEV" --yes "$KERNEL"
+  exec sh "$HERE/prepare_sd.sh" "$DEV" --yes "$KERNEL"
 fi
