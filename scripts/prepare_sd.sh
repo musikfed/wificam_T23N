@@ -52,6 +52,11 @@ ROOTFS_MIB=$((TOTAL_MIB - 1 - BOOT_MIB - MEDIA_MIB - RESERVE_MIB))
     exit 1
 }
 
+# Generate the 7-second original chiptune locally if it is not present yet.
+if [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "$REPO_DIR/tools/generate_boot_jingle.py"
+fi
+
 echo "WARNING: ALL DATA ON $DEV WILL BE DESTROYED"
 echo
 echo "Planned layout:"
@@ -88,15 +93,18 @@ mkfs.ext4 -F -L MEDIA "$(part 3)"
 MNT="$(mktemp -d)"
 trap 'umount "$MNT" 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true' EXIT
 
-# BOOT: kernel plus branding assets. U-Boot use of these files is optional;
-# Linux uses the same assets from rootfs after boot.
 mount "$(part 1)" "$MNT"
+
 if [ -n "$IMAGE" ]; then
     [ -f "$IMAGE" ] || { umount "$MNT"; echo "uImage not found: $IMAGE" >&2; exit 1; }
     cp "$IMAGE" "$MNT/uImage"
 fi
-[ -f "$REPO_DIR/web/assets/peginelab-logo.png" ] && cp "$REPO_DIR/web/assets/peginelab-logo.png" "$MNT/peginelab-logo.png"
-[ -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && cp "$REPO_DIR/web/assets/boot-jingle.wav" "$MNT/boot-jingle.wav"
+
+if [ -f "$REPO_DIR/branding/peginelab-logo.png.b64" ]; then
+    base64 -d "$REPO_DIR/branding/peginelab-logo.png.b64" > "$MNT/peginelab-logo.png"
+fi
+[ -f "$REPO_DIR/web/assets/boot-jingle.wav" ] &&     cp "$REPO_DIR/web/assets/boot-jingle.wav" "$MNT/boot-jingle.wav"
+
 sync
 umount "$MNT"
 
@@ -125,6 +133,6 @@ lsblk -f "$DEV"
 echo
 echo "MEDIA contains: recordings/ snapshots/ events/"
 echo "ROOTFS gets every remaining MiB outside BOOT and MEDIA."
-echo "BOOT also contains PegineLab logo/jingle when present in this branch."
+echo "BOOT contains PegineLab logo and generated boot jingle when available."
 echo "Next: validate U-Boot printenv and load uImage from BOOT into RAM."
 echo "Do NOT erase the factory SPI/NOR/NAND yet."
