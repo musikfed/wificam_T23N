@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 
+REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 MEDIA_GIB="${MEDIA_GIB:-20}"
 BOOT_MIB=128
 MEDIA_MIB=$((MEDIA_GIB * 1024))
@@ -87,13 +88,17 @@ mkfs.ext4 -F -L MEDIA "$(part 3)"
 MNT="$(mktemp -d)"
 trap 'umount "$MNT" 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true' EXIT
 
+# BOOT: kernel plus branding assets. U-Boot use of these files is optional;
+# Linux uses the same assets from rootfs after boot.
+mount "$(part 1)" "$MNT"
 if [ -n "$IMAGE" ]; then
-    [ -f "$IMAGE" ] || { echo "uImage not found: $IMAGE" >&2; exit 1; }
-    mount "$(part 1)" "$MNT"
+    [ -f "$IMAGE" ] || { umount "$MNT"; echo "uImage not found: $IMAGE" >&2; exit 1; }
     cp "$IMAGE" "$MNT/uImage"
-    sync
-    umount "$MNT"
 fi
+[ -f "$REPO_DIR/web/assets/peginelab-logo.png" ] && cp "$REPO_DIR/web/assets/peginelab-logo.png" "$MNT/peginelab-logo.png"
+[ -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && cp "$REPO_DIR/web/assets/boot-jingle.wav" "$MNT/boot-jingle.wav"
+sync
+umount "$MNT"
 
 if [ -n "$ROOTFS_TAR" ]; then
     [ -f "$ROOTFS_TAR" ] || { echo "rootfs archive not found: $ROOTFS_TAR" >&2; exit 1; }
@@ -120,5 +125,6 @@ lsblk -f "$DEV"
 echo
 echo "MEDIA contains: recordings/ snapshots/ events/"
 echo "ROOTFS gets every remaining MiB outside BOOT and MEDIA."
+echo "BOOT also contains PegineLab logo/jingle when present in this branch."
 echo "Next: validate U-Boot printenv and load uImage from BOOT into RAM."
 echo "Do NOT erase the factory SPI/NOR/NAND yet."
