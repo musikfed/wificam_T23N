@@ -1,100 +1,171 @@
-# wificam_T23N
+# wificam_T23N — autonomous SD firmware
 
 ![PegineLab](web/assets/peginelab-logo.svg)
 
-Экспериментальная прошивка и Web UI для Wi‑Fi камеры на **Ingenic T23/T23N**.  
-Experimental firmware and Web UI for an **Ingenic T23/T23N** Wi‑Fi camera.
+Экспериментальная прошивка для Wi‑Fi камеры **Ingenic T23/T23N**, ветка
+`mymarrchWFcam`.
 
-> **Experimental branch:** `mymarrchWFcam` — PegineLab branding + non-blocking boot splash + original ~7 s 8-bit boot jingle.
->
-> **Status:** Linux 3.10.14 kernel build = **SUCCESS**. SD/rootfs tooling, Wi‑Fi/IP UI, camera-service integration and on-demand SSH/VPN controls are in the repository.
+## Аппаратный режим этой ветки
 
-## PegineLab boot branding / Загрузка
+**SPI/NOR flash физически отсутствует.** Прошивка не рассчитывает на загрузчик,
+kernel, rootfs или environment во внешней flash-памяти.
 
-В этой ветке:
-
-- логотип PegineLab встроен в Web UI;
-- favicon использует PegineLab PL;
-- `S05peginelab-boot` пытается показать логотип через framebuffer;
-- оригинальный ~7-секундный 8-bit/chiptune джингл генерируется при сборке;
-- splash и звук работают **в фоне** и не должны задерживать Wi‑Fi/camera startup;
-- если framebuffer/audio player отсутствуют, загрузка просто продолжается.
-
-Настройки:
+Полная цепочка загрузки должна находиться на SD:
 
 ```text
-BOOT_SPLASH=1
-BOOT_SOUND=1
-BOOT_BRANDING_SECONDS=7
+T23 BootROM
+   ↓
+raw SD sector 34 (17 KiB)
+SPL / MMC bootstrap
+   ↓
+raw SD sector 86
+U-Boot T23N MMC
+   ↓
+raw SD sector 0x1800 (3 MiB)
+uImage, raw slot 0x3000 sectors = 6 MiB
+   ↓
+/dev/mmcblk0p2
+ext4 ROOTFS
+   ↓
+OpenIPC T23 userspace + WIFICAM/PegineLab
 ```
 
-Джингл не хранится большим бинарником в Git. Он воспроизводимо генерируется:
+Для этого **нельзя** использовать обычный U-Boot, собранный для SPI/SFC.
+`scripts/build_sd_bootloader.sh` собирает отдельный T23N MMC/SPL loader.
 
-```sh
-python3 tools/generate_boot_jingle.py
-```
+## Разметка SD
 
-и получается:
+Первые 16 MiB не принадлежат ни одному filesystem-разделу: это raw boot area.
+
+| Область | Положение | Назначение |
+|---|---:|---|
+| MBR | sector 0 | таблица разделов |
+| SPL/U-Boot image | sector 34 | вход BootROM, MMC SPL |
+| U-Boot proper | sector 86 | вычисляется из 26 KiB SPL |
+| U-Boot env | sector 514 | 32 KiB environment |
+| uImage | sector `0x1800` | kernel, raw read slot 6 MiB |
+| p1 BOOT | с 16 MiB, 128 MiB, FAT32 | копии uImage/U-Boot, logo, jingle, boot map |
+| p2 ROOTFS | всё свободное до MEDIA, ext4 | Linux/userspace/configs |
+| p3 MEDIA | 20 GiB, ext4 | recordings/snapshots/events |
+
+U-Boot для MMC использует:
 
 ```text
-web/assets/boot-jingle.wav
+root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
+mmc read 0x80600000 0x1800 0x3000
+bootm 0x80600000
 ```
 
-Файл лёгкий: mono PCM, 8-bit, 11025 Hz, около 77 KiB. Мелодия оригинальная — только стилистика старой 8-bit приставки.
+## Сборка
 
-Документация: [RU](docs/BRANDING_BOOT_RU.md) / [EN](docs/BRANDING_BOOT_EN.md).
-
-## Принципы / Design rules
-
-- камера и сенсор инициализируются ОС при загрузке; Web UI не занимается ручным определением сенсора;
-- 20 GiB SD выделяется только под фото/видео/события;
-- всё остальное место карты получает ROOTFS для Linux, приложений, VPN, SSH и логов;
-- SSH, WireGuard и AmneziaWG выключены по умолчанию;
-- выключенный optional service не запускает постоянный userspace process;
-- Wi‑Fi меняется через test + DHCP + rollback;
-- текущие SSID, IPv4, gateway и DNS видны в Web UI;
-- штатную SPI/NOR/NAND не стирать до успешной обратимой SD/RAM загрузки.
-
-## Build
+Host-пакеты для Ubuntu/WSL:
 
 ```sh
+sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2fsprogs
+```
+
+Собрать всё:
+
+```sh
+cd ~/myipcam/wificam_T23N
+git switch mymarrchWFcam
+git pull
 sh scripts/build_all.sh
 ```
 
-`package_rootfs_overlay.sh` сам генерирует boot jingle, если установлен `python3`, и декодирует компактный PegineLab logo PNG для framebuffer.
+`build_all.sh` выполняет три шага:
 
-Known-good kernel artifacts:
+1. пересобирает Linux kernel с **MMC controller + MMC block + EXT4 встроенными (=y)**;
+2. собирает специальный **T23N SD SPL/U-Boot**;
+3. пакует WIFICAM/PegineLab overlay.
 
-```sh
-sh scripts/export_known_good.sh
+Основные artifacts:
+
+```text
+~/myipcam/build/kernel/arch/mips/boot/uImage
+out/u-boot-t23n-sd.bin
+out/wificam-rootfs-overlay.tar.gz
 ```
 
-Для полного rootfs нужен базовый BusyBox/Linux userspace:
+Старый kernel hash из сборки до SD-only перехода не является deployable reference:
+после включения built-in MMC/ext4 kernel должен быть пересобран и получит новый SHA-256.
+
+## Полная запись SD
+
+Сначала всегда проверить имя карты:
 
 ```sh
-BASE_ROOTFS=/path/to/base-rootfs.tar.gz sh scripts/build_all.sh
+lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
 ```
 
-## SD-карта / SD card
-
-Форматирование уничтожает данные на выбранной карте.
+Затем:
 
 ```sh
-sudo sh scripts/prepare_sd.sh \
-  /dev/sdX --yes \
-  ~/myipcam/build/kernel/arch/mips/boot/uImage \
-  out/wificam-rootfs.tar.gz
+sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 ```
 
-Разметка вычисляется автоматически:
+Скрипт:
 
-| Partition | Size | FS | Purpose |
-|---|---:|---|---|
-| p1 BOOT | 128 MiB | FAT32 | uImage + PegineLab logo/jingle |
-| p2 ROOTFS | all remaining space | ext4 | Linux, apps, configs, VPN, SSH, logs |
-| p3 MEDIA | 20 GiB | ext4 | recordings, snapshots, events |
+- требует специальный `out/u-boot-t23n-sd.bin`;
+- проверяет, что kernel config содержит built-in MMC/ext4;
+- скачивает и SHA-256 проверяет официальный OpenIPC T23 lite userspace bundle;
+- добавляет WIFICAM/PegineLab overlay;
+- **полностью переразмечает SD**;
+- пишет SPL/U-Boot в raw sector 34;
+- пишет kernel в raw sector `0x1800`;
+- проверяет raw kernel readback по SHA-256;
+- распаковывает Linux в p2;
+- создаёт MEDIA p3.
 
-MEDIA:
+Это единственный основной flash-сценарий для данной ветки.
+
+## Root filesystem
+
+База userspace — официальный OpenIPC T23 lite rootfs. Поверх него добавляются:
+
+- PegineLab Web UI;
+- `S05peginelab-boot`;
+- WIFICAM service layer;
+- Wi‑Fi management;
+- MEDIA mount;
+- optional SSH/WireGuard/AmneziaWG controls.
+
+Sensor detection не выполняется вручную Web UI: камера и sensor должны
+инициализироваться kernel/OS camera stack.
+
+## PegineLab boot branding
+
+В rootfs:
+
+- PegineLab logo;
+- оригинальный ~7 s 8-bit/chiptune WAV;
+- ранний `S05peginelab-boot`.
+
+Splash/audio запускаются неблокирующе. Они появятся только если camera Linux
+userspace имеет рабочий framebuffer/audio player. Копии logo/jingle также лежат
+на p1 BOOT, но T23 BootROM их сам не отображает и не проигрывает.
+
+## Web
+
+После успешной загрузки и получения IP:
+
+```text
+OpenIPC/Majestic: http://CAMERA_IP/
+WIFICAM:          http://CAMERA_IP:8080/
+```
+
+WIFICAM на первом локальном запуске позволяет задать Web password, затем
+перезапускается с authentication.
+
+SSH, WireGuard и AmneziaWG по умолчанию выключены. Их marker-файлы:
+
+```text
+/data/services/ssh.enabled
+/data/services/wireguard.enabled
+/data/services/amneziawg.enabled
+```
+
+## MEDIA
 
 ```text
 /mnt/media/
@@ -103,184 +174,30 @@ MEDIA:
 └── events/
 ```
 
-Размер MEDIA можно переопределить, но по умолчанию он фиксирован на 20 GiB:
+## Первый запуск платы
 
-```sh
-MEDIA_GIB=20 sudo -E sh scripts/prepare_sd.sh ...
-```
+После записи SD:
 
-## Web UI
+1. полностью обесточить камеру;
+2. вставить SD;
+3. подключить UART 115200;
+4. подать питание;
+5. сохранить вывод **с первой строки BootROM/SPL/U-Boot**.
 
-```text
-Browser
-   |
-   v
-PegineLab HTML / CSS / JavaScript
-   |
-   v
-BusyBox httpd + CGI JSON API
-   |
-   +--> Wi-Fi / IP / DHCP
-   +--> Camera service managed by OS
-   +--> MEDIA storage
-   +--> SSH on demand
-   +--> WireGuard wg0 on demand
-   +--> AmneziaWG awg0 on demand
-   |
-   v
-Linux 3.10.14 / Ingenic T23/T23N
-```
+При отсутствии SPI/NOR первым проверяется именно SD BootROM path. На некоторых
+платах слот SD может питаться через GPIO; если BootROM не видит карту, это
+проверяется по UART и схеме платы, а не заменяется загрузкой из отсутствующей
+flash.
 
-Меню:
+## Основные файлы
 
 ```text
-Dashboard / Главная
-Live view / Видео
-Recording / Запись
-Image / Изображение
-Network / Wi‑Fi / IP
-  └─ SSH
-  └─ WireGuard
-  └─ AmneziaWG
-Storage / SD
-System
-Firmware update
-Logs
-```
-
-### Optional services
-
-Управляет:
-
-```text
-wificam-service-ctl
-```
-
-Autostart включается только marker-файлом:
-
-```text
-/data/services/ssh.enabled
-/data/services/wireguard.enabled
-/data/services/amneziawg.enabled
-```
-
-VPN configs:
-
-```text
-/data/vpn/wg0.conf
-/data/vpn/awg0.conf
-```
-
-Если marker отсутствует, `S91wificam-services` не запускает соответствующий сервис после reboot.
-
-## Wi‑Fi / IP
-
-```text
-scan SSID
-   ↓
-enter password
-   ↓
-new wpa_supplicant profile
-   ↓
-association + DHCP
-   ↓
-IPv4?
-  ├─ yes → keep
-  └─ no  → restore last-good
-```
-
-Web UI показывает SSID, IPv4/CIDR, default gateway и DNS.
-
-## Web password
-
-По умолчанию Web UI не стартует без пароля:
-
-```sh
-printf '%s' 'NEW_PASSWORD_HERE' | wificam-set-web-password admin
-/etc/init.d/S90wificam start
-```
-
-## Screenshots / Скриншоты
-
-### Dashboard
-![Dashboard](docs/screenshots/dashboard.svg)
-
-### Wi‑Fi
-![Wi-Fi](docs/screenshots/wifi.svg)
-
-### Optional services
-![Optional services](docs/screenshots/services.svg)
-
-### Storage
-![Storage](docs/screenshots/storage.svg)
-
-## Structure
-
-```text
-.
-├── branding/
-│   └── peginelab-logo.png.b64
-├── tools/
-│   └── generate_boot_jingle.py
-├── scripts/
-│   ├── build_kernel.sh
-│   ├── build_all.sh
-│   ├── export_known_good.sh
-│   ├── package_rootfs_overlay.sh
-│   ├── assemble_rootfs.sh
-│   └── prepare_sd.sh
-├── rootfs/
-│   ├── etc/init.d/
-│   │   ├── S05peginelab-boot
-│   │   ├── S90wificam
-│   │   └── S91wificam-services
-│   ├── etc/wificam/wificam.conf
-│   └── usr/bin/
-│       ├── wificam-camera-ctl
-│       ├── wificam-service-ctl
-│       └── wificam-set-web-password
-├── web/
-│   ├── assets/peginelab-logo.svg
-│   ├── index.html
-│   ├── styles.css
-│   ├── app.js
-│   └── cgi-bin/api
-└── docs/
-    ├── BRANDING_BOOT_RU.md / BRANDING_BOOT_EN.md
-    ├── BUILD_RU.md / BUILD_EN.md
-    ├── HARDWARE_AND_SD_RU.md / HARDWARE_AND_SD_EN.md
-    ├── WIFI_ARCHITECTURE_RU.md / WIFI_ARCHITECTURE_EN.md
-    ├── WEB_STACK_RU.md / WEB_STACK_EN.md
-    └── STORAGE_SERVICES_RU.md / STORAGE_SERVICES_EN.md
-```
-
-## Documentation
-
-**Русский**
-- [Загрузка и PegineLab branding](docs/BRANDING_BOOT_RU.md)
-- [Сборка ядра](docs/BUILD_RU.md)
-- [Плата и SD](docs/HARDWARE_AND_SD_RU.md)
-- [Wi‑Fi/IP/VPN](docs/WIFI_ARCHITECTURE_RU.md)
-- [Web UI/API](docs/WEB_STACK_RU.md)
-- [Storage и optional services](docs/STORAGE_SERVICES_RU.md)
-
-**English**
-- [Boot and PegineLab branding](docs/BRANDING_BOOT_EN.md)
-- [Kernel build](docs/BUILD_EN.md)
-- [Board and SD](docs/HARDWARE_AND_SD_EN.md)
-- [Wi‑Fi/IP/VPN](docs/WIFI_ARCHITECTURE_EN.md)
-- [Web UI/API](docs/WEB_STACK_EN.md)
-- [Storage and optional services](docs/STORAGE_SERVICES_EN.md)
-
-## Known-good kernel build
-
-```text
-Image:        uImage.lzma
-Linux:        3.10.14
-Architecture: MIPS
-Compression:  LZMA
-Load Address: 0x80010000
-Entry Point:  0x803c7960
-Size:         1739320 bytes
-SHA-256:      7ba1c4b0a3ea28d3a7a89cd14330fe1968a0ac63166b08c2d9e715541432565f
+scripts/build_kernel.sh
+scripts/build_sd_bootloader.sh
+scripts/flash_full_firmware_sd.sh
+scripts/prepare_sd.sh
+patches/u-boot-ingenic-t23n-sd.patch
+rootfs/
+web/
+docs/
 ```
