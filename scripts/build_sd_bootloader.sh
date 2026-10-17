@@ -81,11 +81,20 @@ if new not in header_text:
     if old not in header_text:
         raise SystemExit("cannot find pinned T23 MMC bootargs line")
     header_text = header_text.replace(old, new, 1)
-    header.write_text(header_text)
+
+old_cmd = '#define CONFIG_BOOTCOMMAND "mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"'
+new_cmd = '#define CONFIG_BOOTCOMMAND "if test \\"$sd_env_initialized\\" != \\"1\\"; then setenv sd_env_initialized 1; saveenv; fi; mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"'
+if new_cmd not in header_text:
+    if old_cmd not in header_text:
+        raise SystemExit("cannot find pinned T23 MMC boot command")
+    header_text = header_text.replace(old_cmd, new_cmd, 1)
+
+header.write_text(header_text)
 PY
 
 grep -q '^isvp_t23_msc0 .*SPL_MMC_SUPPORT.*ENV_IS_IN_MMC.*JZ_MMC_MSC0.*T23N'     "$UBOOT_SRC/boards.cfg" || die "T23N MMC target verification failed"
 grep -q 'root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init'     "$UBOOT_SRC/include/configs/isvp_t23.h" || die "T23N SD bootargs verification failed"
+grep -q 'sd_env_initialized.*saveenv.*mmc read 0x80600000 0x1800 0x3000'     "$UBOOT_SRC/include/configs/isvp_t23.h" || die "T23N SD first-boot env initialization missing"
 
 echo "[4/4] Building T23N U-Boot for direct SD BootROM boot..."
 make -C "$UBOOT_SRC" distclean
@@ -120,3 +129,4 @@ echo "U-Boot env start      : sector 514"
 echo "Kernel raw start      : sector 0x1800 (3 MiB)"
 echo "Kernel raw read size  : 0x3000 sectors (6 MiB)"
 echo "Linux root            : /dev/mmcblk0p2 (ext4)"
+echo "First boot             : save full default U-Boot env once to sector 514"
