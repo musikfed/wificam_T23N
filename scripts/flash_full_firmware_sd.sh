@@ -44,7 +44,7 @@ case "$ROOT_SRC" in
   "$DEV"*) die "$DEV contains the running root filesystem" ;;
 esac
 
-for cmd in curl tar unsquashfs sha256sum stat lsblk od; do
+for cmd in curl tar unsquashfs sha256sum stat lsblk od python3; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "Missing host tool: $cmd" >&2
         echo "Install host requirements with:" >&2
@@ -130,6 +130,43 @@ unsquashfs -d "$WORK/base-rootfs" "$ROOTFS_IMG" >/dev/null
 echo "Applying WIFICAM/PegineLab rootfs overlay..."
 sh "$REPO_DIR/scripts/package_rootfs_overlay.sh"
 tar -C "$WORK/base-rootfs" -xzf "$REPO_DIR/out/wificam-rootfs-overlay.tar.gz"
+
+
+# OpenIPC T23 normally loads jzmmc_v12 as a module late in userspace.
+# SD-root needs that host controller built into the kernel before / is mounted.
+# Skip the duplicate modprobe so camera-driver setup does not abort.
+LOAD_INGENIC="$WORK/base-rootfs/usr/bin/load_ingenic"
+[ -f "$LOAD_INGENIC" ] || die "OpenIPC T23 load_ingenic not found"
+python3 - "$LOAD_INGENIC" <<'PY'
+from pathlib import Path
+import sys
+
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """lsmod | grep -q "jzmmc_v12"
+if [ $? -ne 0 ]; then
+\tmodprobe jzmmc_v12 detect_pin=$(fw_printenv -n gpio_mmc || echo 59)
+\tcheck_return "modprobe mmc"
+fi
+"""
+new = """# WIFICAM autonomous-SD: mmc0 is built into the kernel because it hosts /.
+# Loading jzmmc_v12.ko again would fail and stop this script.
+if ! grep -q 'root=/dev/mmcblk0p2' /proc/cmdline; then
+\tlsmod | grep -q "jzmmc_v12"
+\tif [ $? -ne 0 ]; then
+\t\tmodprobe jzmmc_v12 detect_pin=$(fw_printenv -n gpio_mmc || echo 59)
+\t\tcheck_return "modprobe mmc"
+\tfi
+fi
+"""
+if old not in s:
+    raise SystemExit("pinned OpenIPC load_ingenic MMC block not found")
+p.write_text(s.replace(old, new, 1))
+PY
+
+grep -q "root=/dev/mmcblk0p2" "$LOAD_INGENIC" || die "load_ingenic SD patch verification failed"
+grep -Eq '^/dev/mmcblk0[[:space:]]+0x40400[[:space:]]+0x8000' \
+    "$WORK/base-rootfs/etc/fw_env.config" || die "SD fw_env.config missing or invalid"
 
 mkdir -p     "$WORK/base-rootfs/data/services"     "$WORK/base-rootfs/data/vpn"     "$WORK/base-rootfs/mnt/media"     "$WORK/base-rootfs/etc/wificam"
 
