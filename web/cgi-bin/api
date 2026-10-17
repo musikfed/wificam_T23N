@@ -203,7 +203,10 @@ camera_action() {
 
 web_password() {
     require_post
-    require_auth
+    # First-boot claim: when AUTH_CONF does not exist yet, the per-boot
+    # CSRF token is sufficient on the local bootstrap UI. Once claimed,
+    # changing the password requires authenticated access.
+    [ -s "$AUTH_CONF" ] && require_auth
     require_csrf
     password="$(param new_password)"
     [ "${#password}" -ge 10 ] || fail "new web password must be at least 10 characters"
