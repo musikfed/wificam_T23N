@@ -14,3 +14,8 @@ diff --git a/include/configs/isvp_t23.h b/include/configs/isvp_t23.h
 -	#define CONFIG_BOOTARGS BOOTARGS_COMMON " init=/linuxrc root=/dev/mmcblk0p2 rw rootdelay=1"
 +	#define CONFIG_BOOTARGS BOOTARGS_COMMON " root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init"
  #elif defined(CONFIG_SFC_NOR)
+@@ -241,3 +241,3 @@
+ #ifdef CONFIG_SPL_MMC_SUPPORT
+-#define CONFIG_BOOTCOMMAND "mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"
++#define CONFIG_BOOTCOMMAND "if test \"$sd_env_initialized\" != \"1\"; then setenv sd_env_initialized 1; saveenv; fi; mmc read 0x80600000 0x1800 0x3000; bootm 0x80600000"
+ #endif
