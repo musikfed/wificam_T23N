@@ -1,9 +1,48 @@
 # wificam_T23N
 
+![PegineLab](web/assets/peginelab-logo.svg)
+
 Экспериментальная прошивка и Web UI для Wi‑Fi камеры на **Ingenic T23/T23N**.  
 Experimental firmware and Web UI for an **Ingenic T23/T23N** Wi‑Fi camera.
 
+> **Experimental branch:** `mymarrchWFcam` — PegineLab branding + non-blocking boot splash + original ~7 s 8-bit boot jingle.
+>
 > **Status:** Linux 3.10.14 kernel build = **SUCCESS**. SD/rootfs tooling, Wi‑Fi/IP UI, camera-service integration and on-demand SSH/VPN controls are in the repository.
+
+## PegineLab boot branding / Загрузка
+
+В этой ветке:
+
+- логотип PegineLab встроен в Web UI;
+- favicon использует PegineLab PL;
+- `S05peginelab-boot` пытается показать логотип через framebuffer;
+- оригинальный ~7-секундный 8-bit/chiptune джингл генерируется при сборке;
+- splash и звук работают **в фоне** и не должны задерживать Wi‑Fi/camera startup;
+- если framebuffer/audio player отсутствуют, загрузка просто продолжается.
+
+Настройки:
+
+```text
+BOOT_SPLASH=1
+BOOT_SOUND=1
+BOOT_BRANDING_SECONDS=7
+```
+
+Джингл не хранится большим бинарником в Git. Он воспроизводимо генерируется:
+
+```sh
+python3 tools/generate_boot_jingle.py
+```
+
+и получается:
+
+```text
+web/assets/boot-jingle.wav
+```
+
+Файл лёгкий: mono PCM, 8-bit, 11025 Hz, около 77 KiB. Мелодия оригинальная — только стилистика старой 8-bit приставки.
+
+Документация: [RU](docs/BRANDING_BOOT_RU.md) / [EN](docs/BRANDING_BOOT_EN.md).
 
 ## Принципы / Design rules
 
@@ -21,6 +60,8 @@ Experimental firmware and Web UI for an **Ingenic T23/T23N** Wi‑Fi camera.
 ```sh
 sh scripts/build_all.sh
 ```
+
+`package_rootfs_overlay.sh` сам генерирует boot jingle, если установлен `python3`, и декодирует компактный PegineLab logo PNG для framebuffer.
 
 Known-good kernel artifacts:
 
@@ -49,7 +90,7 @@ sudo sh scripts/prepare_sd.sh \
 
 | Partition | Size | FS | Purpose |
 |---|---:|---|---|
-| p1 BOOT | 128 MiB | FAT32 | uImage / boot |
+| p1 BOOT | 128 MiB | FAT32 | uImage + PegineLab logo/jingle |
 | p2 ROOTFS | all remaining space | ext4 | Linux, apps, configs, VPN, SSH, logs |
 | p3 MEDIA | 20 GiB | ext4 | recordings, snapshots, events |
 
@@ -74,7 +115,7 @@ MEDIA_GIB=20 sudo -E sh scripts/prepare_sd.sh ...
 Browser
    |
    v
-HTML / CSS / JavaScript
+PegineLab HTML / CSS / JavaScript
    |
    v
 BusyBox httpd + CGI JSON API
@@ -177,6 +218,10 @@ printf '%s' 'NEW_PASSWORD_HERE' | wificam-set-web-password admin
 
 ```text
 .
+├── branding/
+│   └── peginelab-logo.png.b64
+├── tools/
+│   └── generate_boot_jingle.py
 ├── scripts/
 │   ├── build_kernel.sh
 │   ├── build_all.sh
@@ -186,6 +231,7 @@ printf '%s' 'NEW_PASSWORD_HERE' | wificam-set-web-password admin
 │   └── prepare_sd.sh
 ├── rootfs/
 │   ├── etc/init.d/
+│   │   ├── S05peginelab-boot
 │   │   ├── S90wificam
 │   │   └── S91wificam-services
 │   ├── etc/wificam/wificam.conf
@@ -194,22 +240,24 @@ printf '%s' 'NEW_PASSWORD_HERE' | wificam-set-web-password admin
 │       ├── wificam-service-ctl
 │       └── wificam-set-web-password
 ├── web/
+│   ├── assets/peginelab-logo.svg
 │   ├── index.html
 │   ├── styles.css
 │   ├── app.js
 │   └── cgi-bin/api
 └── docs/
+    ├── BRANDING_BOOT_RU.md / BRANDING_BOOT_EN.md
     ├── BUILD_RU.md / BUILD_EN.md
     ├── HARDWARE_AND_SD_RU.md / HARDWARE_AND_SD_EN.md
     ├── WIFI_ARCHITECTURE_RU.md / WIFI_ARCHITECTURE_EN.md
     ├── WEB_STACK_RU.md / WEB_STACK_EN.md
-    ├── STORAGE_SERVICES_RU.md / STORAGE_SERVICES_EN.md
-    └── screenshots/
+    └── STORAGE_SERVICES_RU.md / STORAGE_SERVICES_EN.md
 ```
 
 ## Documentation
 
 **Русский**
+- [Загрузка и PegineLab branding](docs/BRANDING_BOOT_RU.md)
 - [Сборка ядра](docs/BUILD_RU.md)
 - [Плата и SD](docs/HARDWARE_AND_SD_RU.md)
 - [Wi‑Fi/IP/VPN](docs/WIFI_ARCHITECTURE_RU.md)
@@ -217,6 +265,7 @@ printf '%s' 'NEW_PASSWORD_HERE' | wificam-set-web-password admin
 - [Storage и optional services](docs/STORAGE_SERVICES_RU.md)
 
 **English**
+- [Boot and PegineLab branding](docs/BRANDING_BOOT_EN.md)
 - [Kernel build](docs/BUILD_EN.md)
 - [Board and SD](docs/HARDWARE_AND_SD_EN.md)
 - [Wi‑Fi/IP/VPN](docs/WIFI_ARCHITECTURE_EN.md)
