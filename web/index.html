@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>PegineLab WIFICAM T23N</title>
-  <link rel="icon" href="assets/peginelab-avatar.png">
+  <link rel="icon" href="assets/peginelab-logo.svg">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
     <div class="brand-lockup">
-      <img src="assets/peginelab-logo.png" alt="PegineLab">
+      <img src="assets/peginelab-logo.svg" alt="PegineLab">
       <div><div class="brand">WIFICAM <b>T23N</b></div><div class="sub">PegineLab • Ingenic camera control</div></div>
     </div>
     <nav id="nav">
@@ -33,7 +33,7 @@
 
     <section id="dashboard" class="page active">
       <div class="brand-panel">
-        <img src="assets/peginelab-logo.png" alt="PegineLab PL">
+        <img src="assets/peginelab-logo.svg" alt="PegineLab PL">
         <div><strong>PegineLab WIFICAM T23N</strong><span>Embedded camera firmware • MIPS / Ingenic</span></div>
       </div>
       <div class="grid cards">
@@ -49,28 +49,17 @@
     </section>
 
     <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2><div class="video">LIVE VIEW<br><small data-i18n="cameraOsHint">Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.</small></div><div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div></div></section>
-
     <section id="recording" class="page"><div class="panel"><h2 data-i18n="recording">Запись</h2><p>Video: <code>/mnt/media/recordings</code></p><p>Photos: <code>/mnt/media/snapshots</code></p><div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div></section>
-
     <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Web UI использует camera service, который ОС подняла при загрузке.</p></div></section>
 
     <section id="network" class="page">
       <div class="panel">
         <h2 data-i18n="network">Сеть / Wi‑Fi</h2>
-        <div class="kv">
-          <div><small>SSID</small><b id="netSsid">—</b></div>
-          <div><small>IPv4</small><b id="netIp">—</b></div>
-          <div><small data-i18n="gateway">Шлюз</small><b id="netGateway">—</b></div>
-          <div><small>DNS</small><b id="netDns">—</b></div>
-        </div>
+        <div class="kv"><div><small>SSID</small><b id="netSsid">—</b></div><div><small>IPv4</small><b id="netIp">—</b></div><div><small data-i18n="gateway">Шлюз</small><b id="netGateway">—</b></div><div><small>DNS</small><b id="netDns">—</b></div></div>
         <p data-i18n="wifiSafe">Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.</p>
         <div class="actions"><button id="scanBtn" data-i18n="scan">Сканировать сети</button></div>
         <div id="networks" class="networks"></div>
-        <form id="wifiForm">
-          <label>SSID<input id="wifiSsid" name="ssid" maxlength="32" required></label>
-          <label><span data-i18n="password">Пароль</span><input id="wifiPassword" name="password" type="password" minlength="8" required></label>
-          <button type="submit" data-i18n="testSwitch">Проверить и переключить</button>
-        </form>
+        <form id="wifiForm"><label>SSID<input id="wifiSsid" name="ssid" maxlength="32" required></label><label><span data-i18n="password">Пароль</span><input id="wifiPassword" name="password" type="password" minlength="8" required></label><button type="submit" data-i18n="testSwitch">Проверить и переключить</button></form>
       </div>
 
       <div class="panel">
