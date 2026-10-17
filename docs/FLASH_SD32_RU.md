@@ -1,55 +1,115 @@
-# Запись 32-ГБ SD — безопасный сценарий
+# Полная запись SD для T23/T23N без SPI/NOR
 
-По предоставленному скриншоту Windows карта отображается как **Диск 2**, съёмное устройство, **29.12 ГБ**, RAW. Это подтверждает физическую карту, но **не определяет Linux-путь**: в Linux она может оказаться `/dev/sdb`, `/dev/sdc`, `/dev/mmcblk0` и т. п.
+Эта инструкция относится к камере, у которой внешняя SPI/NOR flash **физически снята**.
+SD содержит всю загрузочную цепочку.
 
-## 1. Переключиться на ветку
+## 1. Обновить ветку
 
 ```sh
 cd ~/myipcam/wificam_T23N
-git fetch origin
 git switch mymarrchWFcam
 git pull
 ```
 
-## 2. Найти SD в Linux
+## 2. Установить host tools
 
 ```sh
-lsblk -o NAME,PATH,SIZE,MODEL,TRAN,RM,FSTYPE,MOUNTPOINTS
+sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2fsprogs
 ```
 
-Ищем съёмный диск примерно 29–30 GiB. Не выбираем системный диск.
-
-## 3. Проверить kernel
+## 3. Пересобрать kernel для SD root
 
 ```sh
-ls -lh ~/myipcam/build/kernel/arch/mips/boot/uImage
+sh scripts/build_kernel.sh
 ```
 
-## 4. Форматирование + kernel + PegineLab branding
+Скрипт требует built-in:
+
+```text
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_JZMMC_V12=y
+CONFIG_JZMMC_V12_MMC0=y
+CONFIG_EXT4_FS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+```
+
+Это обязательно: kernel не может загрузить MMC/ext4 module из rootfs, пока сам rootfs ещё не смонтирован.
+
+## 4. Собрать специальный SD SPL/U-Boot
 
 ```sh
-sudo sh scripts/flash_sd_32gb_safe.sh /dev/ВАША_SD \
-  ~/myipcam/build/kernel/arch/mips/boot/uImage
+sh scripts/build_sd_bootloader.sh
 ```
 
-Скрипт повторно показывает устройство и требует вручную набрать его точный путь.
+Результат:
 
-Разметка:
+```text
+out/u-boot-t23n-sd.bin
+```
 
-| Раздел | Размер | FS |
-|---|---:|---|
-| BOOT | 128 MiB | FAT32 |
-| ROOTFS | всё оставшееся | ext4 |
-| MEDIA | 20 GiB | ext4 |
+Это MMC/SPL build, а не SPI/SFC U-Boot.
 
-На BOOT попадают `uImage`, PegineLab logo и boot-jingle.
-
-## 5. С полным rootfs
+## 5. Найти SD
 
 ```sh
-sudo sh scripts/flash_sd_32gb_safe.sh /dev/ВАША_SD \
-  ~/myipcam/build/kernel/arch/mips/boot/uImage \
-  out/wificam-rootfs.tar.gz
+lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
 ```
 
-Не стирать штатную SPI/NOR/NAND камеры до успешного SD/RAM boot.
+После каждого detach/re-attach имя `/dev/sdX` проверяется заново.
+
+## 6. Записать всё
+
+```sh
+sudo sh scripts/flash_full_firmware_sd.sh /dev/ВАША_SD
+```
+
+Скрипт потребует строку вида:
+
+```text
+AUTONOMOUS-SD:/dev/sdX
+```
+
+После подтверждения вся карта переразмечается.
+
+## Raw boot map
+
+```text
+sector 0       MBR
+sector 34      SPL/U-Boot image start (17 KiB)
+sector 86      U-Boot proper
+sector 514     U-Boot environment
+sector 0x1800  uImage (3 MiB)
+                raw kernel slot = 0x3000 sectors = 6 MiB
+16 MiB         p1 BOOT FAT32, 128 MiB
+144 MiB        p2 ROOTFS ext4
+...            p3 MEDIA ext4, fixed 20 GiB near end
+```
+
+U-Boot загружает kernel напрямую из raw SD:
+
+```text
+mmc read 0x80600000 0x1800 0x3000
+bootm 0x80600000
+```
+
+Linux root:
+
+```text
+/dev/mmcblk0p2
+rootfstype=ext4
+```
+
+## 7. Первый запуск
+
+После успешного завершения flash script:
+
+```sh
+sync
+```
+
+Отсоединить карту от WSL, вставить её в обесточенную камеру, подключить UART 115200
+и только потом подать питание. Нужен полный лог от первой строки.
+
+SPI/NOR для этого сценария не требуется.
