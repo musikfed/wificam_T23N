@@ -155,8 +155,13 @@ P3="$(part 3)"
 }
 
 mkfs.vfat -F 32 -n BOOT "$P1"
-mkfs.ext4 -F -L ROOTFS "$P2"
-mkfs.ext4 -F -L MEDIA "$P3"
+
+# Linux 3.10 must mount ROOTFS before any userspace is available. Do not use
+# Ubuntu 24.04's newer default ext4 incompat features (notably orphan_file and
+# metadata checksums/64-bit layout) on either filesystem the camera mounts.
+EXT4_COMPAT_OPTS="-O ^64bit,^metadata_csum,^orphan_file"
+mkfs.ext4 -F $EXT4_COMPAT_OPTS -L ROOTFS "$P2"
+mkfs.ext4 -F $EXT4_COMPAT_OPTS -L MEDIA "$P3"
 
 echo "Writing T23N SD SPL/U-Boot at sector $SD_UBOOT_SECTOR ..."
 dd if="$BOOTLOADER" of="$DEV" bs=512 seek="$SD_UBOOT_SECTOR" conv=notrunc,fsync status=none
