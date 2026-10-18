@@ -35,6 +35,9 @@ ROOTFS_TAR="${5:-}"
 [ -b "$DEV" ] || { echo "Not a block device: $DEV" >&2; exit 1; }
 [ -f "$BOOTLOADER" ] || { echo "SD U-Boot not found: $BOOTLOADER" >&2; exit 1; }
 [ -f "$IMAGE" ] || { echo "uImage not found: $IMAGE" >&2; exit 1; }
+command -v readlink >/dev/null 2>&1 || { echo "Missing host tool: readlink" >&2; exit 1; }
+IMAGE_REAL="$(readlink -f "$IMAGE")"
+[ -f "$IMAGE_REAL" ] || { echo "Resolved uImage not found: $IMAGE_REAL" >&2; exit 1; }
 
 case "$DEV" in
   /dev/sd[a-z]|/dev/mmcblk[0-9]) ;;
@@ -100,8 +103,9 @@ UBOOT_MAX=$(((SD_UBOOT_ENV_SECTOR - SD_UBOOT_SECTOR) * 512))
     exit 1
 }
 
-# uImage may be a symlink; size the target, not the link text.
-KERNEL_SIZE="$(stat -Lc '%s' "$IMAGE")"
+# uImage is normally a symlink to uImage.lzma. Resolve it once and size
+# the opened target file, avoiding symlink-size ambiguity.
+KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
 KERNEL_SLOT_BYTES=$((KERNEL_SLOT_SECTORS * 512))
 [ "$KERNEL_SIZE" -le "$KERNEL_SLOT_BYTES" ] || {
     echo "REFUSING: uImage is $KERNEL_SIZE bytes, raw kernel slot is $KERNEL_SLOT_BYTES bytes." >&2
@@ -187,7 +191,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 mount "$P1" "$MNT"
-cp "$IMAGE" "$MNT/uImage"
+cp "$IMAGE_REAL" "$MNT/uImage"
 cp "$BOOTLOADER" "$MNT/u-boot-t23n-sd.bin"
 if [ -f "$REPO_DIR/branding/peginelab-logo.png.b64" ]; then
     base64 -d "$REPO_DIR/branding/peginelab-logo.png.b64" > "$MNT/peginelab-logo.png"
