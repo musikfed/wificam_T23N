@@ -206,8 +206,12 @@ echo "Repartitioning and writing the COMPLETE autonomous SD image..."
 sh "$REPO_DIR/scripts/prepare_sd.sh"     "$DEV" --yes "$BOOTLOADER" "$KERNEL" "$ROOTFS_TAR"
 
 echo
+echo "Verifying the COMPLETE autonomous SD by reading it back..."
+sh "$REPO_DIR/scripts/verify_sd_firmware.sh" "$DEV" "$KERNEL"
+
+echo
 echo "============================================================"
-echo " T23N AUTONOMOUS SD FIRMWARE: COMPLETE"
+echo " T23N AUTONOMOUS SD FIRMWARE: COMPLETE + SD VERIFIED"
 echo "============================================================"
 echo "Boot chain:"
 echo "  T23 BootROM -> SD sector 34 SPL/U-Boot"
@@ -216,4 +220,4 @@ echo "  Linux       -> /dev/mmcblk0p2 ext4"
 echo "  MEDIA       -> /dev/mmcblk0p3 ext4"
 echo
 echo "No SPI/NOR bootloader or root filesystem is required."
-echo "Next validation is UART output from power-on with this SD inserted."
+echo "SD verification completed successfully; the card is ready for the camera."
