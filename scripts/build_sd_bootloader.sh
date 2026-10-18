@@ -15,7 +15,7 @@ TOOLCHAIN_COMMIT="81cb9f1e63d1abebf8a9a51efb95b6b3a78d9924"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-for cmd in git make gcc python3 od sha256sum strings; do
+for cmd in git make gcc python3 od sha256sum strings lzop; do
     command -v "$cmd" >/dev/null 2>&1 || die "$cmd not installed"
 done
 
