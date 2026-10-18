@@ -207,7 +207,7 @@ sh "$REPO_DIR/scripts/prepare_sd.sh"     "$DEV" --yes "$BOOTLOADER" "$KERNEL" "$
 
 echo
 echo "Verifying the COMPLETE autonomous SD by reading it back..."
-sh "$REPO_DIR/scripts/verify_sd_firmware.sh" "$DEV" "$KERNEL"
+sh "$REPO_DIR/scripts/verify_sd_firmware.sh" "$DEV" "$KERNEL" "$BOOTLOADER"
 
 echo
 echo "============================================================"
