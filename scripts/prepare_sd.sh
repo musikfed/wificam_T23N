@@ -178,8 +178,8 @@ DISK_MAGIC="$(dd if="$DEV" bs=512 skip="$SD_UBOOT_SECTOR" count=1 status=none | 
 }
 
 echo "Writing and verifying raw uImage at sector 0x1800 ..."
-EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE" | awk '{print $1}')"
-sh "$REPO_DIR/scripts/write_verify_raw_kernel.sh" "$DEV" "$IMAGE" --yes
+EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE_REAL" | awk '{print $1}')"
+sh "$REPO_DIR/scripts/write_verify_raw_kernel.sh" "$DEV" "$IMAGE_REAL" --yes
 
 VERIFY="$(mktemp)"
 MNT="$(mktemp -d)"
