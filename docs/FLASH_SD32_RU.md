@@ -14,7 +14,7 @@ git pull
 ## 2. Установить host tools
 
 ```sh
-sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2fsprogs
+sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2fsprogs lzop
 ```
 
 ## 3. Пересобрать kernel для SD root
