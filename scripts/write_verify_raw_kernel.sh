@@ -17,6 +17,9 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "run with sudo/root"
 [ -b "$DEV" ] || die "not a block device: $DEV"
 [ -f "$IMAGE" ] || die "kernel image not found: $IMAGE"
+command -v readlink >/dev/null 2>&1 || die "readlink is required"
+IMAGE_REAL="$(readlink -f "$IMAGE")"
+[ -f "$IMAGE_REAL" ] || die "resolved kernel image not found: $IMAGE_REAL"
 [ "$(lsblk -dn -o TYPE "$DEV" 2>/dev/null)" = "disk" ] || die "$DEV is not a whole disk"
 
 case "$DEV" in
@@ -27,8 +30,9 @@ esac
 SECTOR_SIZE="$(blockdev --getss "$DEV")"
 [ "$SECTOR_SIZE" -eq 512 ] || die "expected 512-byte sectors, got $SECTOR_SIZE"
 
-# uImage may be a symlink (for example uImage -> uImage.lzma). Dereference it.
-KERNEL_SIZE="$(stat -Lc '%s' "$IMAGE")"
+# Resolve uImage once and measure the real file through an opened file
+# descriptor. This avoids stat/symlink ambiguity completely.
+KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
 KERNEL_SLOT_BYTES=$((KERNEL_SLOT_SECTORS * 512))
 [ "$KERNEL_SIZE" -le "$KERNEL_SLOT_BYTES" ] || die "kernel is larger than the 6 MiB raw slot"
 KERNEL_BLOCKS=$(((KERNEL_SIZE + 511) / 512))
@@ -49,10 +53,17 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-cp "$IMAGE" "$PAD"
+cp "$IMAGE_REAL" "$PAD"
 truncate -s $((KERNEL_BLOCKS * 512)) "$PAD"
 
-SOURCE_SHA="$(sha256sum "$IMAGE" | awk '{print $1}')"
+SOURCE_SHA="$(sha256sum "$IMAGE_REAL" | awk '{print $1}')"
+PAD_SOURCE_SHA="$(head -c "$KERNEL_SIZE" "$PAD" | sha256sum | awk '{print $1}')"
+[ "$SOURCE_SHA" = "$PAD_SOURCE_SHA" ] || die "internal staging copy SHA mismatch"
+
+echo "Kernel requested path : $IMAGE"
+echo "Kernel resolved path  : $IMAGE_REAL"
+echo "Kernel bytes          : $KERNEL_SIZE"
+echo "Kernel sectors        : $KERNEL_BLOCKS"
 
 echo "Writing raw uImage at sector 0x1800 ..."
 dd if=/dev/zero of="$DEV" bs=512 seek="$KERNEL_SECTOR" count="$KERNEL_SLOT_SECTORS" conv=notrunc status=none
@@ -76,9 +87,11 @@ read_back() {
 read_back "$READ1"
 READ1_SHA="$(head -c "$KERNEL_SIZE" "$READ1" | sha256sum | awk '{print $1}')"
 
-if cmp -s "$PAD" "$READ1"; then
-    echo "Kernel source SHA256 : $SOURCE_SHA"
-    echo "Kernel SD SHA256     : $READ1_SHA"
+echo "Kernel source SHA256 : $SOURCE_SHA"
+echo "Kernel SD SHA256     : $READ1_SHA"
+
+# Never report OK unless the full, unpadded kernel SHA also matches.
+if [ "$SOURCE_SHA" = "$READ1_SHA" ] && cmp -s "$PAD" "$READ1"; then
     echo "Raw kernel readback  : OK"
     exit 0
 fi
