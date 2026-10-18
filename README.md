@@ -16,7 +16,7 @@ kernel, rootfs или environment во внешней flash-памяти.
 T23 BootROM
    ↓
 raw SD sector 34 (17 KiB)
-SPL / MMC bootstrap
+SPL / MMC bootstrap (MSC0 1-bit)
    ↓
 raw SD sector 86
 U-Boot T23N MMC
@@ -32,6 +32,13 @@ OpenIPC T23 userspace + WIFICAM/PegineLab
 
 Для этого **нельзя** использовать обычный U-Boot, собранный для SPI/SFC.
 `scripts/build_sd_bootloader.sh` собирает отдельный T23N MMC/SPL loader.
+
+Для T23N SD-bootstrap используется **MSC0 1-bit**. Это не меняет raw offset:
+SPL по-прежнему начинается с sector 34 (17 KiB), а U-Boot proper после
+26 KiB SPL — с sector 86. Ранее эта ветка ошибочно собирала generic 4-bit
+MMC target из старого OpenIPC U-Boot; для раннего T23N SD bootstrap он
+заменён на 1-bit режим, совместимый с известным
+`isvp_t23n_msc0_mmc1bit` вариантом.
 
 ## Разметка SD
 
@@ -76,7 +83,7 @@ sh scripts/build_all.sh
 `build_all.sh` выполняет три шага:
 
 1. пересобирает Linux kernel с **MMC controller + MMC block + EXT4 встроенными (=y)**;
-2. собирает специальный **T23N SD SPL/U-Boot**;
+2. собирает специальный **T23N SD SPL/U-Boot в MSC0 1-bit режиме**;
 3. пакует WIFICAM/PegineLab overlay.
 
 Основные artifacts:
@@ -176,18 +183,15 @@ SSH, WireGuard и AmneziaWG по умолчанию выключены. Их mar
 
 ## Первый запуск платы
 
-После записи SD:
+После `SD FIRMWARE VERIFY: OK`:
 
 1. полностью обесточить камеру;
 2. вставить SD;
-3. подключить UART 115200;
-4. подать питание;
-5. сохранить вывод **с первой строки BootROM/SPL/U-Boot**.
+3. подать питание.
 
-При отсутствии SPI/NOR первым проверяется именно SD BootROM path. На некоторых
-платах слот SD может питаться через GPIO; если BootROM не видит карту, это
-проверяется по UART и схеме платы, а не заменяется загрузкой из отсутствующей
-flash.
+В этой ветке основной сценарий — автономная загрузка **только с SD** при
+физически отсутствующей SPI/NOR. UART не является частью обязательного
+процесса записи или проверки карты.
 
 ## Основные файлы
 
