@@ -1,18 +1,21 @@
 #!/bin/sh
 set -eu
 
+REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 DEV="${1:-}"
 IMAGE="${2:-}"
+BOOTLOADER="${3:-$REPO_DIR/out/u-boot-t23n-sd.bin}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 [ -n "$DEV" ] && [ -n "$IMAGE" ] || {
-    echo "Usage: sudo $0 /dev/sdX uImage" >&2
+    echo "Usage: sudo $0 /dev/sdX uImage [u-boot-t23n-sd.bin]" >&2
     exit 2
 }
 [ "$(id -u)" -eq 0 ] || die "run with sudo/root"
 [ -b "$DEV" ] || die "not a block device: $DEV"
 [ -f "$IMAGE" ] || die "kernel image not found: $IMAGE"
+[ -f "$BOOTLOADER" ] || die "SD bootloader not found: $BOOTLOADER"
 [ "$(lsblk -dn -o TYPE "$DEV" 2>/dev/null)" = "disk" ] || die "$DEV is not a whole disk"
 
 case "$DEV" in
@@ -46,9 +49,14 @@ P3_LABEL="$(lsblk -no LABEL "$P3" | xargs)"
 [ "$P2_LABEL" = "ROOTFS" ] || die "p2 label is not ROOTFS"
 [ "$P3_LABEL" = "MEDIA" ] || die "p3 label is not MEDIA"
 
-# BootROM-visible MMC SPL magic at raw sector 34.
+# BootROM-visible MMC SPL magic and exact bootloader payload at raw sector 34.
 MAGIC="$(dd if="$DEV" bs=512 skip=34 count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
 [ "$MAGIC" = "4d53504c" ] || die "SPL magic mismatch at sector 34: $MAGIC"
+
+BOOTLOADER_REAL="$(readlink -f "$BOOTLOADER")"
+BOOTLOADER_SIZE="$(wc -c < "$BOOTLOADER_REAL" | tr -d ' ')"
+BOOTLOADER_BLOCKS=$(((BOOTLOADER_SIZE + 511) / 512))
+BOOTLOADER_SOURCE_SHA="$(sha256sum "$BOOTLOADER_REAL" | awk '{print $1}')"
 
 IMAGE_REAL="$(readlink -f "$IMAGE")"
 KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
@@ -56,16 +64,22 @@ KERNEL_BLOCKS=$(((KERNEL_SIZE + 511) / 512))
 SOURCE_SHA="$(sha256sum "$IMAGE_REAL" | awk '{print $1}')"
 
 TMP="$(mktemp)"
+BOOT_TMP="$(mktemp)"
 MNT="$(mktemp -d)"
 cleanup() {
     umount "$MNT" 2>/dev/null || true
-    rm -f "$TMP"
+    rm -f "$TMP" "$BOOT_TMP"
     rmdir "$MNT" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
 sync
 blockdev --flushbufs "$DEV" 2>/dev/null || true
+
+# Verify the complete raw SPL/U-Boot payload at sector 34.
+dd if="$DEV" of="$BOOT_TMP" bs=512 skip=34 count="$BOOTLOADER_BLOCKS" iflag=direct status=none 2>/dev/null || dd if="$DEV" of="$BOOT_TMP" bs=512 skip=34 count="$BOOTLOADER_BLOCKS" status=none
+BOOTLOADER_SD_SHA="$(head -c "$BOOTLOADER_SIZE" "$BOOT_TMP" | sha256sum | awk '{print $1}')"
+[ "$BOOTLOADER_SOURCE_SHA" = "$BOOTLOADER_SD_SHA" ] ||     die "raw SPL/U-Boot SHA mismatch: source=$BOOTLOADER_SOURCE_SHA sd=$BOOTLOADER_SD_SHA"
 
 # Verify the complete raw kernel payload at sector 0x1800.
 dd if="$DEV" of="$TMP" bs=512 skip=$((0x1800)) count="$KERNEL_BLOCKS" iflag=direct status=none 2>/dev/null || dd if="$DEV" of="$TMP" bs=512 skip=$((0x1800)) count="$KERNEL_BLOCKS" status=none
@@ -77,6 +91,8 @@ mount -o ro "$P1" "$MNT"
 [ -f "$MNT/u-boot-t23n-sd.bin" ] || die "BOOT/u-boot-t23n-sd.bin missing"
 BOOT_KERNEL_SHA="$(sha256sum "$MNT/uImage" | awk '{print $1}')"
 [ "$SOURCE_SHA" = "$BOOT_KERNEL_SHA" ] || die "BOOT/uImage SHA mismatch"
+BOOT_BOOTLOADER_SHA="$(sha256sum "$MNT/u-boot-t23n-sd.bin" | awk '{print $1}')"
+[ "$BOOTLOADER_SOURCE_SHA" = "$BOOT_BOOTLOADER_SHA" ] || die "BOOT/u-boot-t23n-sd.bin SHA mismatch"
 umount "$MNT"
 
 mount -o ro "$P2" "$MNT"
@@ -96,9 +112,11 @@ umount "$MNT"
 
 echo
 echo "SD FIRMWARE VERIFY: OK"
-echo "SPL magic           : $MAGIC"
-echo "Raw kernel SHA256   : $SD_SHA"
-echo "BOOT uImage SHA256  : $BOOT_KERNEL_SHA"
+echo "SPL magic             : $MAGIC"
+echo "Raw SPL/U-Boot SHA256 : $BOOTLOADER_SD_SHA"
+echo "BOOT U-Boot SHA256    : $BOOT_BOOTLOADER_SHA"
+echo "Raw kernel SHA256     : $SD_SHA"
+echo "BOOT uImage SHA256    : $BOOT_KERNEL_SHA"
 echo "ROOTFS              : OK"
 echo "MEDIA               : OK"
 echo
