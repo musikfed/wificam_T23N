@@ -147,8 +147,11 @@ echo "[4/4] Building T23N U-Boot for direct SD BootROM boot..."
 make -C "$UBOOT_SRC" distclean
 make -C "$UBOOT_SRC" CROSS_COMPILE="$CROSS_COMPILE" -j"$JOBS" isvp_t23_msc0
 
-IMAGE="$UBOOT_SRC/u-boot-with-spl.bin"
-[ -f "$IMAGE" ] || die "u-boot-with-spl.bin was not produced"
+# CONFIG_SPL_LZOP in the pinned T23 tree produces the combined MMC image
+# as u-boot-lzo-with-spl.bin: padded 26 KiB SPL followed by the LZO-wrapped
+# U-Boot proper. This is the image that must start at raw SD sector 34.
+IMAGE="$UBOOT_SRC/u-boot-lzo-with-spl.bin"
+[ -f "$IMAGE" ] || die "u-boot-lzo-with-spl.bin was not produced"
 
 VERIFY_BIN="$UBOOT_SRC/u-boot"
 [ -f "$VERIFY_BIN" ] || VERIFY_BIN="$UBOOT_SRC/u-boot.bin"
