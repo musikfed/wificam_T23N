@@ -64,9 +64,9 @@ sf_line = (
     "isvp_t23:SPL_SFC_SUPPORT,ENV_IS_IN_SPI_FLASH,SPL_SFC_NOR,JZ_MMC_MSC0,T23N"
 )
 mmc_line = (
-    "isvp_t23_msc0                mips        xburst      isvp_t23"
+    "isvp_t23n_msc0_mmc1bit       mips        xburst      isvp_t23"
     "            ingenic        t23         "
-    "isvp_t23:SPL_MMC_SUPPORT,ENV_IS_IN_MMC,GPT_CREATOR,JZ_MMC_MSC0,SFC_COMMAND,T23N"
+    "isvp_t23:SPL_MMC_SUPPORT,ENV_IS_IN_MMC,GPT_CREATOR,JZ_MMC_MSC0,SFC_COMMAND,T23N,JZ_MMC_1BIT"
 )
 if mmc_line not in board_text:
     if sf_line not in board_text:
@@ -91,6 +91,60 @@ if new_cmd not in header_text:
 
 header.write_text(header_text)
 
+PY
+
+# The pinned OpenIPC tree predates the T23N 1-bit MMC target used by known
+# working SD-boot builds. Add the same host-capability selection implemented
+# by the later Ingenic/Thingino U-Boot tree. This is important on T23N camera
+# boards whose SD bootstrap is reliable only in 1-bit mode.
+python3 - "$UBOOT_SRC" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+mmc = root / "drivers/mmc/jz_mmc.c"
+s = mmc.read_text()
+
+old_spl = """#ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
+\tmmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HC;
+#else
+\tmmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HC;
+#endif
+"""
+new_spl = """#ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
+\tmmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HC;
+#else
+#ifdef CONFIG_JZ_MMC_1BIT
+\tmmc->host_caps = MMC_MODE_HS | MMC_MODE_HC;
+#else
+\tmmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HC;
+#endif
+#endif
+"""
+
+old_full = """#ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
+\tmmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
+#else
+\tmmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
+#endif
+"""
+new_full = """#ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
+\tmmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
+#else
+#ifdef CONFIG_JZ_MMC_1BIT
+\tmmc->host_caps = MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
+#else
+\tmmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
+#endif
+#endif
+"""
+
+if "CONFIG_JZ_MMC_1BIT" not in s:
+    if old_spl not in s or old_full not in s:
+        raise SystemExit("cannot find pinned MMC host capability blocks")
+    s = s.replace(old_spl, new_spl, 1)
+    s = s.replace(old_full, new_full, 1)
+    mmc.write_text(s)
 PY
 
 # OpenIPC's isvp_t23.h includes isvp_common.h last.  That common header
@@ -135,7 +189,8 @@ if marker not in s:
     common.write_text(s)
 PY
 
-grep -q '^isvp_t23_msc0 .*SPL_MMC_SUPPORT.*ENV_IS_IN_MMC.*JZ_MMC_MSC0.*T23N'     "$UBOOT_SRC/boards.cfg" || die "T23N MMC target verification failed"
+grep -q '^isvp_t23n_msc0_mmc1bit .*SPL_MMC_SUPPORT.*ENV_IS_IN_MMC.*JZ_MMC_MSC0.*T23N.*JZ_MMC_1BIT'     "$UBOOT_SRC/boards.cfg" || die "T23N MSC0 1-bit target verification failed"
+grep -q 'CONFIG_JZ_MMC_1BIT' "$UBOOT_SRC/drivers/mmc/jz_mmc.c" || die "T23N 1-bit MMC driver support missing"
 grep -q 'root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init'     "$UBOOT_SRC/include/configs/isvp_t23.h" || die "T23N SD bootargs verification failed"
 grep -q 'sd_env_initialized.*saveenv.*mmc read 0x80600000 0x1800 0x3000'     "$UBOOT_SRC/include/configs/isvp_t23.h" || die "T23N SD first-boot env initialization missing"
 grep -q 'WIFICAM_T23N_SD_ONLY_EFFECTIVE_CONFIG' "$UBOOT_SRC/include/configs/isvp_common.h" || die "effective MMC override missing"
@@ -145,7 +200,9 @@ grep -q 'sd_env_initialized.*saveenv.*mmc read 0x80600000 0x1800 0x3000' "$UBOOT
 
 echo "[4/4] Building T23N U-Boot for direct SD BootROM boot..."
 make -C "$UBOOT_SRC" distclean
-make -C "$UBOOT_SRC" CROSS_COMPILE="$CROSS_COMPILE" -j"$JOBS" isvp_t23_msc0
+make -C "$UBOOT_SRC" CROSS_COMPILE="$CROSS_COMPILE" -j"$JOBS" isvp_t23n_msc0_mmc1bit
+
+grep -q 'CONFIG_JZ_MMC_1BIT' "$UBOOT_SRC/include/config.h" || die "compiled U-Boot config is not MSC0 1-bit"
 
 # CONFIG_SPL_LZOP in the pinned T23 tree produces the combined MMC image
 # as u-boot-lzo-with-spl.bin: padded 26 KiB SPL followed by the LZO-wrapped
@@ -175,11 +232,12 @@ mkdir -p "$(dirname "$OUT")"
 cp "$IMAGE" "$OUT"
 
 echo
-echo "T23N AUTONOMOUS SD BOOTLOADER BUILT:"
+echo "T23N AUTONOMOUS SD BOOTLOADER BUILT (MSC0 1-bit):"
 ls -lh "$OUT"
 sha256sum "$OUT"
 echo
 echo "BootROM raw SPL start : sector 34 (17 KiB)"
+echo "SD bus mode           : MSC0 1-bit (T23N bootstrap compatibility)"
 echo "U-Boot proper start   : sector 86"
 echo "U-Boot env start      : sector 514"
 echo "Kernel raw start      : sector 0x1800 (3 MiB)"
