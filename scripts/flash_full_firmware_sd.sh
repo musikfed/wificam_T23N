@@ -61,6 +61,13 @@ done
     exit 1
 }
 [ -f "$KERNEL_CONFIG" ] || die "kernel config not found: $KERNEL_CONFIG"
+OVERLAY_ARCHIVE="$REPO_DIR/out/wificam-rootfs-overlay.tar.gz"
+[ -s "$OVERLAY_ARCHIVE" ] || {
+    echo "WIFICAM overlay archive missing: $OVERLAY_ARCHIVE" >&2
+    echo "Build it first as the normal user:" >&2
+    echo "  sh scripts/package_rootfs_overlay.sh" >&2
+    exit 1
+}
 
 require_kernel_y() {
     grep -q "^$1=y$" "$KERNEL_CONFIG" || die "$1 is not built-in in $KERNEL_CONFIG; run scripts/build_kernel.sh"
@@ -128,9 +135,8 @@ unsquashfs -d "$WORK/base-rootfs" "$ROOTFS_IMG" >/dev/null
 [ -x "$WORK/base-rootfs/bin/sh" ] || die "OpenIPC base rootfs has no executable /bin/sh"
 [ -x "$WORK/base-rootfs/init" ] || die "OpenIPC base rootfs has no executable /init"
 
-echo "Applying WIFICAM/PegineLab rootfs overlay..."
-sh "$REPO_DIR/scripts/package_rootfs_overlay.sh"
-tar -C "$WORK/base-rootfs" -xzf "$REPO_DIR/out/wificam-rootfs-overlay.tar.gz"
+echo "Applying prebuilt WIFICAM/PegineLab rootfs overlay..."
+tar -C "$WORK/base-rootfs" -xzf "$OVERLAY_ARCHIVE"
 
 
 # OpenIPC T23 normally loads jzmmc_v12 as a module late in userspace.
