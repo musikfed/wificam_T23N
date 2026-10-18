@@ -61,7 +61,7 @@ bootm 0x80600000
 Host-пакеты для Ubuntu/WSL:
 
 ```sh
-sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2fsprogs
+sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2fsprogs lzop
 ```
 
 Собрать всё:
