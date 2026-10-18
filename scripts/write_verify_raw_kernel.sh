@@ -27,7 +27,8 @@ esac
 SECTOR_SIZE="$(blockdev --getss "$DEV")"
 [ "$SECTOR_SIZE" -eq 512 ] || die "expected 512-byte sectors, got $SECTOR_SIZE"
 
-KERNEL_SIZE="$(stat -c '%s' "$IMAGE")"
+# uImage may be a symlink (for example uImage -> uImage.lzma). Dereference it.
+KERNEL_SIZE="$(stat -Lc '%s' "$IMAGE")"
 KERNEL_SLOT_BYTES=$((KERNEL_SLOT_SECTORS * 512))
 [ "$KERNEL_SIZE" -le "$KERNEL_SLOT_BYTES" ] || die "kernel is larger than the 6 MiB raw slot"
 KERNEL_BLOCKS=$(((KERNEL_SIZE + 511) / 512))
