@@ -100,7 +100,8 @@ UBOOT_MAX=$(((SD_UBOOT_ENV_SECTOR - SD_UBOOT_SECTOR) * 512))
     exit 1
 }
 
-KERNEL_SIZE="$(stat -c '%s' "$IMAGE")"
+# uImage may be a symlink; size the target, not the link text.
+KERNEL_SIZE="$(stat -Lc '%s' "$IMAGE")"
 KERNEL_SLOT_BYTES=$((KERNEL_SLOT_SECTORS * 512))
 [ "$KERNEL_SIZE" -le "$KERNEL_SLOT_BYTES" ] || {
     echo "REFUSING: uImage is $KERNEL_SIZE bytes, raw kernel slot is $KERNEL_SLOT_BYTES bytes." >&2
