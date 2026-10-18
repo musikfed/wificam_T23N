@@ -173,6 +173,7 @@ DISK_MAGIC="$(dd if="$DEV" bs=512 skip="$SD_UBOOT_SECTOR" count=1 status=none | 
 }
 
 echo "Writing raw uImage at sector 0x1800 ..."
+EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE" | awk '{print $1}')"
 dd if=/dev/zero of="$DEV" bs=512 seek="$KERNEL_SECTOR" count="$KERNEL_SLOT_SECTORS" conv=notrunc status=none
 dd if="$IMAGE" of="$DEV" bs=512 seek="$KERNEL_SECTOR" conv=notrunc,fsync status=none
 
@@ -186,11 +187,33 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 KERNEL_BLOCKS=$(((KERNEL_SIZE + 511) / 512))
-dd if="$DEV" of="$VERIFY" bs=512 skip="$KERNEL_SECTOR" count="$KERNEL_BLOCKS" status=none
-EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE" | awk '{print $1}')"
-READBACK_KERNEL_SHA="$(head -c "$KERNEL_SIZE" "$VERIFY" | sha256sum | awk '{print $1}')"
+
+# USB card readers and WSL can expose write caching. Force the block cache out
+# before validating the raw kernel and retry once after a short settle delay.
+sync
+blockdev --flushbufs "$DEV" 2>/dev/null || true
+sleep 1
+
+read_kernel_sha() {
+    : > "$VERIFY"
+    dd if="$DEV" of="$VERIFY" bs=512 skip="$KERNEL_SECTOR" count="$KERNEL_BLOCKS" status=none
+    head -c "$KERNEL_SIZE" "$VERIFY" | sha256sum | awk '{print $1}'
+}
+
+READBACK_KERNEL_SHA="$(read_kernel_sha)"
+if [ "$EXPECTED_KERNEL_SHA" != "$READBACK_KERNEL_SHA" ]; then
+    echo "Kernel readback mismatch on first pass; flushing and retrying..." >&2
+    sync
+    blockdev --flushbufs "$DEV" 2>/dev/null || true
+    sleep 2
+    READBACK_KERNEL_SHA="$(read_kernel_sha)"
+fi
+
+echo "Kernel source SHA256 : $EXPECTED_KERNEL_SHA"
+echo "Kernel SD SHA256     : $READBACK_KERNEL_SHA"
+
 [ "$EXPECTED_KERNEL_SHA" = "$READBACK_KERNEL_SHA" ] || {
-    echo "REFUSING: raw kernel readback SHA-256 mismatch" >&2
+    echo "REFUSING: raw kernel readback SHA-256 mismatch after flush/retry" >&2
     exit 1
 }
 
