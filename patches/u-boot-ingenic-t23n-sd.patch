@@ -4,7 +4,7 @@ diff --git a/boards.cfg b/boards.cfg
 @@ -381,3 +381,4 @@ isvp_t20_msc0                mips        xburst      isvp_t20
  isvp_t21_sfcnor              mips        xburst      isvp_t21            ingenic        t21         isvp_t21:SPL_SFC_SUPPORT,ENV_IS_IN_SPI_FLASH,SPL_SFC_NOR,JZ_MMC_MSC0
  isvp_t23_sfcnor              mips        xburst      isvp_t23            ingenic        t23         isvp_t23:SPL_SFC_SUPPORT,ENV_IS_IN_SPI_FLASH,SPL_SFC_NOR,JZ_MMC_MSC0,T23N
-+isvp_t23_msc0                mips        xburst      isvp_t23            ingenic        t23         isvp_t23:SPL_MMC_SUPPORT,ENV_IS_IN_MMC,GPT_CREATOR,JZ_MMC_MSC0,SFC_COMMAND,T23N
++isvp_t23n_msc0_mmc1bit       mips        xburst      isvp_t23            ingenic        t23         isvp_t23:SPL_MMC_SUPPORT,ENV_IS_IN_MMC,GPT_CREATOR,JZ_MMC_MSC0,SFC_COMMAND,T23N,JZ_MMC_1BIT
  isvp_t30_sfcnor              mips        xburst      isvp_t30            ingenic        t30         isvp_t30:SPL_SFC_SUPPORT,ENV_IS_IN_SPI_FLASH,SPL_SFC_NOR,JZ_MMC_MSC0
 
 diff --git a/include/configs/isvp_t23.h b/include/configs/isvp_t23.h
@@ -52,3 +52,31 @@ diff --git a/include/configs/isvp_common.h b/include/configs/isvp_common.h
 +#define CONFIG_ENV_SIZE        (32 << 10)
 +#define CONFIG_ENV_SECT_SIZE   (32 << 10)
 +#endif
+
+
+diff --git a/drivers/mmc/jz_mmc.c b/drivers/mmc/jz_mmc.c
+--- a/drivers/mmc/jz_mmc.c
++++ b/drivers/mmc/jz_mmc.c
+@@ -356,7 +356,11 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
+ #ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
+ 	mmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HC;
+ #else
++#ifdef CONFIG_JZ_MMC_1BIT
++	mmc->host_caps = MMC_MODE_HS | MMC_MODE_HC;
++#else
+ 	mmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HC;
++#endif
+ #endif
+ #else
+ 	mmc->f_max = 52000000;
+@@ -365,7 +369,11 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
+ #ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
+ 	mmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
+ #else
++#ifdef CONFIG_JZ_MMC_1BIT
++	mmc->host_caps = MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
++#else
+ 	mmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
++#endif
+ #endif
+ #else /* CONFIG_FPGA */
