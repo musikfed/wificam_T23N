@@ -24,7 +24,7 @@ case "$ROOT_SRC" in
 esac
 
 echo "Autonomous SD mode: the camera's SPI/NOR boot flash is not required."
-echo "The full flasher will reserve raw sectors for T23 BootROM/SPL/U-Boot/kernel,"
+echo "The full flasher reserves raw sectors for T23 BootROM/SPL/U-Boot and a kernel backup,"
 echo "then create BOOT, ROOTFS and MEDIA partitions."
 echo
 lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS "$DEV"
