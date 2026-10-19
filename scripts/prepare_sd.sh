@@ -7,7 +7,7 @@ MEDIA_GIB="${MEDIA_GIB:-20}"
 # T23 BootROM/U-Boot raw SD layout.
 RAW_RESERVE_MIB=16
 SD_UBOOT_SECTOR=34
-SD_UBOOT_ENV_SECTOR=514
+SD_UBOOT_ENV_SECTOR=546
 KERNEL_SECTOR=$((0x1800))
 KERNEL_SLOT_SECTORS=$((0x3000))
 
@@ -120,9 +120,10 @@ fi
 echo "WARNING: ALL DATA ON $DEV WILL BE DESTROYED"
 echo
 echo "AUTONOMOUS T23N SD layout (no SPI/NOR):"
-echo "  raw 0..16 MiB : BootROM/SPL/U-Boot/env + raw uImage slot"
+echo "  raw 0..16 MiB : BootROM/SPL/U-Boot/env + redundant raw uImage backup"
 echo "  SPL/U-Boot    : sector $SD_UBOOT_SECTOR (17 KiB)"
-echo "  kernel        : sector 0x1800 (3 MiB), slot 6 MiB"
+echo "  kernel boot   : BOOT FAT32 /uImage"
+echo "  kernel backup : sector 0x1800 (3 MiB), slot 6 MiB"
 echo "  BOOT          : ${BOOT_MIB} MiB FAT32, starts at ${RAW_RESERVE_MIB} MiB"
 echo "  ROOTFS        : ${ROOTFS_MIB} MiB ext4 (/dev/mmcblk0p2)"
 echo "  MEDIA         : ${MEDIA_MIB} MiB ext4 (${MEDIA_GIB} GiB)"
@@ -177,7 +178,7 @@ DISK_MAGIC="$(dd if="$DEV" bs=512 skip="$SD_UBOOT_SECTOR" count=1 status=none | 
     exit 1
 }
 
-echo "Writing and verifying raw uImage at sector 0x1800 ..."
+echo "Writing and verifying redundant raw uImage backup at sector 0x1800 ..."
 EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE_REAL" | awk '{print $1}')"
 sh "$REPO_DIR/scripts/write_verify_raw_kernel.sh" "$DEV" "$IMAGE_REAL" --yes
 
@@ -202,8 +203,9 @@ T23N autonomous SD boot map
 SPI/NOR required: NO
 SPL/U-Boot raw start: sector 34 (17 KiB)
 U-Boot proper raw start: sector 86
-U-Boot environment raw start: sector 514
-Kernel raw start: sector 0x1800 (3 MiB)
+U-Boot environment raw start: sector 546 (0x44400)
+Kernel boot source: BOOT FAT32 /uImage
+Redundant kernel raw backup: sector 0x1800 (3 MiB)
 Kernel raw slot: 0x3000 sectors (6 MiB)
 Root filesystem: /dev/mmcblk0p2, ext4
 BOOT partition: p1, FAT32, starts at 16 MiB
@@ -236,7 +238,8 @@ echo "AUTONOMOUS SD CARD PREPARED:"
 lsblk -f "$DEV"
 echo
 echo "SPL/U-Boot raw boot: OK (sector 34)"
-echo "Raw kernel readback: OK ($EXPECTED_KERNEL_SHA)"
+echo "BOOT/uImage is the active kernel boot source"
+echo "Redundant raw kernel readback: OK ($EXPECTED_KERNEL_SHA)"
 echo "ROOTFS: $P2"
 echo "MEDIA: recordings/ snapshots/ events/"
 echo
