@@ -114,6 +114,40 @@ out/wificam-rootfs-overlay.tar.gz
 Старый kernel hash из сборки до SD-only перехода не является deployable reference:
 после включения built-in MMC/ext4 kernel должен быть пересобран и получит новый SHA-256.
 
+## Проверенный старый Thingino FAT32 installer path
+
+Для платы, на которой ранее реально запускался Thingino через простую FAT32 SD,
+оставлен отдельный восстановительный сценарий. Он **не использует** текущую
+многораздельную SD-root схему и не пишет INGE descriptor.
+
+Схема повторяет старый installer-style layout:
+
+```text
+sector 0      DOS/MBR
+sector 34     u-boot-isvp_t23n_msc0_mmc1bit.bin
+sector 2048   p1 FAT32
+FAT32 root    autoupdate-full.bin
+```
+
+Важно: `seek=34` при `bs=512` означает **LBA 34 = 17 KiB**, а не 34 KiB.
+
+Для полностью очищенной SD:
+
+```sh
+sudo sh scripts/prepare_legacy_thingino_sd.sh /dev/sdX /path/to/autoupdate-full.bin
+```
+
+Скрипт полностью стирает выбранную SD, создаёт один FAT32-раздел с LBA 2048,
+пишет зафиксированный T23N MSC0 1-bit U-Boot в LBA 34 и проверяет его полным
+SHA-256 readback. Этот режим предназначен прежде всего для воспроизведения
+ранее работавшего boot/install пути перед дальнейшими изменениями разметки.
+
+Текущий upstream `sdupdate` для `autoupdate-full.bin` выполняет
+`sf erase/sf write`, то есть сам по себе рассчитан на запись во внешнюю SPI.
+Поэтому при физически отсутствующей SPI этот FAT32 installer path нельзя
+считать постоянным SD-root решением; сначала им проверяется ранняя загрузка,
+после чего постоянное хранилище на SD делается отдельным этапом.
+
 ## Полная запись SD
 
 Сначала всегда проверить имя карты:
