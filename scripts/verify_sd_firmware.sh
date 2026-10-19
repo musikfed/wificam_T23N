@@ -8,6 +8,7 @@ BOOTLOADER="${3:-$REPO_DIR/out/u-boot-t23n-sd.bin}"
 
 UPSTREAM_UBOOT_SHA256="4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5"
 UPSTREAM_UBOOT_SIZE=189685
+INGE_SPL_SIZE=26624
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -51,6 +52,28 @@ P3_LABEL="$(lsblk -no LABEL "$P3" | xargs)"
 [ "$P1_LABEL" = "BOOT" ] || die "p1 label is not BOOT"
 [ "$P2_LABEL" = "ROOTFS" ] || die "p2 label is not ROOTFS"
 [ "$P3_LABEL" = "MEDIA" ] || die "p3 label is not MEDIA"
+
+# Ingenic MMC boot image descriptor at block 0. Thingino's MMC image builder
+# restores these first 36 bytes after writing the DOS partition table.
+INGE_CHECK="$(python3 - "$DEV" "$INGE_SPL_SIZE" <<'PY'
+import struct
+import sys
+
+dev = sys.argv[1]
+expected_size = int(sys.argv[2])
+with open(dev, "rb", buffering=0) as f:
+    header = f.read(36)
+ok = (
+    len(header) == 36
+    and header[:4] == b"INGE"
+    and struct.unpack("<I", header[4:8])[0] == expected_size
+    and header[8:32] == b"\x00" * 24
+    and header[32:36] == b"\xff" * 4
+)
+print("OK" if ok else "BAD")
+PY
+)"
+[ "$INGE_CHECK" = "OK" ] || die "BootROM INGE header missing/invalid at block 0"
 
 # BootROM-visible MMC SPL magic and exact bootloader payload at raw sector 34.
 MAGIC="$(dd if="$DEV" bs=512 skip=34 count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
@@ -117,6 +140,7 @@ umount "$MNT"
 
 echo
 echo "SD FIRMWARE VERIFY: OK"
+echo "BootROM INGE header   : $INGE_CHECK"
 echo "SPL magic             : $MAGIC"
 echo "Raw SPL/U-Boot SHA256 : $BOOTLOADER_SD_SHA"
 echo "BOOT U-Boot SHA256    : $BOOT_BOOTLOADER_SHA"
