@@ -20,7 +20,6 @@ T23 BootROM
    ↓
 block 0: INGE descriptor
    ↓
-   ↓
 raw SD sector 34 (17 KiB)
 SPL / MMC bootstrap (MSC0 1-bit)
    ↓
