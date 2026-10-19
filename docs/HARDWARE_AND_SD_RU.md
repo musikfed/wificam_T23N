@@ -13,6 +13,8 @@ SD является единственным постоянным загрузо
 ```text
 T23 BootROM
   ↓
+SD block 0 — INGE descriptor
+  ↓
 SD sector 34 — MMC SPL (MSC0 1-bit)
   ↓
 SD sector 86 — upstream T23N U-Boot
@@ -40,7 +42,7 @@ root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
 ## Первые 16 MiB
 
 ```text
-0             MBR
+0             INGE descriptor + MBR partition table
 17 KiB        SPL/U-Boot combined image (sector 34)
 43 KiB        U-Boot proper (sector 86)
 273 KiB       U-Boot env (sector 546 / 0x44400)
