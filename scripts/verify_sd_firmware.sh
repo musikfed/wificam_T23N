@@ -6,6 +6,9 @@ DEV="${1:-}"
 IMAGE="${2:-}"
 BOOTLOADER="${3:-$REPO_DIR/out/u-boot-t23n-sd.bin}"
 
+UPSTREAM_UBOOT_SHA256="4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5"
+UPSTREAM_UBOOT_SIZE=189685
+
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 [ -n "$DEV" ] && [ -n "$IMAGE" ] || {
@@ -57,6 +60,8 @@ BOOTLOADER_REAL="$(readlink -f "$BOOTLOADER")"
 BOOTLOADER_SIZE="$(wc -c < "$BOOTLOADER_REAL" | tr -d ' ')"
 BOOTLOADER_BLOCKS=$(((BOOTLOADER_SIZE + 511) / 512))
 BOOTLOADER_SOURCE_SHA="$(sha256sum "$BOOTLOADER_REAL" | awk '{print $1}')"
+[ "$BOOTLOADER_SIZE" -eq "$UPSTREAM_UBOOT_SIZE" ] || die "wrong T23N SD U-Boot size: $BOOTLOADER_SIZE != $UPSTREAM_UBOOT_SIZE"
+[ "$BOOTLOADER_SOURCE_SHA" = "$UPSTREAM_UBOOT_SHA256" ] || die "wrong T23N SD U-Boot SHA256: $BOOTLOADER_SOURCE_SHA"
 
 IMAGE_REAL="$(readlink -f "$IMAGE")"
 KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
@@ -99,7 +104,7 @@ mount -o ro "$P2" "$MNT"
 [ -x "$MNT/bin/sh" ] || die "ROOTFS /bin/sh missing"
 [ -x "$MNT/init" ] || die "ROOTFS /init missing"
 [ -f "$MNT/etc/fw_env.config" ] || die "ROOTFS /etc/fw_env.config missing"
-grep -Eq '^/dev/mmcblk0[[:space:]]+0x40400[[:space:]]+0x8000' "$MNT/etc/fw_env.config" ||     die "ROOTFS fw_env.config is invalid"
+grep -Eq '^/dev/mmcblk0[[:space:]]+0x44400[[:space:]]+0x8000' "$MNT/etc/fw_env.config" ||     die "ROOTFS fw_env.config is invalid"
 [ -x "$MNT/etc/init.d/S90wificam" ] || die "WIFICAM init script missing"
 [ -x "$MNT/etc/init.d/S91wificam-services" ] || die "WIFICAM services init script missing"
 umount "$MNT"
@@ -115,8 +120,9 @@ echo "SD FIRMWARE VERIFY: OK"
 echo "SPL magic             : $MAGIC"
 echo "Raw SPL/U-Boot SHA256 : $BOOTLOADER_SD_SHA"
 echo "BOOT U-Boot SHA256    : $BOOT_BOOTLOADER_SHA"
-echo "Raw kernel SHA256     : $SD_SHA"
-echo "BOOT uImage SHA256    : $BOOT_KERNEL_SHA"
+echo "Raw kernel backup SHA256 : $SD_SHA"
+echo "BOOT uImage SHA256       : $BOOT_KERNEL_SHA"
+echo "Kernel boot source       : BOOT partition /uImage"
 echo "ROOTFS              : OK"
 echo "MEDIA               : OK"
 echo
