@@ -40,7 +40,7 @@ KERNEL_BLOCKS=$(((KERNEL_SIZE + 511) / 512))
 if [ "$CONFIRM" != "--yes" ]; then
     echo "Target: $DEV"
     lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS "$DEV"
-    printf "Type RAW-KERNEL:%s to rewrite only the raw kernel slot at sector 0x1800: " "$DEV"
+    printf "Type RAW-KERNEL:%s to rewrite only the redundant raw kernel backup at sector 0x1800: " "$DEV"
     read answer
     [ "$answer" = "RAW-KERNEL:$DEV" ] || { echo "Cancelled."; exit 1; }
 fi
@@ -65,7 +65,7 @@ echo "Kernel resolved path  : $IMAGE_REAL"
 echo "Kernel bytes          : $KERNEL_SIZE"
 echo "Kernel sectors        : $KERNEL_BLOCKS"
 
-echo "Writing raw uImage at sector 0x1800 ..."
+echo "Writing redundant raw uImage backup at sector 0x1800 ..."
 dd if=/dev/zero of="$DEV" bs=512 seek="$KERNEL_SECTOR" count="$KERNEL_SLOT_SECTORS" conv=notrunc status=none
 
 if ! dd if="$PAD" of="$DEV" bs=512 seek="$KERNEL_SECTOR" count="$KERNEL_BLOCKS" oflag=direct conv=notrunc,fsync status=none 2>/dev/null; then
@@ -92,7 +92,7 @@ echo "Kernel SD SHA256     : $READ1_SHA"
 
 # Never report OK unless the full, unpadded kernel SHA also matches.
 if [ "$SOURCE_SHA" = "$READ1_SHA" ] && cmp -s "$PAD" "$READ1"; then
-    echo "Raw kernel readback  : OK"
+    echo "Raw kernel backup readback : OK"
     exit 0
 fi
 
@@ -111,7 +111,7 @@ FIRST_DIFF="$(cmp -l "$PAD" "$READ1" 2>/dev/null | head -n 1 || true)"
 [ -n "$FIRST_DIFF" ] && echo "First differing byte : $FIRST_DIFF"
 
 if cmp -s "$READ1" "$READ2"; then
-    die "raw kernel write/read is repeatable but differs from source"
+    die "raw kernel backup write/read is repeatable but differs from source"
 else
-    die "raw kernel reads are unstable; check SD card / reader / usbipd path"
+    die "raw kernel backup reads are unstable; check SD card / reader / usbipd path"
 fi
