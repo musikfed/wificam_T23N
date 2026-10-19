@@ -8,6 +8,7 @@ MEDIA_GIB="${MEDIA_GIB:-20}"
 RAW_RESERVE_MIB=16
 SD_UBOOT_SECTOR=34
 SD_UBOOT_ENV_SECTOR=546
+INGE_SPL_SIZE=26624
 KERNEL_SECTOR=$((0x1800))
 KERNEL_SLOT_SECTORS=$((0x3000))
 
@@ -49,7 +50,7 @@ case "$ROOT_SRC" in
   "$DEV"*) echo "REFUSING: $DEV contains the running root filesystem" >&2; exit 1 ;;
 esac
 
-for cmd in blockdev sfdisk wipefs mkfs.vfat mkfs.ext4 dd od sha256sum stat mount umount lsblk; do
+for cmd in blockdev sfdisk wipefs mkfs.vfat mkfs.ext4 dd od sha256sum stat mount umount lsblk python3; do
     command -v "$cmd" >/dev/null 2>&1 || { echo "Missing host tool: $cmd" >&2; exit 1; }
 done
 
@@ -148,6 +149,23 @@ start=$ROOTFS_START, size=$ROOTFS_SECTORS, type=83
 start=$MEDIA_START, size=$MEDIA_SECTORS, type=83
 EOF
 
+# Ingenic MMC BootROM descriptor. Keep bytes 446..509 (DOS partition table)
+# and 510..511 (0x55aa signature) untouched.
+python3 - "$DEV" "$INGE_SPL_SIZE" <<'PY'
+import os
+import struct
+import sys
+
+dev = sys.argv[1]
+spl_size = int(sys.argv[2])
+header = b"INGE" + struct.pack("<I", spl_size) + (b"\x00" * 24) + (b"\xff" * 4)
+with open(dev, "r+b", buffering=0) as f:
+    f.seek(0)
+    f.write(header)
+    f.flush()
+    os.fsync(f.fileno())
+PY
+
 sync
 partprobe "$DEV" 2>/dev/null || true
 sleep 2
@@ -171,6 +189,26 @@ mkfs.ext4 -F $EXT4_COMPAT_OPTS -L MEDIA "$P3"
 
 echo "Writing T23N SD SPL/U-Boot at sector $SD_UBOOT_SECTOR ..."
 dd if="$BOOTLOADER" of="$DEV" bs=512 seek="$SD_UBOOT_SECTOR" conv=notrunc,fsync status=none
+
+INGE_CHECK="$(python3 - "$DEV" "$INGE_SPL_SIZE" <<'PY'
+import struct
+import sys
+dev = sys.argv[1]
+expected_size = int(sys.argv[2])
+with open(dev, "rb", buffering=0) as f:
+    h = f.read(36)
+print("OK" if (
+    len(h) == 36 and h[:4] == b"INGE"
+    and struct.unpack("<I", h[4:8])[0] == expected_size
+    and h[8:32] == b"\x00" * 24
+    and h[32:36] == b"\xff" * 4
+) else "BAD")
+PY
+)"
+[ "$INGE_CHECK" = "OK" ] || {
+    echo "REFUSING: INGE BootROM header verification failed" >&2
+    exit 1
+}
 
 DISK_MAGIC="$(dd if="$DEV" bs=512 skip="$SD_UBOOT_SECTOR" count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
 [ "$DISK_MAGIC" = "4d53504c" ] || {
@@ -237,6 +275,7 @@ echo
 echo "AUTONOMOUS SD CARD PREPARED:"
 lsblk -f "$DEV"
 echo
+echo "BootROM INGE header: OK (block 0)"
 echo "SPL/U-Boot raw boot: OK (sector 34)"
 echo "BOOT/uImage is the active kernel boot source"
 echo "Redundant raw kernel readback: OK ($EXPECTED_KERNEL_SHA)"
