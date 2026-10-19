@@ -50,9 +50,10 @@ size:    189685 bytes
 sha256:  4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5
 ```
 
-Upstream boot layout:
+The MMC image starts with the Ingenic BootROM descriptor:
 
 ```text
+block 0         INGE + uint32_le(26624) + 24*00 + 4*ff
 sector 34       SPL / combined image
 sector 86       U-Boot proper
 sector 546      U-Boot environment (0x44400), 32 KiB
