@@ -19,10 +19,9 @@ raw SD sector 34 (17 KiB)
 SPL / MMC bootstrap (MSC0 1-bit)
    ↓
 raw SD sector 86
-U-Boot T23N MMC
+upstream T23N MMC U-Boot
    ↓
-raw SD sector 0x1800 (3 MiB)
-uImage, raw slot 0x3000 sectors = 6 MiB
+p1 BOOT (FAT32) /uImage
    ↓
 /dev/mmcblk0p2
 ext4 ROOTFS
@@ -30,15 +29,17 @@ ext4 ROOTFS
 OpenIPC T23 userspace + WIFICAM/PegineLab
 ```
 
-Для этого **нельзя** использовать обычный U-Boot, собранный для SPI/SFC.
-`scripts/build_sd_bootloader.sh` собирает отдельный T23N MMC/SPL loader.
+Для этого используется точный upstream-образ
+`u-boot-isvp_t23n_msc0_mmc1bit.bin` из
+`gtxaspec/ingenic-u-boot-xburst1`, release `uboot-xb1-2025-09-11`.
+`scripts/build_sd_bootloader.sh` теперь не пересобирает старое дерево OpenIPC,
+а скачивает этот зафиксированный release asset и проверяет его размер, MSPL
+magic и SHA-256.
 
-Для T23N SD-bootstrap используется **MSC0 1-bit**. Это не меняет raw offset:
-SPL по-прежнему начинается с sector 34 (17 KiB), а U-Boot proper после
-26 KiB SPL — с sector 86. Ранее эта ветка ошибочно собирала generic 4-bit
-MMC target из старого OpenIPC U-Boot; для раннего T23N SD bootstrap он
-заменён на 1-bit режим, совместимый с известным
-`isvp_t23n_msc0_mmc1bit` вариантом.
+Для T23N SD-bootstrap используется **MSC0 1-bit**. Raw offset остаётся тем же:
+SPL начинается с sector 34 (17 KiB), U-Boot proper после 26 KiB SPL — с
+sector 86. Upstream MMC U-Boot загружает kernel как `/uImage` из FAT32 p1
+и передаёт root `/dev/mmcblk0p2`.
 
 ## Разметка SD
 
@@ -49,19 +50,23 @@ MMC target из старого OpenIPC U-Boot; для раннего T23N SD boo
 | MBR | sector 0 | таблица разделов |
 | SPL/U-Boot image | sector 34 | вход BootROM, MMC SPL |
 | U-Boot proper | sector 86 | вычисляется из 26 KiB SPL |
-| U-Boot env | sector 514 | 32 KiB environment |
-| uImage | sector `0x1800` | kernel, raw read slot 6 MiB |
+| U-Boot env | sector 546 (`0x44400`) | 32 KiB environment |
+| uImage | p1 `BOOT:/uImage` | активный kernel boot source |
+| raw uImage backup | sector `0x1800` | резервная копия; upstream U-Boot её не читает |
 | p1 BOOT | с 16 MiB, 128 MiB, FAT32 | копии uImage/U-Boot, logo, jingle, boot map |
 | p2 ROOTFS | всё свободное до MEDIA, ext4 | Linux/userspace/configs |
 | p3 MEDIA | 20 GiB, ext4 | recordings/snapshots/events |
 
-U-Boot для MMC использует:
+Upstream MMC U-Boot использует FAT boot path:
 
 ```text
 root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
-mmc read 0x80600000 0x1800 0x3000
-bootm 0x80600000
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
 ```
+
+MMC environment находится по `0x44400` (sector 546), размер 32 KiB.
 
 ## Сборка
 
@@ -83,7 +88,7 @@ sh scripts/build_all.sh
 `build_all.sh` выполняет три шага:
 
 1. пересобирает Linux kernel с **MMC controller + MMC block + EXT4 встроенными (=y)**;
-2. собирает специальный **T23N SD SPL/U-Boot в MSC0 1-bit режиме**;
+2. получает и проверяет pinned upstream **T23N SD SPL/U-Boot MSC0 1-bit**;
 3. пакует WIFICAM/PegineLab overlay.
 
 Основные artifacts:
@@ -119,8 +124,8 @@ sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 - добавляет WIFICAM/PegineLab overlay;
 - **полностью переразмечает SD**;
 - пишет SPL/U-Boot в raw sector 34;
-- пишет kernel в raw sector `0x1800`;
-- проверяет raw kernel readback по SHA-256;
+- кладёт активный kernel как `BOOT:/uImage` и дополнительно сохраняет raw backup в sector `0x1800`;
+- проверяет `BOOT:/uImage` и резервный raw kernel readback по SHA-256;
 - распаковывает Linux в p2;
 - создаёт MEDIA p3.
 
