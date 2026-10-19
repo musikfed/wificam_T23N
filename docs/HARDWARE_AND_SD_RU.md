@@ -3,12 +3,8 @@
 ## Аппаратное состояние
 
 Целевая камера использует **Ingenic T23/T23N**, а внешняя SPI/NOR flash
-**физически выпаяна**. Поэтому проект не должен зависеть от:
-
-- U-Boot во внешней flash;
-- environment во внешней flash;
-- kernel во внешней flash;
-- rootfs во внешней flash.
+**физически выпаяна**. Проект не должен зависеть от bootloader, environment,
+kernel или rootfs во внешней flash.
 
 SD является единственным постоянным загрузочным носителем.
 
@@ -17,47 +13,47 @@ SD является единственным постоянным загрузо
 ```text
 T23 BootROM
   ↓
-SD sector 34 — MMC SPL
+SD sector 34 — MMC SPL (MSC0 1-bit)
   ↓
-SD sector 86 — U-Boot proper
+SD sector 86 — upstream T23N U-Boot
   ↓
-SD sector 0x1800 — uImage
+p1 BOOT FAT32 — /uImage
   ↓
 /dev/mmcblk0p2 — ext4 ROOTFS
 ```
 
-T23 source tree содержит MMC SPL path и boot command:
+Используется upstream
+`u-boot-isvp_t23n_msc0_mmc1bit.bin`. Его normal kernel path:
 
 ```text
-mmc read 0x80600000 0x1800 0x3000
-bootm 0x80600000
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
 ```
 
-Наш T23N MMC U-Boot дополнительно передаёт:
+Root:
 
 ```text
 root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
 ```
 
-## Почему первые 16 MiB не являются разделом
-
-Raw boot components должны находиться по фиксированным секторам, поэтому
-partition 1 начинается только с 16 MiB.
+## Первые 16 MiB
 
 ```text
-0            MBR
-17 KiB       SPL/U-Boot combined image
-43 KiB       U-Boot proper (sector 86)
-257 KiB      U-Boot env (sector 514)
-3 MiB        raw uImage
-3–9 MiB      kernel raw slot
-16 MiB       p1 BOOT begins
+0             MBR
+17 KiB        SPL/U-Boot combined image (sector 34)
+43 KiB        U-Boot proper (sector 86)
+273 KiB       U-Boot env (sector 546 / 0x44400)
+3 MiB         резервная raw-копия uImage
+16 MiB        p1 BOOT begins; /uImage здесь является активным kernel
 ```
+
+Raw kernel по `0x1800` оставлен только как резервная проверяемая копия и
+upstream U-Boot в normal boot path его не читает.
 
 ## Kernel requirements
 
-Для root-on-SD недостаточно `CONFIG_MMC=y`. Host controller и ext4 также должны
-быть встроены:
+Для root-on-SD должны быть встроены:
 
 ```text
 CONFIG_MMC=y
@@ -70,25 +66,21 @@ CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
 ```
 
-`scripts/build_kernel.sh` выставляет и проверяет эти параметры перед сборкой.
-
 ## Разделы
 
 | Раздел | Размер | FS | Назначение |
 |---|---:|---|---|
-| raw boot area | 16 MiB | — | SPL/U-Boot/env/kernel |
-| p1 BOOT | 128 MiB | FAT32 | backup-копии boot artifacts, PegineLab assets, boot map |
+| raw boot area | 16 MiB | — | SPL/U-Boot/env + raw backup |
+| p1 BOOT | 128 MiB | FAT32 | активный /uImage, копия U-Boot, branding |
 | p2 ROOTFS | всё свободное до MEDIA | ext4 | Linux/userspace/settings |
 | p3 MEDIA | 20 GiB | ext4 | recordings/snapshots/events |
 
 ## Первый power-on
 
-Первый тест выполняется с UART 115200. Нужен лог с самого момента подачи питания.
+После полной offline-проверки SD камера полностью обесточивается, карта
+вставляется и затем подаётся питание. UART не является обязательной частью
+этого workflow.
 
-Если BootROM не начинает читать SD, проверяются питание SD slot, GPIO/card-detect
-и разводка конкретной платы. На некоторых Ingenic-камерах питание microSD
-коммутируется GPIO; при физически отсутствующей flash это аппаратный вопрос,
-а не повод возвращаться к SPI boot.
-
-Определение image sensor остаётся задачей kernel/OS camera stack, а не ручным
-этапом Web UI.
+Если BootROM не начинает читать SD, проверяются питание SD slot,
+card-detect/strap и разводка конкретной платы. При физически отсутствующей
+SPI/NOR это уже ранний аппаратный вопрос, а не повод возвращаться к SPI boot.
