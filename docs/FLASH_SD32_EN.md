@@ -28,8 +28,11 @@ Re-check the Linux device name after every detach/re-attach.
 
 The resulting layout is:
 
+The first 36 bytes of sector 0 contain the Ingenic MMC descriptor; the DOS
+partition table remains at byte 446 of the same sector.
+
 ```text
-sector 0       MBR
+sector 0       INGE descriptor + MBR partition table
 sector 34      SPL/U-Boot image start
 sector 86      U-Boot proper
 sector 546     U-Boot environment (0x44400), 32 KiB
