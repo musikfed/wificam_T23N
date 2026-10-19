@@ -68,6 +68,12 @@ bootm ${baseaddr}
 
 MMC environment находится по `0x44400` (sector 546), размер 32 KiB.
 
+Важно: `autoupdate-full.bin` — это механизм установки/обновления Thingino,
+который обычно переносит firmware во внутреннюю flash. В режиме этой ветки
+SPI/NOR физически отсутствует, поэтому `autoupdate-full.bin` не является
+постоянной ОС и не нужен для загрузки. Постоянная SD-only схема здесь —
+upstream MMC U-Boot + `BOOT:/uImage` + ext4 `/dev/mmcblk0p2`.
+
 ## Сборка
 
 Host-пакеты для Ubuntu/WSL:
