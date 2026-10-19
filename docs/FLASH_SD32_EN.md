@@ -32,12 +32,11 @@ The first 36 bytes of sector 0 contain the Ingenic MMC descriptor; the DOS
 partition table remains at byte 446 of the same sector.
 
 ```text
-sector 0       INGE descriptor + MBR partition table
+sector 0       DOS/MBR partition table
 sector 34      SPL/U-Boot image start
 sector 86      U-Boot proper
 sector 546     U-Boot environment (0x44400), 32 KiB
-sector 0x1800  redundant raw uImage copy
-16 MiB         p1 BOOT FAT32, active /uImage
+1 MiB          p1 BOOT FAT32 (sector 2048), active /uImage
 144 MiB        p2 ROOTFS ext4
 ...            p3 MEDIA ext4, fixed 20 GiB
 ```
