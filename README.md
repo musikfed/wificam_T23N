@@ -10,15 +10,12 @@
 **SPI/NOR flash физически отсутствует.** Прошивка не рассчитывает на загрузчик,
 kernel, rootfs или environment во внешней flash-памяти.
 
-Полная цепочка загрузки должна находиться на SD. Для MMC-образа Ingenic перед
-SPL нужен 36-байтовый descriptor в block 0: `INGE` + little-endian размер
-SPL (`26624`) + 24 нулевых байта + `0xffffffff`. Таблица DOS-разделов при
-этом остаётся в том же sector 0 начиная с byte 446.
+Полная цепочка загрузки находится на SD. Для этой платы сохраняется геометрия,
+которая уже совпадает со старым рабочим Thingino installer path: обычный DOS/MBR
+в sector 0, SPL/U-Boot в raw LBA 34 и первый FAT32-раздел с LBA 2048.
 
 ```text
 T23 BootROM
-   ↓
-block 0: INGE descriptor
    ↓
 raw SD sector 34 (17 KiB)
 SPL / MMC bootstrap (MSC0 1-bit)
@@ -26,7 +23,7 @@ SPL / MMC bootstrap (MSC0 1-bit)
 raw SD sector 86
 upstream T23N MMC U-Boot
    ↓
-p1 BOOT (FAT32) /uImage
+p1 BOOT FAT32, start sector 2048 (1 MiB), /uImage
    ↓
 /dev/mmcblk0p2
 ext4 ROOTFS
@@ -49,17 +46,16 @@ sector 86. Upstream MMC U-Boot загружает kernel как `/uImage` из F
 
 ## Разметка SD
 
-Первые 16 MiB не принадлежат ни одному filesystem-разделу: это raw boot area.
+Первый 1 MiB оставлен под MBR, SPL/U-Boot и environment; p1 начинается с sector 2048.
 
 | Область | Положение | Назначение |
 |---|---:|---|
-| INGE + MBR | sector 0 | INGE descriptor bytes 0..35; DOS partition table bytes 446..511 |
+| DOS/MBR | sector 0 | таблица разделов |
 | SPL/U-Boot image | sector 34 | вход BootROM, MMC SPL |
 | U-Boot proper | sector 86 | вычисляется из 26 KiB SPL |
 | U-Boot env | sector 546 (`0x44400`) | 32 KiB environment |
 | uImage | p1 `BOOT:/uImage` | активный kernel boot source |
-| raw uImage backup | sector `0x1800` | резервная копия; upstream U-Boot её не читает |
-| p1 BOOT | с 16 MiB, 128 MiB, FAT32 | копии uImage/U-Boot, logo, jingle, boot map |
+| p1 BOOT | с 1 MiB (sector 2048), 128 MiB, FAT32 | активный uImage, копия U-Boot, logo, jingle, boot map |
 | p2 ROOTFS | всё свободное до MEDIA, ext4 | Linux/userspace/configs |
 | p3 MEDIA | 20 GiB, ext4 | recordings/snapshots/events |
 
@@ -149,7 +145,7 @@ WSL.
 
 Для платы, на которой ранее реально запускался Thingino через простую FAT32 SD,
 оставлен отдельный восстановительный сценарий. Он **не использует** текущую
-многораздельную SD-root схему и не пишет INGE descriptor.
+основную SD-root схему.
 
 Схема повторяет старый installer-style layout:
 
@@ -200,10 +196,9 @@ sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 - скачивает и SHA-256 проверяет официальный OpenIPC T23 lite userspace bundle;
 - добавляет WIFICAM/PegineLab overlay;
 - **полностью переразмечает SD**;
-- пишет INGE BootROM descriptor в первые 36 bytes sector 0, не затрагивая таблицу разделов;
 - пишет SPL/U-Boot в raw sector 34;
-- кладёт активный kernel как `BOOT:/uImage` и дополнительно сохраняет raw backup в sector `0x1800`;
-- проверяет `BOOT:/uImage` и резервный raw kernel readback по SHA-256;
+- кладёт активный kernel как `BOOT:/uImage`;
+- проверяет `BOOT:/uImage` по SHA-256;
 - распаковывает Linux в p2;
 - создаёт MEDIA p3.
 
