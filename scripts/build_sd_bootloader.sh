@@ -62,7 +62,6 @@ ls -lh "$OUT"
 sha256sum "$OUT"
 echo
 echo "Upstream release        : gtxaspec/ingenic-u-boot-xburst1 $UBOOT_TAG"
-echo "BootROM block 0 header  : INGE, SPL size 26624 bytes"
 echo "BootROM raw SPL start   : sector 34 (17 KiB)"
 echo "SD bus mode             : MSC0 1-bit"
 echo "U-Boot proper start     : sector 86"
