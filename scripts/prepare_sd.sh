@@ -5,12 +5,9 @@ REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 MEDIA_GIB="${MEDIA_GIB:-20}"
 
 # T23 BootROM/U-Boot raw SD layout.
-RAW_RESERVE_MIB=16
+RAW_RESERVE_MIB=1
 SD_UBOOT_SECTOR=34
 SD_UBOOT_ENV_SECTOR=546
-INGE_SPL_SIZE=26624
-KERNEL_SECTOR=$((0x1800))
-KERNEL_SLOT_SECTORS=$((0x3000))
 
 BOOT_MIB=128
 MEDIA_MIB=$((MEDIA_GIB * 1024))
@@ -107,11 +104,6 @@ UBOOT_MAX=$(((SD_UBOOT_ENV_SECTOR - SD_UBOOT_SECTOR) * 512))
 # uImage is normally a symlink to uImage.lzma. Resolve it once and size
 # the opened target file, avoiding symlink-size ambiguity.
 KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
-KERNEL_SLOT_BYTES=$((KERNEL_SLOT_SECTORS * 512))
-[ "$KERNEL_SIZE" -le "$KERNEL_SLOT_BYTES" ] || {
-    echo "REFUSING: uImage is $KERNEL_SIZE bytes, raw kernel slot is $KERNEL_SLOT_BYTES bytes." >&2
-    exit 1
-}
 
 # Generate PegineLab jingle if needed.
 if [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && command -v python3 >/dev/null 2>&1; then
@@ -121,10 +113,9 @@ fi
 echo "WARNING: ALL DATA ON $DEV WILL BE DESTROYED"
 echo
 echo "AUTONOMOUS T23N SD layout (no SPI/NOR):"
-echo "  raw 0..16 MiB : BootROM/SPL/U-Boot/env + redundant raw uImage backup"
+echo "  raw 0..1 MiB  : DOS/MBR + SPL/U-Boot + environment"
 echo "  SPL/U-Boot    : sector $SD_UBOOT_SECTOR (17 KiB)"
 echo "  kernel boot   : BOOT FAT32 /uImage"
-echo "  kernel backup : sector 0x1800 (3 MiB), slot 6 MiB"
 echo "  BOOT          : ${BOOT_MIB} MiB FAT32, starts at ${RAW_RESERVE_MIB} MiB"
 echo "  ROOTFS        : ${ROOTFS_MIB} MiB ext4 (/dev/mmcblk0p2)"
 echo "  MEDIA         : ${MEDIA_MIB} MiB ext4 (${MEDIA_GIB} GiB)"
@@ -136,7 +127,7 @@ for n in 1 2 3; do
     umount "$(part "$n")" 2>/dev/null || true
 done
 
-# Clear the complete raw boot area first. Partition filesystems start at 16 MiB.
+# Recreate the proven installer-compatible boot area. Partition 1 starts at 1 MiB.
 dd if=/dev/zero of="$DEV" bs=1M count="$RAW_RESERVE_MIB" conv=fsync status=none
 wipefs -a "$DEV" >/dev/null 2>&1 || true
 
@@ -149,22 +140,6 @@ start=$ROOTFS_START, size=$ROOTFS_SECTORS, type=83
 start=$MEDIA_START, size=$MEDIA_SECTORS, type=83
 EOF
 
-# Ingenic MMC BootROM descriptor. Keep bytes 446..509 (DOS partition table)
-# and 510..511 (0x55aa signature) untouched.
-python3 - "$DEV" "$INGE_SPL_SIZE" <<'PY'
-import os
-import struct
-import sys
-
-dev = sys.argv[1]
-spl_size = int(sys.argv[2])
-header = b"INGE" + struct.pack("<I", spl_size) + (b"\x00" * 24) + (b"\xff" * 4)
-with open(dev, "r+b", buffering=0) as f:
-    f.seek(0)
-    f.write(header)
-    f.flush()
-    os.fsync(f.fileno())
-PY
 
 sync
 partprobe "$DEV" 2>/dev/null || true
@@ -190,35 +165,13 @@ mkfs.ext4 -F $EXT4_COMPAT_OPTS -L MEDIA "$P3"
 echo "Writing T23N SD SPL/U-Boot at sector $SD_UBOOT_SECTOR ..."
 dd if="$BOOTLOADER" of="$DEV" bs=512 seek="$SD_UBOOT_SECTOR" conv=notrunc,fsync status=none
 
-INGE_CHECK="$(python3 - "$DEV" "$INGE_SPL_SIZE" <<'PY'
-import struct
-import sys
-dev = sys.argv[1]
-expected_size = int(sys.argv[2])
-with open(dev, "rb", buffering=0) as f:
-    h = f.read(36)
-print("OK" if (
-    len(h) == 36 and h[:4] == b"INGE"
-    and struct.unpack("<I", h[4:8])[0] == expected_size
-    and h[8:32] == b"\x00" * 24
-    and h[32:36] == b"\xff" * 4
-) else "BAD")
-PY
-)"
-[ "$INGE_CHECK" = "OK" ] || {
-    echo "REFUSING: INGE BootROM header verification failed" >&2
-    exit 1
-}
-
 DISK_MAGIC="$(dd if="$DEV" bs=512 skip="$SD_UBOOT_SECTOR" count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
 [ "$DISK_MAGIC" = "4d53504c" ] || {
     echo "REFUSING: SPL readback magic mismatch: $DISK_MAGIC" >&2
     exit 1
 }
 
-echo "Writing and verifying redundant raw uImage backup at sector 0x1800 ..."
 EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE_REAL" | awk '{print $1}')"
-sh "$REPO_DIR/scripts/write_verify_raw_kernel.sh" "$DEV" "$IMAGE_REAL" --yes
 
 VERIFY="$(mktemp)"
 MNT="$(mktemp -d)"
@@ -239,15 +192,13 @@ fi
 cat > "$MNT/SD-BOOT-MAP.txt" <<EOF
 T23N autonomous SD boot map
 SPI/NOR required: NO
-BootROM block 0: INGE descriptor, SPL size 26624 bytes
+BootROM block 0: DOS/MBR
 SPL/U-Boot raw start: sector 34 (17 KiB)
 U-Boot proper raw start: sector 86
 U-Boot environment raw start: sector 546 (0x44400)
 Kernel boot source: BOOT FAT32 /uImage
-Redundant kernel raw backup: sector 0x1800 (3 MiB)
-Kernel raw slot: 0x3000 sectors (6 MiB)
 Root filesystem: /dev/mmcblk0p2, ext4
-BOOT partition: p1, FAT32, starts at 16 MiB
+BOOT partition: p1, FAT32, starts at 1 MiB (sector 2048)
 MEDIA partition: p3, ext4
 uImage SHA256: $EXPECTED_KERNEL_SHA
 EOF
@@ -276,10 +227,9 @@ echo
 echo "AUTONOMOUS SD CARD PREPARED:"
 lsblk -f "$DEV"
 echo
-echo "BootROM INGE header: OK (block 0)"
+echo "DOS/MBR + FAT32 installer-compatible layout: OK"
 echo "SPL/U-Boot raw boot: OK (sector 34)"
 echo "BOOT/uImage is the active kernel boot source"
-echo "Redundant raw kernel readback: OK ($EXPECTED_KERNEL_SHA)"
 echo "ROOTFS: $P2"
 echo "MEDIA: recordings/ snapshots/ events/"
 echo
