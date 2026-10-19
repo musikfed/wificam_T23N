@@ -2,17 +2,14 @@
 
 ## Kernel
 
-The old pre-SD-only kernel image is not the final deployable reference. Direct
-`root=/dev/mmcblk0p2` requires the MMC host driver and EXT4 to be built into
-the kernel.
-
-Build:
+For direct `root=/dev/mmcblk0p2`, the MMC host driver and EXT4 must be built
+**into** the kernel, not loaded as modules after the root filesystem mount.
 
 ```sh
 sh scripts/build_kernel.sh
 ```
 
-The script forces and verifies:
+The script verifies:
 
 ```text
 CONFIG_MMC=y
@@ -31,38 +28,45 @@ Result:
 ~/myipcam/build/kernel/arch/mips/boot/uImage
 ```
 
-The kernel must fit the 6 MiB raw slot read by U-Boot:
-
-```text
-mmc read 0x80600000 0x1800 0x3000
-```
-
-Use the SHA-256 printed by the new build. The previous pre-SD-root hash is not a
-deployment readiness check.
+The active kernel is loaded by upstream U-Boot from the FAT32 BOOT partition as
+`/uImage`. A redundant copy is also stored at raw sector `0x1800`; the
+normal boot path does not read that backup.
 
 ## SD SPL/U-Boot
 
-A normal SPI/SFC U-Boot image is not suitable.
+A SPI/SFC U-Boot image is not used for this layout.
 
 ```sh
 sh scripts/build_sd_bootloader.sh
 ```
 
-The script pins OpenIPC `u-boot-ingenic`, creates a T23N MMC target with
-`SPL_MMC_SUPPORT`, `ENV_IS_IN_MMC`, `JZ_MMC_MSC0` and `T23N`, and uses:
+The script downloads and verifies this exact release asset:
 
 ```text
-root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
+gtxaspec/ingenic-u-boot-xburst1
+release: uboot-xb1-2025-09-11
+file:    u-boot-isvp_t23n_msc0_mmc1bit.bin
+size:    189685 bytes
+sha256:  4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5
 ```
 
-Result:
+Upstream boot layout:
 
 ```text
-out/u-boot-t23n-sd.bin
+sector 34       SPL / combined image
+sector 86       U-Boot proper
+sector 546      U-Boot environment (0x44400), 32 KiB
+BOOT:/uImage    active kernel
+/dev/mmcblk0p2  ext4 rootfs
 ```
 
-The build validates the MMC SPL magic and that the combined image does not
-overlap its SD environment area.
+Kernel load path:
+
+```text
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
+```
 
 ## Build everything
 
@@ -70,10 +74,7 @@ overlap its SD environment area.
 sh scripts/build_all.sh
 ```
 
-This builds the autonomous-SD kernel, T23N MMC SPL/U-Boot and WIFICAM/PegineLab
-overlay.
-
-Write the complete card with:
+Then write the complete card with:
 
 ```sh
 sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
