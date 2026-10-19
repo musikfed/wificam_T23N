@@ -1,18 +1,15 @@
 # Сборка T23/T23N для автономной SD
 
-## Что изменилось
-
-Старый kernel, собранный до перехода на SD-only, загружался как MIPS uImage, но
-не является финальным deployable kernel: для прямого `root=/dev/mmcblk0p2`
-нужны MMC host driver и EXT4 **встроенными** в kernel.
-
 ## Kernel
+
+Для прямого `root=/dev/mmcblk0p2` MMC host driver и EXT4 должны быть
+**встроены** в kernel, а не загружаться модулями после mount rootfs.
 
 ```sh
 sh scripts/build_kernel.sh
 ```
 
-Скрипт принудительно включает и после `olddefconfig` проверяет:
+Скрипт проверяет:
 
 ```text
 CONFIG_MMC=y
@@ -31,46 +28,47 @@ CONFIG_DEVTMPFS_MOUNT=y
 ~/myipcam/build/kernel/arch/mips/boot/uImage
 ```
 
-Kernel ограничен raw slot размером 6 MiB, потому что SD U-Boot выполняет:
-
-```text
-mmc read 0x80600000 0x1800 0x3000
-```
-
-После новой сборки использовать SHA-256, который печатает сам build script.
-Старый pre-SD-root hash не следует использовать как критерий готовности.
+Активный kernel загружается upstream U-Boot с FAT32-раздела BOOT как
+`/uImage`. В raw sector `0x1800` сохраняется резервная копия; основной boot
+path её не читает.
 
 ## SD SPL/U-Boot
 
-Обычный SPI/SFC U-Boot здесь не подходит.
+SPI/SFC U-Boot для этой схемы не используется.
 
 ```sh
 sh scripts/build_sd_bootloader.sh
 ```
 
-Скрипт использует pinned OpenIPC `u-boot-ingenic`, добавляет T23N MMC target:
+Скрипт получает точный release asset:
 
 ```text
-SPL_MMC_SUPPORT
-ENV_IS_IN_MMC
-JZ_MMC_MSC0
-T23N
+gtxaspec/ingenic-u-boot-xburst1
+release: uboot-xb1-2025-09-11
+file:    u-boot-isvp_t23n_msc0_mmc1bit.bin
+size:    189685 bytes
+sha256:  4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5
 ```
 
-и bootargs:
+И проверяет размер, SHA-256 и MSPL magic.
+
+Boot layout этого upstream U-Boot:
 
 ```text
-root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
+sector 34       SPL / combined image
+sector 86       U-Boot proper
+sector 546      U-Boot environment (0x44400), 32 KiB
+BOOT:/uImage    активный kernel
+/dev/mmcblk0p2  ext4 rootfs
 ```
 
-Результат:
+Kernel загружается так:
 
 ```text
-out/u-boot-t23n-sd.bin
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
 ```
-
-Build script проверяет MMC SPL magic и размер image, чтобы U-Boot не пересёк
-свою environment area.
 
 ## Полная сборка
 
@@ -78,13 +76,7 @@ Build script проверяет MMC SPL magic и размер image, чтобы 
 sh scripts/build_all.sh
 ```
 
-Это последовательно собирает:
-
-1. autonomous-SD kernel;
-2. T23N MMC SPL/U-Boot;
-3. WIFICAM/PegineLab rootfs overlay.
-
-После этого карта записывается:
+После этого полная запись карты:
 
 ```sh
 sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
