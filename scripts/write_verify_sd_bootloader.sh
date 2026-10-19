@@ -6,7 +6,8 @@ BOOTLOADER="${2:-}"
 CONFIRM="${3:-}"
 
 SD_UBOOT_SECTOR=34
-SD_UBOOT_ENV_SECTOR=514
+SD_UBOOT_ENV_SECTOR=546
+SD_UBOOT_ENV_BLOCKS=64
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -63,6 +64,9 @@ echo "Writing T23N MSC0 1-bit SPL/U-Boot at sector $SD_UBOOT_SECTOR ..."
 if ! dd if="$PAD" of="$DEV" bs=512 seek="$SD_UBOOT_SECTOR" count="$BLOCKS" oflag=direct conv=notrunc,fsync status=none 2>/dev/null; then
     dd if="$PAD" of="$DEV" bs=512 seek="$SD_UBOOT_SECTOR" count="$BLOCKS" conv=notrunc,fsync status=none
 fi
+echo "Clearing upstream U-Boot environment at sector $SD_UBOOT_ENV_SECTOR ..."
+dd if=/dev/zero of="$DEV" bs=512 seek="$SD_UBOOT_ENV_SECTOR" count="$SD_UBOOT_ENV_BLOCKS" conv=notrunc,fsync status=none
+
 sync
 blockdev --flushbufs "$DEV" 2>/dev/null || true
 sleep 2
@@ -81,15 +85,29 @@ echo "SPL magic                : $DISK_MAGIC"
 [ "$DISK_MAGIC" = "4d53504c" ] || die "raw SPL magic mismatch"
 
 case "$DEV" in
-  /dev/mmcblk*) P1="${DEV}p1" ;;
-  *) P1="${DEV}1" ;;
+  /dev/mmcblk*) P1="${DEV}p1"; P2="${DEV}p2" ;;
+  *) P1="${DEV}1"; P2="${DEV}2" ;;
 esac
 [ -b "$P1" ] || die "BOOT partition missing: $P1"
+[ -b "$P2" ] || die "ROOTFS partition missing: $P2"
 
 mount "$P1" "$MNT"
 cp "$BOOTLOADER" "$MNT/u-boot-t23n-sd.bin"
 sync
 umount "$MNT"
 
+mount "$P2" "$MNT"
+[ -d "$MNT/etc" ] || die "ROOTFS /etc missing"
+cat > "$MNT/etc/fw_env.config" <<'EOF'
+# T23N upstream MSC0 1-bit U-Boot environment on SD.
+# 230 KiB monitor + sector 86 * 512 = 0x44400 = sector 546.
+# Device            Device offset   Env size
+/dev/mmcblk0         0x44400         0x8000
+EOF
+sync
+umount "$MNT"
+
 echo "Raw SPL/U-Boot readback  : OK"
+echo "U-Boot env sector 546    : cleared for upstream defaults"
 echo "BOOT partition copy      : updated"
+echo "ROOTFS fw_env.config     : updated to 0x44400"
