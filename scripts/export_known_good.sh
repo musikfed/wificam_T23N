@@ -44,6 +44,7 @@ cp "$UBOOT" "$OUT/u-boot-t23n-sd.bin"
 cat > "$OUT/BOOT-MAP.txt" <<'EOF'
 T23N autonomous SD
 SPI/NOR required: NO
+Block 0: INGE descriptor (SPL size 26624) + DOS MBR partition table
 Bootloader: upstream u-boot-isvp_t23n_msc0_mmc1bit.bin
 SPL/U-Boot: raw sector 34
 U-Boot proper: sector 86
