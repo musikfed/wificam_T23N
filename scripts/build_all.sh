@@ -5,7 +5,7 @@ HERE="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 echo "[1/3] Building autonomous-SD kernel"
 sh "$HERE/scripts/build_kernel.sh"
 
-echo "[2/3] Building T23N SD SPL/U-Boot"
+echo "[2/3] Preparing verified upstream T23N SD SPL/U-Boot"
 sh "$HERE/scripts/build_sd_bootloader.sh"
 
 echo "[3/3] Packaging WIFICAM/PegineLab rootfs overlay"
