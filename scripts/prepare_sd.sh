@@ -239,6 +239,7 @@ fi
 cat > "$MNT/SD-BOOT-MAP.txt" <<EOF
 T23N autonomous SD boot map
 SPI/NOR required: NO
+BootROM block 0: INGE descriptor, SPL size 26624 bytes
 SPL/U-Boot raw start: sector 34 (17 KiB)
 U-Boot proper raw start: sector 86
 U-Boot environment raw start: sector 546 (0x44400)
