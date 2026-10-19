@@ -1,7 +1,7 @@
 # Полная запись SD для T23/T23N без SPI/NOR
 
-Эта инструкция относится к камере, у которой внешняя SPI/NOR flash **физически снята**.
-SD содержит всю загрузочную цепочку.
+Эта инструкция относится к камере, у которой внешняя SPI/NOR flash
+**физически снята**. SD содержит всю постоянную загрузочную цепочку.
 
 ## 1. Обновить ветку
 
@@ -11,48 +11,18 @@ git switch mymarrchWFcam
 git pull
 ```
 
-## 2. Установить host tools
+## 2. Собрать/получить artifacts
 
 ```sh
-sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2fsprogs lzop
+sh scripts/build_all.sh
 ```
 
-## 3. Пересобрать kernel для SD root
+Для bootloader используется точный upstream
+`u-boot-isvp_t23n_msc0_mmc1bit.bin`, release
+`uboot-xb1-2025-09-11`, SHA-256
+`4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5`.
 
-```sh
-sh scripts/build_kernel.sh
-```
-
-Скрипт требует built-in:
-
-```text
-CONFIG_MMC=y
-CONFIG_MMC_BLOCK=y
-CONFIG_JZMMC_V12=y
-CONFIG_JZMMC_V12_MMC0=y
-CONFIG_EXT4_FS=y
-CONFIG_MSDOS_PARTITION=y
-CONFIG_DEVTMPFS=y
-CONFIG_DEVTMPFS_MOUNT=y
-```
-
-Это обязательно: kernel не может загрузить MMC/ext4 module из rootfs, пока сам rootfs ещё не смонтирован.
-
-## 4. Собрать специальный SD SPL/U-Boot
-
-```sh
-sh scripts/build_sd_bootloader.sh
-```
-
-Результат:
-
-```text
-out/u-boot-t23n-sd.bin
-```
-
-Это MMC/SPL build, а не SPI/SFC U-Boot.
-
-## 5. Найти SD
+## 3. Найти SD
 
 ```sh
 lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
@@ -60,39 +30,37 @@ lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
 
 После каждого detach/re-attach имя `/dev/sdX` проверяется заново.
 
-## 6. Записать всё
+## 4. Записать всё
 
 ```sh
 sudo sh scripts/flash_full_firmware_sd.sh /dev/ВАША_SD
 ```
 
-Скрипт потребует строку вида:
+Скрипт потребует подтверждение вида:
 
 ```text
 AUTONOMOUS-SD:/dev/sdX
 ```
 
-После подтверждения вся карта переразмечается.
-
-## Raw boot map
+## Карта загрузки
 
 ```text
 sector 0       MBR
-sector 34      SPL/U-Boot image start (17 KiB)
+sector 34      SPL/U-Boot image start
 sector 86      U-Boot proper
-sector 514     U-Boot environment
-sector 0x1800  uImage (3 MiB)
-                raw kernel slot = 0x3000 sectors = 6 MiB
-16 MiB         p1 BOOT FAT32, 128 MiB
+sector 546     U-Boot environment (0x44400), 32 KiB
+sector 0x1800  резервная raw-копия uImage
+16 MiB         p1 BOOT FAT32, активный /uImage
 144 MiB        p2 ROOTFS ext4
-...            p3 MEDIA ext4, fixed 20 GiB near end
+...            p3 MEDIA ext4, fixed 20 GiB
 ```
 
-U-Boot загружает kernel напрямую из raw SD:
+Upstream U-Boot загружает активный kernel с FAT32:
 
 ```text
-mmc read 0x80600000 0x1800 0x3000
-bootm 0x80600000
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
 ```
 
 Linux root:
@@ -102,15 +70,18 @@ Linux root:
 rootfstype=ext4
 ```
 
-## 7. Первый запуск
+## 5. Первый запуск
 
-После успешного завершения flash script:
+После `SD FIRMWARE VERIFY: OK`:
 
 ```sh
 sync
 ```
 
-Отсоединить карту от WSL, вставить её в обесточенную камеру, подключить UART 115200
-и только потом подать питание. Нужен полный лог от первой строки.
+Полностью обесточить камеру, вынуть SD из кардридера, вставить SD в камеру и
+только затем подать питание. UART для записи и обязательной проверки карты не
+нужен.
 
-SPI/NOR для этого сценария не требуется.
+Если плата не начинает загрузку даже с точно проверенным upstream MMC U-Boot,
+дальше проверяется ранний аппаратный путь BootROM → SD: питание слота,
+card-detect/strap и разводка платы. SPI/NOR для этого сценария не используется.
