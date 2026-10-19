@@ -17,6 +17,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
     exit 2
 }
 [ "$(id -u)" -eq 0 ] || die "run with sudo/root"
+command -v python3 >/dev/null 2>&1 || die "python3 not installed"
 [ -b "$DEV" ] || die "not a block device: $DEV"
 [ -f "$IMAGE" ] || die "kernel image not found: $IMAGE"
 [ -f "$BOOTLOADER" ] || die "SD bootloader not found: $BOOTLOADER"
