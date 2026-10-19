@@ -1,34 +1,21 @@
 # Full SD image for T23/T23N with no SPI/NOR
 
-This guide is for hardware where the external SPI/NOR flash is **physically absent**.
-The SD card contains the complete boot chain.
+This guide is for hardware where the external SPI/NOR flash is **physically
+absent**. The SD card contains the complete persistent boot chain.
 
-## Build the deployable kernel
+## Update and build
 
 ```sh
 cd ~/myipcam/wificam_T23N
 git switch mymarrchWFcam
 git pull
-sh scripts/build_kernel.sh
+sh scripts/build_all.sh
 ```
 
-The script requires MMC, the T23 MMC host controller and EXT4 to be built into the
-kernel (`=y`), because modules cannot be loaded before the SD root filesystem is
-mounted.
-
-## Build the T23N SD SPL/U-Boot
-
-```sh
-sh scripts/build_sd_bootloader.sh
-```
-
-Result:
-
-```text
-out/u-boot-t23n-sd.bin
-```
-
-This is a dedicated MMC/SPL build, not a SPI/SFC U-Boot image.
+The bootloader is the exact upstream
+`u-boot-isvp_t23n_msc0_mmc1bit.bin` from release
+`uboot-xb1-2025-09-11`, SHA-256
+`4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5`.
 
 ## Identify and write the SD card
 
@@ -39,28 +26,33 @@ sudo sh scripts/flash_full_firmware_sd.sh /dev/YOUR_SD
 
 Re-check the Linux device name after every detach/re-attach.
 
-The writer rebuilds the whole card and uses this raw map:
+The resulting layout is:
 
 ```text
 sector 0       MBR
-sector 34      SPL/U-Boot image start (17 KiB)
+sector 34      SPL/U-Boot image start
 sector 86      U-Boot proper
-sector 514     U-Boot environment
-sector 0x1800  uImage (3 MiB), 6 MiB raw slot
-16 MiB         p1 BOOT FAT32, 128 MiB
+sector 546     U-Boot environment (0x44400), 32 KiB
+sector 0x1800  redundant raw uImage copy
+16 MiB         p1 BOOT FAT32, active /uImage
 144 MiB        p2 ROOTFS ext4
 ...            p3 MEDIA ext4, fixed 20 GiB
 ```
 
-U-Boot reads the kernel with:
+Upstream U-Boot loads the active kernel from FAT32:
 
 ```text
-mmc read 0x80600000 0x1800 0x3000
-bootm 0x80600000
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
 ```
 
 Linux mounts `/dev/mmcblk0p2` as the ext4 root filesystem.
 
-After writing, insert the SD into the powered-off camera, attach a 115200 UART,
-then power the board and capture the log from the first line. No SPI/NOR boot
-storage is required by this layout.
+After `SD FIRMWARE VERIFY: OK`, run `sync`, remove the card from the reader,
+insert it into the fully powered-off camera, then apply power. UART is not
+required for writing or mandatory SD verification.
+
+If the board still does not begin booting with the verified upstream MMC
+U-Boot, investigate the early BootROM → SD hardware path: slot power,
+card-detect/strap state and board routing.
