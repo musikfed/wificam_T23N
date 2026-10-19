@@ -10,10 +10,16 @@
 **SPI/NOR flash физически отсутствует.** Прошивка не рассчитывает на загрузчик,
 kernel, rootfs или environment во внешней flash-памяти.
 
-Полная цепочка загрузки должна находиться на SD:
+Полная цепочка загрузки должна находиться на SD. Для MMC-образа Ingenic перед
+SPL нужен 36-байтовый descriptor в block 0: `INGE` + little-endian размер
+SPL (`26624`) + 24 нулевых байта + `0xffffffff`. Таблица DOS-разделов при
+этом остаётся в том же sector 0 начиная с byte 446.
 
 ```text
 T23 BootROM
+   ↓
+block 0: INGE descriptor
+   ↓
    ↓
 raw SD sector 34 (17 KiB)
 SPL / MMC bootstrap (MSC0 1-bit)
@@ -48,7 +54,7 @@ sector 86. Upstream MMC U-Boot загружает kernel как `/uImage` из F
 
 | Область | Положение | Назначение |
 |---|---:|---|
-| MBR | sector 0 | таблица разделов |
+| INGE + MBR | sector 0 | INGE descriptor bytes 0..35; DOS partition table bytes 446..511 |
 | SPL/U-Boot image | sector 34 | вход BootROM, MMC SPL |
 | U-Boot proper | sector 86 | вычисляется из 26 KiB SPL |
 | U-Boot env | sector 546 (`0x44400`) | 32 KiB environment |
@@ -130,6 +136,7 @@ sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 - скачивает и SHA-256 проверяет официальный OpenIPC T23 lite userspace bundle;
 - добавляет WIFICAM/PegineLab overlay;
 - **полностью переразмечает SD**;
+- пишет INGE BootROM descriptor в первые 36 bytes sector 0, не затрагивая таблицу разделов;
 - пишет SPL/U-Boot в raw sector 34;
 - кладёт активный kernel как `BOOT:/uImage` и дополнительно сохраняет raw backup в sector `0x1800`;
 - проверяет `BOOT:/uImage` и резервный raw kernel readback по SHA-256;
