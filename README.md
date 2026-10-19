@@ -114,6 +114,37 @@ out/wificam-rootfs-overlay.tar.gz
 Старый kernel hash из сборки до SD-only перехода не является deployable reference:
 после включения built-in MMC/ext4 kernel должен быть пересобран и получит новый SHA-256.
 
+## Windows + WSL: подключение SD-кардридера
+
+Команда `usbipd` относится к **Windows host**, а не к Ubuntu/WSL. Если в
+Ubuntu появляется `Command 'usbipd' not found`, не устанавливайте
+`linux-tools-common`: это другой пакет и он не подключает USB-устройство к
+WSL.
+
+Порядок:
+
+1. В **Windows PowerShell**:
+   ```powershell
+   usbipd list
+   ```
+2. Найдите USB-кардридер и его текущий `BUSID`.
+3. Если устройство ещё не `Shared`, в PowerShell от администратора:
+   ```powershell
+   usbipd bind --busid <BUSID>
+   ```
+4. Подключите его к WSL:
+   ```powershell
+   usbipd attach --wsl --busid <BUSID>
+   ```
+5. Уже в Ubuntu/WSL:
+   ```sh
+   lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
+   ```
+
+После каждого detach/attach имя SD может измениться. Писать можно только на
+диск, который совпадает по размеру/модели/USB/RM=1. Системный WSL-диск трогать
+нельзя.
+
 ## Проверенный старый Thingino FAT32 installer path
 
 Для платы, на которой ранее реально запускался Thingino через простую FAT32 SD,
