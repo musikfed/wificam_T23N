@@ -8,7 +8,6 @@ BOOTLOADER="${3:-$REPO_DIR/out/u-boot-t23n-sd.bin}"
 
 UPSTREAM_UBOOT_SHA256="4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5"
 UPSTREAM_UBOOT_SIZE=189685
-INGE_SPL_SIZE=26624
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -17,7 +16,6 @@ die() { echo "ERROR: $*" >&2; exit 1; }
     exit 2
 }
 [ "$(id -u)" -eq 0 ] || die "run with sudo/root"
-command -v python3 >/dev/null 2>&1 || die "python3 not installed"
 [ -b "$DEV" ] || die "not a block device: $DEV"
 [ -f "$IMAGE" ] || die "kernel image not found: $IMAGE"
 [ -f "$BOOTLOADER" ] || die "SD bootloader not found: $BOOTLOADER"
@@ -45,7 +43,7 @@ P3="$(part 3)"
 
 # Partition map expected by the autonomous no-SPI/NOR layout.
 P1_START="$(lsblk -bn -o START "$P1" | tr -d ' ')"
-[ "$P1_START" = "32768" ] || die "BOOT does not start at sector 32768 (16 MiB): $P1_START"
+[ "$P1_START" = "2048" ] || die "BOOT does not start at sector 2048 (1 MiB): $P1_START"
 
 P1_LABEL="$(lsblk -no LABEL "$P1" | xargs)"
 P2_LABEL="$(lsblk -no LABEL "$P2" | xargs)"
@@ -54,27 +52,9 @@ P3_LABEL="$(lsblk -no LABEL "$P3" | xargs)"
 [ "$P2_LABEL" = "ROOTFS" ] || die "p2 label is not ROOTFS"
 [ "$P3_LABEL" = "MEDIA" ] || die "p3 label is not MEDIA"
 
-# Ingenic MMC boot image descriptor at block 0. Thingino's MMC image builder
-# restores these first 36 bytes after writing the DOS partition table.
-INGE_CHECK="$(python3 - "$DEV" "$INGE_SPL_SIZE" <<'PY'
-import struct
-import sys
-
-dev = sys.argv[1]
-expected_size = int(sys.argv[2])
-with open(dev, "rb", buffering=0) as f:
-    header = f.read(36)
-ok = (
-    len(header) == 36
-    and header[:4] == b"INGE"
-    and struct.unpack("<I", header[4:8])[0] == expected_size
-    and header[8:32] == b"\x00" * 24
-    and header[32:36] == b"\xff" * 4
-)
-print("OK" if ok else "BAD")
-PY
-)"
-[ "$INGE_CHECK" = "OK" ] || die "BootROM INGE header missing/invalid at block 0"
+# DOS/MBR sector 0 must be valid while the BootROM-visible SPL stays at raw sector 34.
+MBR_SIG="$(dd if="$DEV" bs=1 skip=510 count=2 status=none | od -An -tx1 | tr -d ' \n')"
+[ "$MBR_SIG" = "55aa" ] || die "DOS/MBR signature missing at sector 0"
 
 # BootROM-visible MMC SPL magic and exact bootloader payload at raw sector 34.
 MAGIC="$(dd if="$DEV" bs=512 skip=34 count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
@@ -92,12 +72,11 @@ KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
 KERNEL_BLOCKS=$(((KERNEL_SIZE + 511) / 512))
 SOURCE_SHA="$(sha256sum "$IMAGE_REAL" | awk '{print $1}')"
 
-TMP="$(mktemp)"
 BOOT_TMP="$(mktemp)"
 MNT="$(mktemp -d)"
 cleanup() {
     umount "$MNT" 2>/dev/null || true
-    rm -f "$TMP" "$BOOT_TMP"
+    rm -f "$BOOT_TMP"
     rmdir "$MNT" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
@@ -109,11 +88,6 @@ blockdev --flushbufs "$DEV" 2>/dev/null || true
 dd if="$DEV" of="$BOOT_TMP" bs=512 skip=34 count="$BOOTLOADER_BLOCKS" iflag=direct status=none 2>/dev/null || dd if="$DEV" of="$BOOT_TMP" bs=512 skip=34 count="$BOOTLOADER_BLOCKS" status=none
 BOOTLOADER_SD_SHA="$(head -c "$BOOTLOADER_SIZE" "$BOOT_TMP" | sha256sum | awk '{print $1}')"
 [ "$BOOTLOADER_SOURCE_SHA" = "$BOOTLOADER_SD_SHA" ] ||     die "raw SPL/U-Boot SHA mismatch: source=$BOOTLOADER_SOURCE_SHA sd=$BOOTLOADER_SD_SHA"
-
-# Verify the complete raw kernel payload at sector 0x1800.
-dd if="$DEV" of="$TMP" bs=512 skip=$((0x1800)) count="$KERNEL_BLOCKS" iflag=direct status=none 2>/dev/null || dd if="$DEV" of="$TMP" bs=512 skip=$((0x1800)) count="$KERNEL_BLOCKS" status=none
-SD_SHA="$(head -c "$KERNEL_SIZE" "$TMP" | sha256sum | awk '{print $1}')"
-[ "$SOURCE_SHA" = "$SD_SHA" ] || die "raw kernel SHA mismatch: source=$SOURCE_SHA sd=$SD_SHA"
 
 mount -o ro "$P1" "$MNT"
 [ -f "$MNT/uImage" ] || die "BOOT/uImage missing"
@@ -141,11 +115,10 @@ umount "$MNT"
 
 echo
 echo "SD FIRMWARE VERIFY: OK"
-echo "BootROM INGE header   : $INGE_CHECK"
+echo "DOS/MBR signature     : $MBR_SIG"
 echo "SPL magic             : $MAGIC"
 echo "Raw SPL/U-Boot SHA256 : $BOOTLOADER_SD_SHA"
 echo "BOOT U-Boot SHA256    : $BOOT_BOOTLOADER_SHA"
-echo "Raw kernel backup SHA256 : $SD_SHA"
 echo "BOOT uImage SHA256       : $BOOT_KERNEL_SHA"
 echo "Kernel boot source       : BOOT partition /uImage"
 echo "ROOTFS              : OK"
