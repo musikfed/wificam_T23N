@@ -32,6 +32,7 @@ OpenIPC T23 userspace + WIFICAM/PegineLab
 Для этого используется точный upstream-образ
 `u-boot-isvp_t23n_msc0_mmc1bit.bin` из
 `gtxaspec/ingenic-u-boot-xburst1`, release `uboot-xb1-2025-09-11`.
+Зафиксированный SHA-256: `4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5`.
 `scripts/build_sd_bootloader.sh` теперь не пересобирает старое дерево OpenIPC,
 а скачивает этот зафиксированный release asset и проверяет его размер, MSPL
 magic и SHA-256.
@@ -211,7 +212,7 @@ scripts/build_kernel.sh
 scripts/build_sd_bootloader.sh
 scripts/flash_full_firmware_sd.sh
 scripts/prepare_sd.sh
-patches/u-boot-ingenic-t23n-sd.patch
+scripts/write_verify_sd_bootloader.sh
 rootfs/
 web/
 docs/
