@@ -89,7 +89,7 @@ lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS "$DEV"
 echo
 echo "SPI/NOR boot flash : NOT USED / may be physically absent"
 echo "BootROM -> SD SPL  : raw sector 34"
-echo "U-Boot -> kernel   : raw sector 0x1800"
+echo "U-Boot -> kernel   : BOOT FAT32 /uImage"
 echo "Linux root         : SD partition 2, ext4"
 echo "Camera media       : SD partition 3, ext4, 20 GiB"
 echo
@@ -172,7 +172,7 @@ p.write_text(s.replace(old, new, 1))
 PY
 
 grep -q "root=/dev/mmcblk0p2" "$LOAD_INGENIC" || die "load_ingenic SD patch verification failed"
-grep -Eq '^/dev/mmcblk0[[:space:]]+0x40400[[:space:]]+0x8000' \
+grep -Eq '^/dev/mmcblk0[[:space:]]+0x44400[[:space:]]+0x8000' \
     "$WORK/base-rootfs/etc/fw_env.config" || die "SD fw_env.config missing or invalid"
 
 mkdir -p     "$WORK/base-rootfs/data/services"     "$WORK/base-rootfs/data/vpn"     "$WORK/base-rootfs/mnt/media"     "$WORK/base-rootfs/etc/wificam"
@@ -215,7 +215,7 @@ echo " T23N AUTONOMOUS SD FIRMWARE: COMPLETE + SD VERIFIED"
 echo "============================================================"
 echo "Boot chain:"
 echo "  T23 BootROM -> SD sector 34 SPL/U-Boot"
-echo "  U-Boot      -> SD sector 0x1800 uImage"
+echo "  U-Boot      -> BOOT FAT32 /uImage"
 echo "  Linux       -> /dev/mmcblk0p2 ext4"
 echo "  MEDIA       -> /dev/mmcblk0p3 ext4"
 echo
