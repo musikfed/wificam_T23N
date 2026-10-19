@@ -44,8 +44,11 @@ AUTONOMOUS-SD:/dev/sdX
 
 ## Карта загрузки
 
+The first 36 bytes of sector 0 are the Ingenic MMC descriptor; the DOS
+partition table remains at byte 446 in the same sector.
+
 ```text
-sector 0       MBR
+sector 0       INGE descriptor + MBR partition table
 sector 34      SPL/U-Boot image start
 sector 86      U-Boot proper
 sector 546     U-Boot environment (0x44400), 32 KiB
