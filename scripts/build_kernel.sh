@@ -76,7 +76,7 @@ IMAGE="$BUILD_DIR/arch/mips/boot/uImage"
 
 size="$(wc -c < "$IMAGE" | tr -d ' ')"
 max=$((6 * 1024 * 1024))
-[ "$size" -le "$max" ] || die "uImage is too large for the 6 MiB raw SD kernel slot: $size bytes"
+[ "$size" -le "$max" ] || die "uImage is too large for the 6 MiB redundant raw backup slot: $size bytes"
 
 echo
 if command -v mkimage >/dev/null 2>&1; then
