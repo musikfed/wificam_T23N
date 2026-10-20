@@ -126,21 +126,40 @@ rootfstype=ext4
 
 ## Write the SD card
 
-Always identify the SD card again immediately before a destructive write:
+Under WSL2, pass the USB card reader from Windows to WSL first. Run
+`usbipd` in **Windows PowerShell as Administrator**, not inside Ubuntu/WSL:
+
+```powershell
+usbipd list
+usbipd bind --busid <BUSID>
+usbipd attach --wsl --busid <BUSID>
+```
+
+Use only the actual BUSID reported for the intended card reader.
+
+After attach, identify the card again inside WSL:
 
 ```sh
+lsusb
 lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
 ```
 
-The current reader/card should look roughly like:
+The current card should be roughly 29.1 GiB with `TRAN=usb` and `RM=1`.
+Never write to WSL Virtual Disk devices.
+
+**Offset rule:** `Thingino/thingino-t23-sd.bin` is a complete disk image.
+Always write it from **LBA0 / byte 0**, with no `seek=`. The required boot
+offset is already encoded inside the image:
 
 ```text
-29.1G  SD/MMC/MS PRO  usb  RM=1
+LBA0      MBR
+LBA34     SPL/MSPL
+LBA86     U-Boot proper
+LBA2048   p1 FAT16 /uImage
+LBA34816  p2 ext4 rootfs
 ```
 
-Never write to the WSL system disk `/dev/sdd`.
-
-If the card is still `/dev/sde`:
+If the card appears as `/dev/sde`:
 
 ```sh
 sudo sh scripts/write_thingino_wificam_sd.sh /dev/sde
@@ -152,8 +171,12 @@ Confirmation string:
 THINGINO-WIFICAM:/dev/sde
 ```
 
-The writer verifies full-image SHA readback, `55aa`, LBA34
-`MSPL`, p1 at LBA2048 and p2 at LBA34816.
+Before writing, the writer verifies the SHA256 sidecar, MBR `55aa`, MSPL at
+LBA34, and p1/p2 starts in the source image. It then writes the whole image
+from LBA0 and verifies full-image SHA readback, `55aa`, LBA34 MSPL, p1 at
+LBA2048 and p2 at LBA34816. Do not use manual `dd ... seek=34` with the
+finished `thingino-t23-sd.bin`; that would shift the whole disk image and
+break the MBR.
 
 ## First hardware test
 
