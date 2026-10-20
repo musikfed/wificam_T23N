@@ -32,6 +32,10 @@ echo "RU: Web UI является обязательной частью этог
 echo "EN: The PegineLab WIFICAM Web UI is a mandatory part of this image."
 echo
 
+if [ "$PUBLISH" = "1" ] && ! git -C "$REPO_DIR" diff --cached --quiet; then
+    die "refusing PUBLISH=1 because unrelated files are already staged in the project repo"
+fi
+
 # MMC mode boots p2/rootfs.ext2 directly. Thingino user/overlay normally feeds
 # data.jffs2, which is not mounted as the root device in this SD-root mode.
 # Therefore build a dedicated Buildroot rootfs overlay and inject WIFICAM into
