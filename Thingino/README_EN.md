@@ -85,9 +85,13 @@ The script:
 7. enables BusyBox httpd for the independent WIFICAM service on TCP 8080;
    The minimal PegineLab admin requires only `CONFIG_HTTPD`,
    `CONFIG_FEATURE_HTTPD_CGI`, `CONFIG_FEATURE_HTTPD_BASIC_AUTH`, and
-   `CONFIG_FEATURE_HTTPD_AUTH_MD5`. If a FAST build reuses a stale BusyBox
-   `.config`, the wrapper automatically runs `br-busybox-reconfigure` and
-   regenerates `rootfs.ext2`;
+   `CONFIG_FEATURE_HTTPD_AUTH_MD5`. The minimal HTTP flags are supplied through Buildroot's supported
+   `BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES` setting. This matters for the
+   pinned Thingino revision because its `BUSYBOX_KCONFIG_FRAGMENT_FILES += ...`
+   append is later overwritten by `package/busybox/busybox.mk`. If a FAST
+   build still contains a stale BusyBox `.config`, the wrapper runs
+   `br-busybox-reconfigure`, verifies the four flags, and regenerates
+   `rootfs.ext2`;
 8. injects WIFICAM directly through Buildroot's rootfs overlay;
 9. if `cleanbuild` did not emit `rootfs.ext2`, explicitly runs the Buildroot `rootfs-ext2` target;
 10. verifies WIFICAM in the build target and inside `rootfs.ext2` with `debugfs`;
