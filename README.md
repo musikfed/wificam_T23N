@@ -34,6 +34,19 @@ sh scripts/export_known_good.sh
 BASE_ROOTFS=/path/to/base-rootfs.tar.gz sh scripts/build_all.sh
 ```
 
+## Thingino SD/MMC build
+
+Текущий проверяемый путь сборки использует pinned Thingino commit `9925f46f73b9c39ec8d2a65134b18c94e6fdfb97` и профиль `galayou_g2_t23n_sc2336_atbm6012bx`. Web UI PegineLab WIFICAM обязателен в итоговом образе.
+
+Current validated build path uses pinned Thingino commit `9925f46f73b9c39ec8d2a65134b18c94e6fdfb97` and camera profile `galayou_g2_t23n_sc2336_atbm6012bx`. The PegineLab WIFICAM Web UI is mandatory in the final image.
+
+```sh
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+```
+
+Если Buildroot сообщает `Your PATH contains spaces, TABs, and/or newline`, не удаляйте checkout Thingino: повторите сборку с чистым `PATH`, как выше. / If Buildroot reports that error, do not reclone Thingino; re-run with the clean `PATH` above.
+
 ## SD-карта / SD card
 
 Форматирование уничтожает данные на выбранной карте.
