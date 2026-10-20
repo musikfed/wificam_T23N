@@ -130,11 +130,55 @@ wc -c out/u-boot-t23n-sd.bin
 
 ## 4. Найти настоящий autoupdate-full.bin
 
+Сначала ищем **старый реально использованный файл/installer на этом компьютере**.
+Это надёжнее, чем угадывать профиль по одному только SoC.
+
+В Ubuntu/WSL:
+
 ```sh
-find ~/myipcam -type f -name 'autoupdate-full.bin' -print
+find ~/myipcam /mnt/c/Users/obzor/Downloads /mnt/c/Users/obzor/Desktop /mnt/c/Users/obzor/Documents \
+  -type f \( \
+    -iname 'autoupdate-full.bin' -o \
+    -iname 'thingino-*.bin' -o \
+    -iname '*thingino*.zip' -o \
+    -iname '*t23n*.bin' \
+  \) -print 2>/dev/null
 ```
 
-Если команда ничего не вывела, файла действительно нет.
+И проверить историю загрузок/команд:
+
+```sh
+grep -Ei 'thingino|autoupdate|themactep|wltechblog|wget|curl' ~/.bash_history 2>/dev/null
+```
+
+Если старого файла нет, смотрим **только существующие assets текущего release**:
+
+```sh
+sh scripts/list_thingino_t23n_assets.sh
+```
+
+Можно фильтровать по известному sensor/Wi-Fi:
+
+```sh
+sh scripts/list_thingino_t23n_assets.sh sc2336 atbm6012
+sh scripts/list_thingino_t23n_assets.sh gc2083 aic8800
+```
+
+На 2026-10-20 upstream latest release содержит десятки разных T23N-профилей.
+Точного публичного соответствия для PCB `GV-T23-PTZ-MAIN-V2.0` в GitHub не
+найдено, поэтому **по одному имени платы payload не выбираем**.
+
+Нужно подтвердить минимум:
+
+```text
+SoC    : T23N
+sensor : например SC2336 / SC2336P / SC1A4T / GC2083 / ...
+Wi-Fi  : например ATBM6012BX / ATBM6132U / AIC8800 / ...
+```
+
+После этого выбирается точный release asset
+`thingino-<camera>_t23n_<sensor>_<wifi>.bin` и только он переименовывается в
+`autoupdate-full.bin`.
 
 Upstream `thingino-installers` для T23N обычно делает именно такую операцию:
 скачивает **конкретный профиль камеры** вида
@@ -235,7 +279,31 @@ sudo dd if=out/u-boot-t23n-sd.bin \
 использовать `prepare_legacy_thingino_sd.sh`, потому что он дополнительно
 проверяет устройство, размер сектора, hash и readback.
 
-## 7. Тест в камере
+## 7. Проверить recovery-карту после копирования payload
+
+Для **этой однораздельной recovery-карты** использовать:
+
+```sh
+sudo sh scripts/verify_legacy_thingino_sd.sh /dev/sde
+```
+
+Если есть исходный payload на диске, можно одновременно проверить его SHA:
+
+```sh
+sudo sh scripts/verify_legacy_thingino_sd.sh /dev/sde out/autoupdate-full.bin
+```
+
+Не запускать здесь `scripts/verify_sd_firmware.sh`: тот скрипт проверяет
+полный SD-root layout с p2/p3 и `BOOT:/uImage`, поэтому для legacy-карты он
+неподходящий.
+
+Проверка наличия `autoupdate-full.bin` подтверждает только содержимое карты.
+Она **не гарантирует**, что конкретный payload сможет работать без физической
+SPI/NOR: актуальный upstream auto-update код содержит `sf erase/sf write`.
+На этом этапе мы воспроизводим исторически работавший SD installer path и
+проверяем поведение конкретной платы.
+
+## 8. Тест в камере
 
 После успешной проверки:
 
@@ -256,7 +324,7 @@ sync
 питание SD и T23/T23N boot-ROM requirements. Kernel/rootfs в таком случае пока
 не трогаем.
 
-## Важное замечание про autoupdate
+## 9. Важное замечание про autoupdate
 
 В актуальном upstream-коде `sdupdate` присутствуют операции
 `sf erase` / `sf write`. Поэтому сам факт наличия
