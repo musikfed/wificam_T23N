@@ -6,11 +6,19 @@ CONF=/etc/wificam/wificam.conf
 WEBROOT=/usr/share/wificam-web
 PIDFILE=/var/run/wificam-httpd.pid
 LOG=/var/log/wificam-httpd.log
-AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
+STATE_DIR="${STATE_DIR:-/opt/wificam}"
+AUTH_CONF="${AUTH_CONF:-$STATE_DIR/httpd.conf}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_UNAUTHENTICATED_WEB="${ALLOW_UNAUTHENTICATED_WEB:-0}"
 WEB_PORT="${WEB_PORT:-8080}"
 MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
+MEDIA_FALLBACKS="${MEDIA_FALLBACKS:-/mnt/mmcblk0p1 /mnt/sdcard /mnt/sda0}"
+
+httpd_available() {
+    command -v httpd >/dev/null 2>&1 && return 0
+    busybox httpd -h 2>&1 | grep -qi httpd && return 0
+    return 1
+}
 
 httpd_run() {
     if command -v httpd >/dev/null 2>&1; then
@@ -30,31 +38,77 @@ make_csrf() {
     fi
 }
 
+pick_media_mount() {
+    # Final autonomous SD-root: mount dedicated LABEL=MEDIA if available.
+    if mountpoint -q "$MEDIA_MOUNT" 2>/dev/null; then
+        echo "$MEDIA_MOUNT"
+        return 0
+    fi
+
+    mkdir -p "$MEDIA_MOUNT"
+    if mount -L MEDIA "$MEDIA_MOUNT" 2>/dev/null; then
+        echo "$MEDIA_MOUNT"
+        return 0
+    fi
+
+    # Thingino/recovery fallback: reuse whichever SD mount the OS already owns.
+    for p in $MEDIA_FALLBACKS; do
+        if [ -d "$p" ] && mountpoint -q "$p" 2>/dev/null; then
+            echo "$p"
+            return 0
+        fi
+    done
+
+    # UI must still start even with no writable media mounted.
+    mkdir -p /tmp/wificam-media
+    echo /tmp/wificam-media
+}
+
 start() {
-    mkdir -p /var/run /var/log /data /data/services /data/vpn "$MEDIA_MOUNT"
-    mountpoint -q "$MEDIA_MOUNT" 2>/dev/null || mount -L MEDIA "$MEDIA_MOUNT" 2>/dev/null || true
-    mkdir -p "$MEDIA_MOUNT/recordings" "$MEDIA_MOUNT/snapshots" "$MEDIA_MOUNT/events"
+    mkdir -p /var/run /var/log "$STATE_DIR" "$STATE_DIR/services" "$STATE_DIR/vpn"
+
+    ACTIVE_MEDIA="$(pick_media_mount)"
+    export ACTIVE_MEDIA
+    RECORDINGS="$ACTIVE_MEDIA/recordings"
+    SNAPSHOTS="$ACTIVE_MEDIA/snapshots"
+    EVENTS="$ACTIVE_MEDIA/events"
+    export RECORDINGS SNAPSHOTS EVENTS MEDIA_MOUNT="$ACTIVE_MEDIA"
+    mkdir -p "$RECORDINGS" "$SNAPSHOTS" "$EVENTS" 2>/dev/null || true
 
     [ -x "$WEBROOT/cgi-bin/api" ] || chmod 0755 "$WEBROOT/cgi-bin/api" 2>/dev/null || true
+    [ -x "$WEBROOT/cgi-bin/snapshot.jpg" ] || chmod 0755 "$WEBROOT/cgi-bin/snapshot.jpg" 2>/dev/null || true
     make_csrf
 
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
         return 0
     fi
 
+    if ! httpd_available; then
+        echo "WIFICAM web UI not started: BusyBox httpd applet is unavailable" | tee -a "$LOG"
+        echo "Thingino integration must build BR2_PACKAGE_BUSYBOX_HTTPD=y" | tee -a "$LOG"
+        return 1
+    fi
+
     if [ -s "$AUTH_CONF" ]; then
-        echo "Starting authenticated WIFICAM web interface on port $WEB_PORT..."
-        httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" -c "$AUTH_CONF" -r "WIFICAM T23N" >>"$LOG" 2>&1 &
+        echo "Starting authenticated PegineLab WIFICAM on port $WEB_PORT..."
+        httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" -c "$AUTH_CONF" -r "PegineLab WIFICAM T23N" >>"$LOG" 2>&1 &
     elif [ "$ALLOW_UNAUTHENTICATED_WEB" = "1" ]; then
-        echo "WARNING: starting WIFICAM bootstrap UI WITHOUT authentication on port $WEB_PORT"
+        echo "WARNING: starting PegineLab WIFICAM bootstrap UI WITHOUT authentication on port $WEB_PORT"
         httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" >>"$LOG" 2>&1 &
     else
         echo "WIFICAM web UI not started: no $AUTH_CONF"
-        echo "Provision over UART:"
+        echo "Set a password with:"
         echo "  printf '%s' 'NEW_PASSWORD' | wificam-set-web-password admin"
         return 0
     fi
+
     echo $! > "$PIDFILE"
+    sleep 1
+    if ! kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "WIFICAM httpd exited during startup; see $LOG" >&2
+        rm -f "$PIDFILE"
+        return 1
+    fi
 }
 
 stop() {
