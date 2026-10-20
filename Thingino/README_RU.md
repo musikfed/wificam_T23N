@@ -43,14 +43,26 @@ Wi-Fi  : ATBM6012BX
 ## Обязательная Web UI
 
 PegineLab WIFICAM — не дополнительный файл «на потом», а обязательная часть
-канонического image.
+канонического image. При этом штатная Thingino UI и PegineLab WIFICAM — это
+**две разные веб-службы**.
 
-После успешной загрузки ожидается:
+После успешной загрузки:
 
 ```text
-Thingino Web UI       : http://CAMERA_IP/
+Thingino stock UI     : http://CAMERA_IP/ или https://CAMERA_IP/
+Thingino login        : root
+Thingino password     : root
+
 PegineLab WIFICAM     : http://CAMERA_IP:8080/
 ```
+
+Если браузер показывает `https://CAMERA_IP/login.html` с логотипом Thingino,
+это нормальная штатная Thingino Web UI. Для PegineLab нужно явно открыть
+`http://CAMERA_IP:8080/`.
+
+Первый запуск WIFICAM настроен как локальный bootstrap без аутентификации:
+`ALLOW_UNAUTHENTICATED_WEB=1`. После задания пароля WIFICAM перезапускается
+с Basic Auth; имя пользователя по умолчанию для установки пароля — `admin`.
 
 WIFICAM включает:
 
@@ -237,10 +249,19 @@ sync
 ```text
 1. Камера показывает признаки Linux boot.
 2. Поднимается Thingino/Wi-Fi.
-3. Доступна штатная Thingino Web UI.
-4. ОБЯЗАТЕЛЬНО доступна PegineLab WIFICAM на :8080.
+3. Доступна штатная Thingino Web UI; default login root/root.
+4. Отдельно открыть http://CAMERA_IP:8080/ — это PegineLab WIFICAM.
 5. WIFICAM status API отвечает.
 6. Snapshot preview работает при поднятом Prudynt.
+```
+
+Если открывается только штатный Thingino, а `:8080` не отвечает, это не
+ошибка SD boot. Проверять нужно именно сервис WIFICAM:
+
+```sh
+ps | grep '[h]ttpd'
+cat /var/log/wificam-httpd.log
+/etc/init.d/S90wificam restart
 ```
 
 Только после этого расширяем оставшееся место 32-ГБ карты под постоянные
