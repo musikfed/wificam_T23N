@@ -1,7 +1,11 @@
-PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
+PegineLab WIFICAM T23N — hardware-verified Thingino MMC SD image
+
+STATUS / СТАТУС:
+0.1_test — АППАРАТНО ПОДТВЕРЖДЕНО / HARDWARE VERIFIED
+2026-10-21: загрузка с SD и работа PegineLab WIFICAM подтверждены на целевой камере.
 
 RU:
-Профиль-кандидат: galayou_g2_t23n_sc2336_atbm6012bx
+Профиль: galayou_g2_t23n_sc2336_atbm6012bx
 Источник Thingino: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
 Файл: Thingino/thingino-t23-sd.bin
 Размер: 84934656 bytes
@@ -15,7 +19,8 @@ Root: /dev/mmcblk0p2 ext4
 Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
 
 EN:
-Candidate profile: galayou_g2_t23n_sc2336_atbm6012bx
+2026-10-21: SD boot and PegineLab WIFICAM operation confirmed on the target camera.
+Profile: galayou_g2_t23n_sc2336_atbm6012bx
 Thingino source: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
 File: Thingino/thingino-t23-sd.bin
 Size: 84934656 bytes
