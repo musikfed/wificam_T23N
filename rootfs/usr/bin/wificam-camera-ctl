@@ -5,6 +5,9 @@ CONF=/etc/wificam/wificam.conf
 [ -f "$CONF" ] && . "$CONF"
 
 MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
+if [ -s /var/run/wificam-media ]; then
+    MEDIA_MOUNT="$(cat /var/run/wificam-media)"
+fi
 RECORDINGS="${RECORDINGS:-$MEDIA_MOUNT/recordings}"
 SNAPSHOTS="${SNAPSHOTS:-$MEDIA_MOUNT/snapshots}"
 
