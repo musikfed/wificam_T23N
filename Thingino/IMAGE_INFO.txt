@@ -1,41 +1,48 @@
 PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
 
 STATUS / СТАТУС:
-PENDING LOCAL BUILD + VERIFICATION
+BUILD PIPELINE FIXED AFTER 2026-10-20 CLEANBUILD; NEXT LOCAL RUN REQUIRED
 
 RU:
-Канонический бинарник должен находиться здесь:
+Канонический файл:
   Thingino/thingino-t23-sd.bin
 
-Историческая shell history указывает на локальный reference:
-  /mnt/d/Thingino/thingino-t23-sd.bin
-  profile: galayou_g2_t23n_sc2336_atbm6012bx
+Профиль:
+  galayou_g2_t23n_sc2336_atbm6012bx
 
-Старый локальный binary НЕ публикуется вслепую как canonical, потому что
-PegineLab WIFICAM является обязательной частью итогового image.
+Pinned Thingino:
+  9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
 
-Canonical image создаётся:
-  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+Лог cleanbuild от 2026-10-20 доказал, что стандартный файл
+  images/thingino-galayou_g2_t23n_sc2336_atbm6012bx.bin
+является 8 MiB SFC/SPI image с MTD-разметкой. Он НЕ является direct-SD image и
+больше не копируется/публикуется под именем thingino-t23-sd.bin.
 
-Скрипт сначала встраивает WIFICAM в p2/rootfs.ext2, проверяет её через debugfs,
-создаёт SHA256, сравнивает provenance с историческим локальным reference (если
-он существует), и только после этого commit/push-ит
-Thingino/thingino-t23-sd.bin.
+Исправленный pipeline:
+  1. Thingino cleanbuild/fast;
+  2. явный Buildroot rootfs-ext2, если rootfs.ext2 не был создан;
+  3. проверка PegineLab WIFICAM внутри rootfs.ext2;
+  4. pinned MMC SPL/U-Boot на LBA34;
+  5. p1: FAT16 16 MiB с /uImage;
+  6. p2: ext4 rootfs на LBA34816 (/dev/mmcblk0p2);
+  7. SHA/readback verification;
+  8. только после этого PUBLISH.
 
 EN:
-The canonical binary must live here:
+Canonical file:
   Thingino/thingino-t23-sd.bin
 
-Shell history points to this historical local reference:
-  /mnt/d/Thingino/thingino-t23-sd.bin
-  profile: galayou_g2_t23n_sc2336_atbm6012bx
+Profile:
+  galayou_g2_t23n_sc2336_atbm6012bx
 
-The old local binary is NOT blindly published as canonical because PegineLab
-WIFICAM is a mandatory part of the final image.
+Pinned Thingino:
+  9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
 
-Build and publish the canonical image with:
-  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+The 2026-10-20 cleanbuild log proves that the normal
+  images/thingino-galayou_g2_t23n_sc2336_atbm6012bx.bin
+is an 8 MiB SFC/SPI flash image with an MTD layout. It is NOT the direct-SD
+image and is no longer copied/published as thingino-t23-sd.bin.
 
-The script first embeds WIFICAM into p2/rootfs.ext2, verifies it with debugfs,
-creates SHA256, records provenance against the historical local reference when
-present, and only then commits/pushes Thingino/thingino-t23-sd.bin.
+The fixed pipeline explicitly creates the ext4 rootfs, verifies WIFICAM inside
+it, combines the pinned MMC U-Boot at LBA34 with a FAT16 boot partition and
+ext4 p2, verifies readback hashes, and only then allows publishing.
