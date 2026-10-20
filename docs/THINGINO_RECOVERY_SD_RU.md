@@ -37,7 +37,23 @@ git rev-parse --short HEAD
 
 ## 2. Подключить SD к WSL
 
-`usbipd` запускается в **Windows PowerShell**, а не в Ubuntu/WSL.
+Для USB-кардридера в этой установке используем **usbipd**, потому что этот путь
+уже фактически давал карту в WSL как `/dev/sde`.
+
+`usbipd` и `wsl.exe` запускаются в **Windows PowerShell**, а не внутри
+Ubuntu/WSL. Если в Ubuntu появляется:
+
+```text
+Command 'usbipd' not found
+```
+
+или:
+
+```text
+Command 'wsl' not found
+```
+
+не устанавливать одноимённые Ubuntu-пакеты: это не Windows-команды.
 
 В Windows PowerShell:
 
@@ -45,7 +61,8 @@ git rev-parse --short HEAD
 usbipd list
 ```
 
-Если кардридер ещё не Shared, в PowerShell от администратора:
+Найти USB-кардридер и его текущий `BUSID`. Если он ещё не Shared, в
+PowerShell от администратора:
 
 ```powershell
 usbipd bind --busid BUSID
@@ -57,15 +74,20 @@ usbipd bind --busid BUSID
 usbipd attach --wsl --busid BUSID
 ```
 
-После этого в Ubuntu/WSL:
+После этого уже в Ubuntu/WSL:
 
 ```sh
 lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
 ```
 
-Перед записью должны одновременно совпасть признаки карты: около 29.1G,
-модель кардридера, `TRAN=usb`, `RM=1`. Имя `/dev/sdX` после переподключения
-может измениться. Системный WSL-диск выбирать нельзя.
+Для этой карты ожидаем около `29.1G`, модель кардридера `SD/MMC/MS PRO`,
+`TRAN=usb`, `RM=1`. Имя `/dev/sdX` может меняться после каждого
+переподключения, поэтому его всегда определять заново. Системный WSL-диск
+выбирать нельзя.
+
+Не смешивать одновременно `usbipd attach` и `wsl --mount` для одного и того
+же кардридера. Если всё же используется `wsl --mount`, эта команда тоже
+выполняется только в Windows PowerShell.
 
 ## 3. Проверить U-Boot
 
@@ -90,9 +112,29 @@ wc -c out/u-boot-t23n-sd.bin
 find ~/myipcam -type f -name 'autoupdate-full.bin' -print
 ```
 
-Не переименовывать произвольный `thingino-*.bin` только ради имени. Для
-контрольного теста нужен installer payload, предназначенный для
-`autoupdate-full.bin`.
+Если команда ничего не вывела, файла действительно нет.
+
+Upstream `thingino-installers` для T23N обычно делает именно такую операцию:
+скачивает **конкретный профиль камеры** вида
+`thingino-<camera>_t23n_<sensor>_<wifi>.bin` и переименовывает его в
+`autoupdate-full.bin`. Поэтому само переименование допустимо, но только после
+точного выбора профиля sensor/Wi-Fi/board. Случайный `thingino-t23n.bin`
+использовать нельзя.
+
+Для удобства в этом репозитории есть helper:
+
+```sh
+sh scripts/fetch_thingino_autoupdate.sh thingino-ТОЧНЫЙ_ПРОФИЛЬ.bin
+```
+
+Он скачивает указанный asset из latest release Thingino и сохраняет его как:
+
+```text
+out/autoupdate-full.bin
+```
+
+Helper специально **не угадывает профиль**. Имя asset должно быть подтверждено
+по железу или по ранее рабочей конфигурации.
 
 Если файла пока нет, можно подготовить только boot geometry без payload:
 
