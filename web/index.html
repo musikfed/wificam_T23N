@@ -48,7 +48,7 @@
       </div>
     </section>
 
-    <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2><div class="video">LIVE VIEW<br><small data-i18n="cameraOsHint">Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.</small></div><div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div></div></section>
+    <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2><div class="video live-view"><img id="liveFrame" src="/cgi-bin/snapshot.jpg" alt="Camera preview"><small data-i18n="cameraOsHint">Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.</small></div><div class="actions"><button onclick="refreshPreview()">Refresh preview</button><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div></div></section>
     <section id="recording" class="page"><div class="panel"><h2 data-i18n="recording">Запись</h2><p>Video: <code>/mnt/media/recordings</code></p><p>Photos: <code>/mnt/media/snapshots</code></p><div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div></section>
     <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Web UI использует camera service, который ОС подняла при загрузке.</p></div></section>
 
