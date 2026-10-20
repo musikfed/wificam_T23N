@@ -139,6 +139,37 @@ usbipd attach --wsl --busid <BUSID>
 `<BUSID>` берётся только из реального вывода `usbipd list` для нужного
 кардридера; примерный номер нельзя подставлять вслепую.
 
+Проверенный пример для текущего Acer/Realtek кардридера:
+
+```text
+Windows usbipd list:
+BUSID 3-2
+VID:PID 0bda:0177
+DEVICE Realtek USB 2.0 Card Reader
+STATE Shared
+```
+
+Если состояние уже `Shared`, повторный `bind` не нужен; достаточно в
+Windows PowerShell:
+
+```powershell
+usbipd attach --wsl --busid 3-2
+```
+
+После успешного attach текущий reader подтверждён в WSL так:
+
+```text
+lsusb:
+0bda:0177 Realtek Semiconductor Corp. USB2.0-CRW
+
+lsblk:
+sde    /dev/sde   29.1G  SD/MMC/MS PRO  usb  RM=1
+└─sde1 /dev/sde1 128M   BOOT  vfat
+```
+
+Имя `/dev/sde` подтверждено только для этой конкретной сессии. После
+переподключения всё равно снова сверять размер, MODEL, `TRAN=usb` и `RM=1`.
+
 После attach в WSL обязательно определить карту заново:
 
 ```sh
