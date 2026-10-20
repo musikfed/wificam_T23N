@@ -7,3 +7,9 @@ uImage
 vmlinux
 System.map
 web/assets/boot-jingle.wav
+
+# Canonical reviewed Thingino candidate is intentionally versioned.
+!Thingino/
+!Thingino/thingino-t23-sd.bin
+!Thingino/thingino-t23-sd.bin.sha256
+!Thingino/IMAGE_INFO.txt
