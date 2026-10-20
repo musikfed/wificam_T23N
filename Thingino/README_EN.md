@@ -1,5 +1,19 @@
 # Thingino T23N SD + PegineLab WIFICAM
 
+## 0.1_test status
+
+**HARDWARE VERIFIED on 2026-10-21.** The canonical
+`Thingino/thingino-t23-sd.bin` was written to SD, passed full readback
+SHA256/MBR/MSPL/partition verification, and booted on the target camera.
+PegineLab WIFICAM was also confirmed working on the real device.
+
+Pinned SHA256:
+
+```text
+f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
+```
+
+
 ## Canonical image
 
 The current hardware test uses a direct MMC/SD disk image:
@@ -12,7 +26,7 @@ This is **not** an `autoupdate-full.bin` payload for SPI/NOR. The image is
 written to the whole SD card and is intended to boot with the external SPI/NOR
 physically absent.
 
-Current candidate profile:
+Hardware-verified profile:
 
 ```text
 galayou_g2_t23n_sc2336_atbm6012bx
@@ -25,9 +39,7 @@ Why this profile: local shell history shows that this exact Thingino profile was
 built previously and its image was copied to
 `/mnt/d/Thingino/thingino-t23-sd.bin`.
 
-That is strong provenance evidence, but it is **not yet proof** that
-`GV-T23-PTZ-MAIN-V2.0` is actually SC2336 + ATBM6012BX. Real hardware boot is
-the final confirmation.
+The 2026-10-21 hardware test confirmed that this profile boots on the target camera.
 
 ## Mandatory Web UI
 
