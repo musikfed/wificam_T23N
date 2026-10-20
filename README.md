@@ -1,5 +1,23 @@
 # wificam_T23N — autonomous SD firmware
 
+## 0.1_test: текущий подтверждённый статус
+
+**2026-10-21: прямой SD boot аппаратно подтверждён на целевой T23N-камере.**
+
+Канонический образ:
+
+```text
+Thingino/thingino-t23-sd.bin
+size:   84934656 bytes
+SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
+```
+
+Подтверждено: запись SD, полный SHA readback, MBR, MSPL на LBA34,
+разделы и фактическая загрузка Thingino с SD. Runtime PegineLab WIFICAM на
+TCP 8080 проверяется отдельно; наличие файлов WIFICAM внутри rootfs уже
+проверяется build pipeline.
+
+
 ![PegineLab](web/assets/peginelab-logo.svg)
 
 Экспериментальная прошивка для Wi‑Fi камеры **Ingenic T23/T23N**, ветка
@@ -11,8 +29,7 @@
 kernel, rootfs или environment во внешней flash-памяти.
 
 Полная цепочка загрузки находится на SD. Для этой платы сохраняется геометрия,
-которая уже совпадает со старым рабочим Thingino installer path: обычный DOS/MBR
-в sector 0, SPL/U-Boot в raw LBA 34 и первый FAT32-раздел с LBA 2048.
+которая использует обычный DOS/MBR в sector 0, SPL/U-Boot в raw LBA 34 и первый FAT16-раздел с LBA 2048.
 
 ```text
 T23 BootROM
@@ -23,10 +40,10 @@ SPL / MMC bootstrap (MSC0 1-bit)
 raw SD sector 86
 upstream T23N MMC U-Boot
    ↓
-p1 BOOT FAT32, start sector 2048 (1 MiB), /uImage
+p1 BOOT FAT16, start sector 2048 (1 MiB), 16 MiB, /uImage
    ↓
 /dev/mmcblk0p2
-ext4 ROOTFS
+ext4 ROOTFS, 64 MiB
    ↓
 Thingino T23N userspace + mandatory PegineLab WIFICAM Web UI
 ```
@@ -41,7 +58,7 @@ magic и SHA-256.
 
 Для T23N SD-bootstrap используется **MSC0 1-bit**. Raw offset остаётся тем же:
 SPL начинается с sector 34 (17 KiB), U-Boot proper после 26 KiB SPL — с
-sector 86. Upstream MMC U-Boot загружает kernel как `/uImage` из FAT32 p1
+sector 86. Upstream MMC U-Boot загружает kernel как `/uImage` из FAT p1
 и передаёт root `/dev/mmcblk0p2`.
 
 ## Текущий основной путь / Current primary path
@@ -49,10 +66,9 @@ sector 86. Upstream MMC U-Boot загружает kernel как `/uImage` из F
 **Основной следующий образ этой ветки — прямой Thingino MMC/SD image, а не
 `autoupdate-full.bin` и не OpenIPC-rootfs.**
 
-История сборки на этом хосте показала ранее использованный профиль
-`galayou_g2_t23n_sc2336_atbm6012bx` (T23N + SC2336 + ATBM6012BX). Пока это
-**профиль-кандидат**, а не доказанная идентификация платы
-`GV-T23-PTZ-MAIN-V2.0`.
+Текущий аппаратно подтверждённый профиль —
+`galayou_g2_t23n_sc2336_atbm6012bx` (T23N + SC2336 + ATBM6012BX).
+Именно этот профиль загрузился с канонической SD на целевой камере.
 
 Canonical artifact:
 
@@ -79,12 +95,23 @@ PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 находится внутри `p2/rootfs.ext2`. Проверяются `index.html`, init-script,
 CGI API, snapshot CGI и наличие BusyBox `httpd`.
 
-Web UI является **обязательным acceptance criterion**:
+Web UI является **обязательным acceptance criterion**, но это две разные
+веб-службы:
 
 ```text
-Thingino UI          : http://CAMERA_IP/   (или HTTPS, если включён Thingino TLS)
+Thingino stock UI    : http://CAMERA_IP/ или https://CAMERA_IP/
+Thingino login       : root / root (заводское значение текущего образа)
 PegineLab WIFICAM    : http://CAMERA_IP:8080/
 ```
+
+Если браузер показывает `https://CAMERA_IP/login.html` с логотипом Thingino,
+это **штатная Thingino Web UI**, а не ошибка и не PegineLab. Для WIFICAM нужно
+явно открыть **HTTP port 8080**.
+
+На первом запуске WIFICAM настроена как локальный bootstrap без HTTP-аутентификации
+(`ALLOW_UNAUTHENTICATED_WEB=1`). После задания пароля WIFICAM использует
+отдельную Basic Auth; пользователь по умолчанию для команды установки пароля —
+`admin`.
 
 The canonical image is a **direct MMC/SD disk image**. It is written to the
 whole SD card and boots `uImage` from p1 with ext4 root on
@@ -95,18 +122,28 @@ English instructions: `Thingino/README_EN.md`
 
 ## Разметка SD
 
-Первый 1 MiB оставлен под MBR, SPL/U-Boot и environment; p1 начинается с sector 2048.
+Канонический `Thingino/thingino-t23-sd.bin` — **полный disk image**. Он
+записывается на карту с LBA0; внешний `seek=34` для готового image запрещён,
+потому что нужное смещение SPL уже находится внутри файла.
 
 | Область | Положение | Назначение |
 |---|---:|---|
-| DOS/MBR | sector 0 | таблица разделов |
-| SPL/U-Boot image | sector 34 | вход BootROM, MMC SPL |
-| U-Boot proper | sector 86 | вычисляется из 26 KiB SPL |
-| U-Boot env | sector 546 (`0x44400`) | 32 KiB environment |
-| uImage | p1 `BOOT:/uImage` | активный kernel boot source |
-| p1 BOOT | с 1 MiB (sector 2048), 128 MiB, FAT32 | активный uImage, копия U-Boot, logo, jingle, boot map |
-| p2 ROOTFS | всё свободное до MEDIA, ext4 | Linux/userspace/configs |
-| p3 MEDIA | 20 GiB, ext4 | recordings/snapshots/events |
+| DOS/MBR | sector 0 | таблица разделов + `55aa` |
+| SPL/MSPL | sector 34 | вход Ingenic BootROM |
+| U-Boot proper | sector 86 | MMC U-Boot |
+| U-Boot env | sector 546 (`0x44400`) | upstream environment area |
+| p1 BOOT | sector 2048, 16 MiB, FAT16 | `/uImage` |
+| p2 rootfs | sector 34816, 64 MiB, ext4 | Thingino + PegineLab WIFICAM |
+| остаток SD | после p2 | пока намеренно не размечен |
+
+Фактически проверенная запись дала:
+
+```text
+MBR signature       : 55aa
+LBA34 MSPL magic    : 4d53504c
+p1 start            : sector 2048
+p2 start            : sector 34816
+```
 
 Upstream MMC U-Boot использует FAT boot path:
 
@@ -117,27 +154,13 @@ fatload mmc 0:1 ${baseaddr} uImage
 bootm ${baseaddr}
 ```
 
-MMC environment находится по `0x44400` (sector 546), размер 32 KiB.
+Точный MMC U-Boot binary имеет 189685 байт; p1 начинается только с LBA2048,
+поэтому raw bootloader area и файловая система p1 не пересекаются.
 
-### Почему разметка p1 не стирает U-Boot
-
-Создание BOOT-раздела не может затереть raw U-Boot в этой схеме:
-
-- SPL/U-Boot начинается с LBA 34;
-- точный upstream binary имеет 189685 байт и занимает LBA 34..404;
-- p1 начинается только с LBA 2048.
-
-Кроме того, `prepare_sd.sh` записывает U-Boot **после** создания/форматирования
-разделов, а `verify_sd_firmware.sh` затем читает raw LBA34 обратно и сравнивает
-полный SHA-256 с исходным файлом. Если в выводе есть
-`Raw SPL/U-Boot SHA256 = 4d4d4ff...`, версия «разделы затёрли LBA34» уже
-исключена; искать нужно раньше/ниже по цепочке BootROM/SD bootstrap или в выборе
-профиля MMC.
-
-Важно: `autoupdate-full.bin` остаётся только историческим recovery/install
-маршрутом. Для текущего основного теста при физически отсутствующей SPI/NOR
+Важно: `autoupdate-full.bin` остаётся только legacy/recovery-маршрутом.
+Для текущего аппаратно подтверждённого пути при отсутствующей SPI/NOR
 используется прямой Thingino MMC image: raw SD bootstrap + `p1:/uImage` +
-ext4 `/dev/mmcblk0p2`. Никакая запись в SPI для этого пути не требуется.
+ext4 `/dev/mmcblk0p2`.
 
 ## Сборка
 
@@ -329,12 +352,37 @@ userspace имеет рабочий framebuffer/audio player. Копии logo/ji
 После успешной загрузки canonical Thingino image и получения IP:
 
 ```text
-Thingino:          http://CAMERA_IP/
-PegineLab WIFICAM: http://CAMERA_IP:8080/
+Thingino stock UI : http://CAMERA_IP/
+Thingino TLS UI   : https://CAMERA_IP/
+Thingino login    : root
+Thingino password : root
+
+PegineLab WIFICAM : http://CAMERA_IP:8080/
 ```
 
-WIFICAM на первом локальном запуске позволяет задать Web password, затем
-перезапускается с authentication.
+**Не путать интерфейсы.** Страница `/login.html` по HTTPS с логотипом
+Thingino — это штатная Web UI. PegineLab WIFICAM специально запущена вторым
+BusyBox `httpd` на TCP 8080 и открывается по **HTTP**.
+
+Первый запуск WIFICAM:
+
+```text
+ALLOW_UNAUTHENTICATED_WEB=1
+```
+
+То есть если `/opt/wificam/httpd.conf` ещё не создан, WIFICAM на 8080
+стартует без логина для локальной первичной настройки. После задания пароля
+она перезапускается с Basic Auth. Команда по умолчанию создаёт пользователя
+`admin`.
+
+Если `http://CAMERA_IP:8080/` не отвечает, SD boot всё равно может быть
+успешен. Тогда проверяется именно сервис WIFICAM:
+
+```sh
+ps | grep '[h]ttpd'
+cat /var/log/wificam-httpd.log
+/etc/init.d/S90wificam restart
+```
 
 SSH, WireGuard и AmneziaWG по умолчанию выключены. Persistent marker-файлы
 WIFICAM хранятся под `/opt/wificam/services/`.
