@@ -57,9 +57,10 @@ BR2_TARGET_ROOTFS_EXT2_4=y
 BR2_TARGET_ROOTFS_EXT2_MKFS_OPTIONS="-O ^metadata_csum,^64bit"
 BR2_TARGET_ROOTFS_EXT2_SIZE="64M"
 
-# Keep Thingino's normal Web UI on 80/443 and compile BusyBox httpd for the
-# independent PegineLab WIFICAM service on TCP 8080.
-BR2_PACKAGE_BUSYBOX_HTTPD=y
+# Use Thingino's supported BusyBox-httpd webserver choice. This enables the
+# CGI + Basic Auth + MD5 feature fragment required by PegineLab WIFICAM while
+# still serving the normal Thingino Web UI on port 80 (and its SSL wrapper).
+BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y
 
 # Mandatory PegineLab/WIFICAM files are embedded directly into p2/rootfs.ext2.
 BR2_ROOTFS_OVERLAY="\$(BR2_EXTERNAL_THINGINO_PATH)/overlay $ROOTFS_OVERLAY"
@@ -102,10 +103,117 @@ grep -q '^BR2_PACKAGE_THINGINO_KOPT_MMC0_BOOT=y$' "$OUTDIR/.config" || \
     die "MMC0_BOOT is not enabled in final Thingino config"
 grep -q '^BR2_PACKAGE_THINGINO_UBOOT_ROOT="/dev/mmcblk0p2"$' "$OUTDIR/.config" || \
     die "U-Boot root is not /dev/mmcblk0p2"
-grep -q '^BR2_PACKAGE_BUSYBOX_HTTPD=y$' "$OUTDIR/.config" || \
-    die "BusyBox HTTPD package switch missing"
-find "$OUTDIR/build" -path '*/busybox-*/.config' -type f -exec grep -q '^CONFIG_HTTPD=y$' {} \; -print | grep -q . || \
-    die "BusyBox httpd applet was not compiled"
+grep -q '^BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y
+
+# Verify the mandatory UI in the actual ext4 filesystem embedded as p2.
+debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM index is absent from rootfs.ext2"
+debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "S90wificam is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/cgi-bin/api' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM API is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/cgi-bin/snapshot.jpg' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM snapshot CGI is absent from rootfs.ext2"
+
+mkdir -p "$REPO_DIR/Thingino"
+cp -f "$IMAGE" "$REPO_DIR/Thingino/thingino-t23-sd.bin"
+
+IMAGE_SIZE="$(stat -c '%s' "$REPO_DIR/Thingino/thingino-t23-sd.bin")"
+IMAGE_SHA="$(sha256sum "$REPO_DIR/Thingino/thingino-t23-sd.bin" | awk '{print $1}')"
+
+# Preserve provenance of the historical local image found in shell history.
+HISTORICAL_REFERENCE="/mnt/d/Thingino/thingino-t23-sd.bin"
+HISTORICAL_SHA="not-present"
+HISTORICAL_SIZE="not-present"
+if [ -f "$HISTORICAL_REFERENCE" ]; then
+    HISTORICAL_SHA="$(sha256sum "$HISTORICAL_REFERENCE" | awk '{print $1}')"
+    HISTORICAL_SIZE="$(stat -c '%s' "$HISTORICAL_REFERENCE")"
+fi
+
+MAX_GITHUB_SIZE=$((95 * 1024 * 1024))
+[ "$IMAGE_SIZE" -le "$MAX_GITHUB_SIZE" ] || \
+    die "canonical image is $IMAGE_SIZE bytes; refusing Git publish above 95 MiB"
+
+printf '%s  %s\n' "$IMAGE_SHA" "thingino-t23-sd.bin" > "$REPO_DIR/Thingino/thingino-t23-sd.bin.sha256"
+
+cat > "$REPO_DIR/Thingino/IMAGE_INFO.txt" <<EOF
+PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
+
+RU:
+Профиль-кандидат: $CAMERA
+Источник Thingino: $THINGINO_COMMIT
+Файл: Thingino/thingino-t23-sd.bin
+Размер: $IMAGE_SIZE bytes
+SHA256: $IMAGE_SHA
+Исторический локальный reference: $HISTORICAL_REFERENCE
+Reference size: $HISTORICAL_SIZE
+Reference SHA256: $HISTORICAL_SHA
+Web UI: ОБЯЗАТЕЛЬНО ПРОВЕРЕНА в rootfs.ext2
+Web URL после загрузки: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
+
+EN:
+Candidate profile: $CAMERA
+Thingino source: $THINGINO_COMMIT
+File: Thingino/thingino-t23-sd.bin
+Size: $IMAGE_SIZE bytes
+SHA256: $IMAGE_SHA
+Historical local reference: $HISTORICAL_REFERENCE
+Reference size: $HISTORICAL_SIZE
+Reference SHA256: $HISTORICAL_SHA
+Web UI: MANDATORY and VERIFIED inside rootfs.ext2
+Web URL after boot: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
+EOF
+
+echo
+echo "THINGINO WIFICAM SD IMAGE: VERIFIED"
+echo "Source image : $IMAGE"
+echo "Canonical    : Thingino/thingino-t23-sd.bin"
+echo "Size         : $IMAGE_SIZE bytes"
+echo "SHA256       : $IMAGE_SHA"
+echo "Historical   : $HISTORICAL_REFERENCE"
+echo "Historical SHA: $HISTORICAL_SHA"
+echo "Web UI       : VERIFIED inside p2 rootfs.ext2"
+echo "Web URL      : http://CAMERA_IP:8080/"
+echo
+
+if [ "$PUBLISH" = "1" ]; then
+    BRANCH="$(git -C "$REPO_DIR" branch --show-current)"
+    [ "$BRANCH" = "mymarrchWFcam" ] || die "refusing publish from branch: $BRANCH"
+
+    git -C "$REPO_DIR" add -f \
+        Thingino/thingino-t23-sd.bin \
+        Thingino/thingino-t23-sd.bin.sha256 \
+        Thingino/IMAGE_INFO.txt
+
+    if git -C "$REPO_DIR" diff --cached --quiet; then
+        echo "Git: canonical image already committed."
+    else
+        git -C "$REPO_DIR" commit -m "firmware(thingino): verify relevant T23N SD image with WIFICAM / проверка релевантного T23N SD образа с WIFICAM"
+    fi
+    git -C "$REPO_DIR" push origin "$BRANCH"
+    echo "Git publish: OK ($BRANCH)"
+else
+    echo "Not pushed. To build + commit + push in one run:"
+    echo "  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh"
+fi
+ "$OUTDIR/.config" || \
+    die "Thingino BusyBox webserver choice is not enabled"
+
+BUSYBOX_CONFIG="$(find "$OUTDIR/build" -path '*/busybox-*/.config' -type f | head -n1)"
+[ -n "$BUSYBOX_CONFIG" ] && [ -f "$BUSYBOX_CONFIG" ] || die "BusyBox .config not found"
+for opt in \
+    CONFIG_HTTPD \
+    CONFIG_FEATURE_HTTPD_BASIC_AUTH \
+    CONFIG_FEATURE_HTTPD_AUTH_MD5 \
+    CONFIG_FEATURE_HTTPD_CGI \
+    CONFIG_FEATURE_HTTPD_CONFIG_WITH_SCRIPT_INTERPR
+do
+    grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || die "BusyBox HTTP feature missing: $opt"
+done
 
 # Verify the mandatory UI in the actual ext4 filesystem embedded as p2.
 debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
