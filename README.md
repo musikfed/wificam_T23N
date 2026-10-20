@@ -147,14 +147,31 @@ WSL.
    ```powershell
    usbipd attach --wsl --busid <BUSID>
    ```
-5. Уже в Ubuntu/WSL:
+5. После успешного `usbipd attach --wsl ...` вернитесь в уже открытый Ubuntu/WSL и **сразу** выполните:
    ```sh
    lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
    ```
 
+Подтверждённый на этом хосте порядок такой:
+
+```text
+Windows PowerShell:
+  usbipd list
+  usbipd bind --busid BUSID      # только если ещё не Shared
+  usbipd attach --wsl --busid BUSID
+
+Ubuntu/WSL:
+  lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
+```
+
+Не запускайте `wsl --mount ...` внутри Ubuntu: `wsl.exe` — Windows-команда.
+Ошибка `Command 'wsl' not found` внутри Ubuntu ничего не подключает, и ставить
+`sudo apt install wsl` ради этого не нужно.
+
 После каждого detach/attach имя SD может измениться. Писать можно только на
 диск, который совпадает по размеру/модели/USB/RM=1. Системный WSL-диск трогать
-нельзя.
+нельзя. Старые разделы `BOOT/ROOTFS/MEDIA` после подключения допустимы:
+recovery-скрипт сам переразметит карту.
 
 ## Этап 1 — воспроизвести исторически работавшую Thingino SD
 
