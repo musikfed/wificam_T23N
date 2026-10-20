@@ -84,11 +84,12 @@ The script:
 6. sets root to `/dev/mmcblk0p2`, ext4;
 7. enables BusyBox httpd for the independent WIFICAM service on TCP 8080;
 8. injects WIFICAM directly through Buildroot's rootfs overlay;
-9. verifies WIFICAM in the build target and inside `rootfs.ext2` with
-   `debugfs`;
-10. writes the canonical artifact to `Thingino/thingino-t23-sd.bin`;
-11. creates SHA256 and `Thingino/IMAGE_INFO.txt`;
-12. with `PUBLISH=1`, commits and pushes the canonical artifacts.
+9. if `cleanbuild` did not emit `rootfs.ext2`, explicitly runs the Buildroot `rootfs-ext2` target;
+10. verifies WIFICAM in the build target and inside `rootfs.ext2` with `debugfs`;
+11. assembles a real SD disk image: DOS/MBR + pinned MMC U-Boot at LBA34 + FAT p1 + ext4 p2;
+12. writes it to `Thingino/thingino-t23-sd.bin`;
+13. creates SHA256 and `Thingino/IMAGE_INFO.txt`;
+14. with `PUBLISH=1`, commits and pushes the canonical artifacts.
 
 If the historical file `/mnt/d/Thingino/thingino-t23-sd.bin` exists, its size
 and SHA256 are also recorded in `IMAGE_INFO.txt` for provenance comparison.
@@ -98,11 +99,10 @@ and SHA256 are also recorded in `IMAGE_INFO.txt` for provenance comparison.
 The current Thingino MMC builder creates:
 
 ```text
-byte 0..35      INGE descriptor
 sector 0        DOS/MBR partition table + 55aa
 sector 34       SPL / MSPL
 sector 86       U-Boot proper
-sector 2048     p1 FAT32, /uImage
+sector 2048     p1 FAT16 (16 MiB), /uImage
 sector 34816    p2 ext4, Thingino rootfs + PegineLab WIFICAM
 after image     intentionally unused for the first hardware test
 ```
@@ -143,7 +143,7 @@ Confirmation string:
 THINGINO-WIFICAM:/dev/sde
 ```
 
-The writer verifies full-image SHA readback, `INGE`, `55aa`, LBA34
+The writer verifies full-image SHA readback, `55aa`, LBA34
 `MSPL`, p1 at LBA2048 and p2 at LBA34816.
 
 ## First hardware test
