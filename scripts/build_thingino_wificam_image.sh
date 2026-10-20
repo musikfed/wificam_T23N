@@ -1,6 +1,11 @@
 #!/bin/sh
 set -eu
 
+# Buildroot rejects PATH entries containing spaces/TAB/newlines. Keep the
+# build independent from the interactive shell environment.
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
+
 REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 CAMERA="${CAMERA:-galayou_g2_t23n_sc2336_atbm6012bx}"
 THINGINO_REF="${THINGINO_REF:-9925f46f73b9c39ec8d2a65134b18c94e6fdfb97}"
@@ -104,7 +109,7 @@ BR2_PACKAGE_THINGINO_UBOOT_ROOT="/dev/mmcblk0p2"
 BR2_PACKAGE_THINGINO_UBOOT_ROOTFSTYPE="ext4"
 BR2_TARGET_ROOTFS_EXT2=y
 BR2_TARGET_ROOTFS_EXT2_4=y
-BR2_TARGET_ROOTFS_EXT2_MKFS_OPTIONS="-O ^metadata_csum,^64bit"
+BR2_TARGET_ROOTFS_EXT2_MKFS_OPTIONS="-O ^metadata_csum,^64bit,^orphan_file"
 BR2_TARGET_ROOTFS_EXT2_SIZE="64M"
 
 # Thingino BusyBox httpd webserver choice enables CGI + Basic Auth + MD5.
@@ -132,14 +137,38 @@ echo
         make CAMERA="$CAMERA" "$BUILD_TARGET"
 )
 
-IMAGE="$(find "$THINGINO_DIR/output" -type f -path "*/images/thingino-$CAMERA.bin" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n1 | cut -d' ' -f2-)"
-[ -n "$IMAGE" ] && [ -f "$IMAGE" ] || die "built Thingino MMC image not found"
+SPI_IMAGE="$(find "$THINGINO_DIR/output" -type f -path "*/images/thingino-$CAMERA.bin" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n1 | cut -d' ' -f2-)"
+[ -n "$SPI_IMAGE" ] && [ -f "$SPI_IMAGE" ] || die "built Thingino SPI image not found"
 
-OUTDIR="$(dirname "$(dirname "$IMAGE")")"
+# The normal thingino-$CAMERA.bin is the 8 MiB SFC/SPI flash image.
+# It is NOT a direct SD disk image and must never be published as one.
+OUTDIR="$(dirname "$(dirname "$SPI_IMAGE")")"
 ROOTFS_EXT="$OUTDIR/images/rootfs.ext2"
 TARGET="$OUTDIR/target"
+KERNEL_IMAGE="$OUTDIR/images/uImage"
+FINAL_CONFIG="$OUTDIR/.config"
 
-[ -f "$ROOTFS_EXT" ] || die "rootfs.ext2 missing: $ROOTFS_EXT"
+[ -f "$FINAL_CONFIG" ] || die "final Thingino .config missing: $FINAL_CONFIG"
+grep -q '^BR2_TARGET_ROOTFS_EXT2=y$' "$FINAL_CONFIG" || \
+    die "BR2_TARGET_ROOTFS_EXT2 is not enabled in final Thingino config"
+grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y$' "$FINAL_CONFIG" || \
+    die "BR2_TARGET_ROOTFS_EXT2_4 is not enabled in final Thingino config"
+
+# Pinned Thingino cleanbuild packages rootfs-squashfs for the normal SPI image.
+# Generate the separately configured ext4 SD rootfs explicitly when necessary.
+if [ ! -f "$ROOTFS_EXT" ]; then
+    echo
+    echo "rootfs.ext2 was not emitted by Thingino cleanbuild."
+    echo "Generating configured ext4 SD rootfs via Buildroot rootfs-ext2..."
+    (
+        cd "$THINGINO_DIR"
+        env IP= THINGINO_USER_DIR="$USER_ROOT" \
+            make CAMERA="$CAMERA" rootfs-ext2
+    )
+fi
+
+[ -f "$ROOTFS_EXT" ] || die "rootfs.ext2 still missing after rootfs-ext2: $ROOTFS_EXT"
+[ -f "$KERNEL_IMAGE" ] || die "uImage missing: $KERNEL_IMAGE"
 [ -f "$TARGET/usr/share/wificam-web/index.html" ] || die "WIFICAM index missing from Thingino target rootfs"
 [ -x "$TARGET/etc/init.d/S90wificam" ] || die "S90wificam missing/not executable in target rootfs"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/api" ] || die "WIFICAM API missing/not executable"
@@ -147,11 +176,11 @@ TARGET="$OUTDIR/target"
 
 grep -q 'PegineLab WIFICAM T23N' "$TARGET/usr/share/wificam-web/index.html" || \
     die "wrong Web UI staged in target"
-grep -q '^BR2_PACKAGE_THINGINO_KOPT_MMC0_BOOT=y$' "$OUTDIR/.config" || \
+grep -q '^BR2_PACKAGE_THINGINO_KOPT_MMC0_BOOT=y$' "$FINAL_CONFIG" || \
     die "MMC0_BOOT is not enabled in final Thingino config"
-grep -q '^BR2_PACKAGE_THINGINO_UBOOT_ROOT="/dev/mmcblk0p2"$' "$OUTDIR/.config" || \
+grep -q '^BR2_PACKAGE_THINGINO_UBOOT_ROOT="/dev/mmcblk0p2"$' "$FINAL_CONFIG" || \
     die "U-Boot root is not /dev/mmcblk0p2"
-grep -q '^BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y$' "$OUTDIR/.config" || \
+grep -q '^BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y$' "$FINAL_CONFIG" || \
     die "Thingino BusyBox webserver choice is not enabled"
 
 BUSYBOX_CONFIG="$(find "$OUTDIR/build" -path '*/busybox-*/.config' -type f | head -n1)"
@@ -166,7 +195,6 @@ do
     grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || die "BusyBox HTTP feature missing: $opt"
 done
 
-# Verify mandatory WIFICAM files in the actual ext4 filesystem embedded as p2.
 debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "WIFICAM index is absent from rootfs.ext2"
 debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
@@ -176,8 +204,25 @@ debugfs -R 'stat /usr/share/wificam-web/cgi-bin/api' "$ROOTFS_EXT" 2>&1 | grep -
 debugfs -R 'stat /usr/share/wificam-web/cgi-bin/snapshot.jpg' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "WIFICAM snapshot CGI is absent from rootfs.ext2"
 
+if command -v dumpe2fs >/dev/null 2>&1; then
+    ROOTFS_FEATURES="$(dumpe2fs -h "$ROOTFS_EXT" 2>/dev/null | sed -n 's/^Filesystem features:[[:space:]]*//p')"
+    case " $ROOTFS_FEATURES " in
+      *" 64bit "*|*" metadata_csum "*|*" orphan_file "*)
+        die "rootfs.ext2 contains ext4 features unsupported by Linux 3.10: $ROOTFS_FEATURES"
+        ;;
+    esac
+fi
+
+# Use the separately pinned T23N MMC SPL/U-Boot, not the sfcnor U-Boot from
+# the 8 MiB SPI image, then assemble a real partitioned SD disk image.
+sh "$REPO_DIR/scripts/build_sd_bootloader.sh"
+
 mkdir -p "$REPO_DIR/Thingino"
-cp -f "$IMAGE" "$REPO_DIR/Thingino/thingino-t23-sd.bin"
+sh "$REPO_DIR/scripts/assemble_thingino_wificam_sd_image.sh" \
+    "$REPO_DIR/out/u-boot-t23n-sd.bin" \
+    "$KERNEL_IMAGE" \
+    "$ROOTFS_EXT" \
+    "$REPO_DIR/Thingino/thingino-t23-sd.bin"
 
 IMAGE_SIZE="$(stat -c '%s' "$REPO_DIR/Thingino/thingino-t23-sd.bin")"
 IMAGE_SHA="$(sha256sum "$REPO_DIR/Thingino/thingino-t23-sd.bin" | awk '{print $1}')"
@@ -230,7 +275,7 @@ EOF
 
 echo
 echo "THINGINO WIFICAM SD IMAGE: VERIFIED"
-echo "Source image  : $IMAGE"
+echo "SPI artifact  : $SPI_IMAGE"
 echo "Canonical     : Thingino/thingino-t23-sd.bin"
 echo "Size          : $IMAGE_SIZE bytes"
 echo "SHA256        : $IMAGE_SHA"
