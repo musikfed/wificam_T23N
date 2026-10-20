@@ -166,9 +166,377 @@ FINAL_CONFIG="$OUTDIR/.config"
 [ -f "$FINAL_CONFIG" ] || die "final Thingino .config missing: $FINAL_CONFIG"
 grep -q '^BR2_TARGET_ROOTFS_EXT2=y$' "$FINAL_CONFIG" || \
     die "BR2_TARGET_ROOTFS_EXT2 is not enabled in final Thingino config"
-grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y from before local.fragment
+grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y
+CONFIG_HTTPD
+CONFIG_FEATURE_HTTPD_BASIC_AUTH
+CONFIG_FEATURE_HTTPD_AUTH_MD5
+CONFIG_FEATURE_HTTPD_CGI
+"
+
+busybox_config_path() {
+    find "$OUTDIR/build" -path '*/busybox-*/.config' -type f | head -n1
+}
+
+BUSYBOX_CONFIG="$(busybox_config_path)"
+BUSYBOX_NEEDS_RECONFIGURE=0
+if [ -z "$BUSYBOX_CONFIG" ] || [ ! -f "$BUSYBOX_CONFIG" ]; then
+    BUSYBOX_NEEDS_RECONFIGURE=1
+else
+    for opt in $BUSYBOX_REQUIRED_OPTS; do
+        grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || BUSYBOX_NEEDS_RECONFIGURE=1
+    done
+fi
+
+if [ "$BUSYBOX_NEEDS_RECONFIGURE" = "1" ]; then
+    echo
+    echo "BusyBox HTTP config is stale/incomplete; reconfiguring BusyBox..."
+    (
+        cd "$THINGINO_DIR"
+        env IP= THINGINO_USER_DIR="$USER_ROOT" \
+            make CAMERA="$CAMERA" br-busybox-reconfigure
+    )
+    BUSYBOX_CONFIG="$(busybox_config_path)"
+fi
+
+[ -n "$BUSYBOX_CONFIG" ] && [ -f "$BUSYBOX_CONFIG" ] || die "BusyBox .config not found after reconfigure"
+for opt in $BUSYBOX_REQUIRED_OPTS; do
+    if ! grep -q "^$opt=y$" "$BUSYBOX_CONFIG"; then
+        echo "BusyBox HTTP config after reconfigure:" >&2
+        grep -E '^(# )?CONFIG_(HTTPD|FEATURE_HTTPD_(CGI|BASIC_AUTH|AUTH_MD5))' "$BUSYBOX_CONFIG" >&2 || true
+        die "BusyBox HTTP feature missing after reconfigure: $opt"
+    fi
+done
+
+# Always regenerate rootfs.ext2 after the BusyBox check.  This guarantees that
+# a repaired BusyBox binary and the current WIFICAM overlay are both inside p2.
+echo
+echo "Generating configured ext4 SD rootfs via Buildroot rootfs-ext2..."
+rm -f "$ROOTFS_EXT"
+(
+    cd "$THINGINO_DIR"
+    env IP= THINGINO_USER_DIR="$USER_ROOT" \
+        make CAMERA="$CAMERA" rootfs-ext2
+)
+
+[ -f "$ROOTFS_EXT" ] || die "rootfs.ext2 missing after rootfs-ext2: $ROOTFS_EXT"
+[ -f "$KERNEL_IMAGE" ] || die "uImage missing: $KERNEL_IMAGE"
+[ -f "$TARGET/usr/share/wificam-web/index.html" ] || die "WIFICAM index missing from Thingino target rootfs"
+[ -x "$TARGET/etc/init.d/S90wificam" ] || die "S90wificam missing/not executable in target rootfs"
+[ -x "$TARGET/usr/share/wificam-web/cgi-bin/api" ] || die "WIFICAM API missing/not executable"
+[ -x "$TARGET/usr/share/wificam-web/cgi-bin/snapshot.jpg" ] || die "snapshot CGI missing/not executable"
+
+grep -q 'PegineLab WIFICAM T23N' "$TARGET/usr/share/wificam-web/index.html" || \
+    die "wrong Web UI staged in target"
+grep -q '^BR2_PACKAGE_THINGINO_KOPT_MMC0_BOOT=y$' "$FINAL_CONFIG" || \
+    die "MMC0_BOOT is not enabled in final Thingino config"
+grep -q '^BR2_PACKAGE_THINGINO_UBOOT_ROOT="/dev/mmcblk0p2"$' "$FINAL_CONFIG" || \
+    die "U-Boot root is not /dev/mmcblk0p2"
+grep -q '^BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y$' "$FINAL_CONFIG" || \
+    die "Thingino BusyBox webserver choice is not enabled"
+
+debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM index is absent from rootfs.ext2"
+debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "S90wificam is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/cgi-bin/api' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM API is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/cgi-bin/snapshot.jpg' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM snapshot CGI is absent from rootfs.ext2"
+
+if command -v dumpe2fs >/dev/null 2>&1; then
+    ROOTFS_FEATURES="$(dumpe2fs -h "$ROOTFS_EXT" 2>/dev/null | sed -n 's/^Filesystem features:[[:space:]]*//p')"
+    case " $ROOTFS_FEATURES " in
+      *" 64bit "*|*" metadata_csum "*|*" orphan_file "*)
+        die "rootfs.ext2 contains ext4 features unsupported by Linux 3.10: $ROOTFS_FEATURES"
+        ;;
+    esac
+fi
+
+# Use the separately pinned T23N MMC SPL/U-Boot, not the sfcnor U-Boot from
+# the 8 MiB SPI image, then assemble a real partitioned SD disk image.
+sh "$REPO_DIR/scripts/build_sd_bootloader.sh"
+
+mkdir -p "$REPO_DIR/Thingino"
+sh "$REPO_DIR/scripts/assemble_thingino_wificam_sd_image.sh" \
+    "$REPO_DIR/out/u-boot-t23n-sd.bin" \
+    "$KERNEL_IMAGE" \
+    "$ROOTFS_EXT" \
+    "$REPO_DIR/Thingino/thingino-t23-sd.bin"
+
+IMAGE_SIZE="$(stat -c '%s' "$REPO_DIR/Thingino/thingino-t23-sd.bin")"
+IMAGE_SHA="$(sha256sum "$REPO_DIR/Thingino/thingino-t23-sd.bin" | awk '{print $1}')"
+
+HISTORICAL_REFERENCE="/mnt/d/Thingino/thingino-t23-sd.bin"
+HISTORICAL_SHA="not-present"
+HISTORICAL_SIZE="not-present"
+if [ -f "$HISTORICAL_REFERENCE" ]; then
+    HISTORICAL_SHA="$(sha256sum "$HISTORICAL_REFERENCE" | awk '{print $1}')"
+    HISTORICAL_SIZE="$(stat -c '%s' "$HISTORICAL_REFERENCE")"
+fi
+
+MAX_GITHUB_SIZE=$((95 * 1024 * 1024))
+[ "$IMAGE_SIZE" -le "$MAX_GITHUB_SIZE" ] || \
+    die "canonical image is $IMAGE_SIZE bytes; refusing Git publish above 95 MiB"
+
+printf '%s  %s\n' "$IMAGE_SHA" "thingino-t23-sd.bin" > "$REPO_DIR/Thingino/thingino-t23-sd.bin.sha256"
+
+cat > "$REPO_DIR/Thingino/IMAGE_INFO.txt" <<EOF
+PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
+
+RU:
+Профиль-кандидат: $CAMERA
+Источник Thingino: $THINGINO_COMMIT
+Файл: Thingino/thingino-t23-sd.bin
+Размер: $IMAGE_SIZE bytes
+SHA256: $IMAGE_SHA
+Исторический локальный reference: $HISTORICAL_REFERENCE
+Reference size: $HISTORICAL_SIZE
+Reference SHA256: $HISTORICAL_SHA
+Web UI: ОБЯЗАТЕЛЬНО ПРОВЕРЕНА в rootfs.ext2
+Web URL после загрузки: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
+
+EN:
+Candidate profile: $CAMERA
+Thingino source: $THINGINO_COMMIT
+File: Thingino/thingino-t23-sd.bin
+Size: $IMAGE_SIZE bytes
+SHA256: $IMAGE_SHA
+Historical local reference: $HISTORICAL_REFERENCE
+Reference size: $HISTORICAL_SIZE
+Reference SHA256: $HISTORICAL_SHA
+Web UI: MANDATORY and VERIFIED inside rootfs.ext2
+Web URL after boot: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
+EOF
+
+echo
+echo "THINGINO WIFICAM SD IMAGE: VERIFIED"
+echo "SPI artifact  : $SPI_IMAGE"
+echo "Canonical     : Thingino/thingino-t23-sd.bin"
+echo "Size          : $IMAGE_SIZE bytes"
+echo "SHA256        : $IMAGE_SHA"
+echo "Historical    : $HISTORICAL_REFERENCE"
+echo "Historical SHA: $HISTORICAL_SHA"
+echo "Web UI        : VERIFIED inside p2 rootfs.ext2"
+echo "Web URL       : http://CAMERA_IP:8080/"
+echo
+
+if [ "$PUBLISH" = "1" ]; then
+    BRANCH="$(git -C "$REPO_DIR" branch --show-current)"
+    [ "$BRANCH" = "mymarrchWFcam" ] || die "refusing publish from branch: $BRANCH"
+
+    git -C "$REPO_DIR" add -f \
+        Thingino/thingino-t23-sd.bin \
+        Thingino/thingino-t23-sd.bin.sha256 \
+        Thingino/IMAGE_INFO.txt
+
+    if git -C "$REPO_DIR" diff --cached --quiet; then
+        echo "Git: canonical image already committed."
+    else
+        git -C "$REPO_DIR" commit -m "firmware(thingino): verify relevant T23N SD image with WIFICAM / проверка релевантного T23N SD образа с WIFICAM"
+    fi
+
+    git -C "$REPO_DIR" push origin "$BRANCH"
+    echo "Git publish: OK ($BRANCH)"
+else
+    echo "Not pushed. To build + commit + push in one run:"
+    echo "  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh"
+fi
+ "$FINAL_CONFIG" || \
+    die "BR2_TARGET_ROOTFS_EXT2_4 is not enabled in final Thingino config"
+grep -Fq "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES=\"$BUSYBOX_WIFICAM_FRAGMENT\"" "$FINAL_CONFIG" || \
+    die "WIFICAM BusyBox fragment path did not reach final Buildroot config"
+
+# FAST builds can reuse an older BusyBox .config from before local.fragment
 # selected BusyBox httpd.  The config is not "missing" in that case; it is
 # stale.  Reconfigure BusyBox only when one of the four features actually used
+# by PegineLab WIFICAM is absent.
+BUSYBOX_REQUIRED_OPTS="
+CONFIG_HTTPD
+CONFIG_FEATURE_HTTPD_BASIC_AUTH
+CONFIG_FEATURE_HTTPD_AUTH_MD5
+CONFIG_FEATURE_HTTPD_CGI
+"
+
+busybox_config_path() {
+    find "$OUTDIR/build" -path '*/busybox-*/.config' -type f | head -n1
+}
+
+BUSYBOX_CONFIG="$(busybox_config_path)"
+BUSYBOX_NEEDS_RECONFIGURE=0
+if [ -z "$BUSYBOX_CONFIG" ] || [ ! -f "$BUSYBOX_CONFIG" ]; then
+    BUSYBOX_NEEDS_RECONFIGURE=1
+else
+    for opt in $BUSYBOX_REQUIRED_OPTS; do
+        grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || BUSYBOX_NEEDS_RECONFIGURE=1
+    done
+fi
+
+if [ "$BUSYBOX_NEEDS_RECONFIGURE" = "1" ]; then
+    echo
+    echo "BusyBox HTTP config is stale/incomplete; reconfiguring BusyBox..."
+    (
+        cd "$THINGINO_DIR"
+        env IP= THINGINO_USER_DIR="$USER_ROOT" \
+            make CAMERA="$CAMERA" br-busybox-reconfigure
+    )
+    BUSYBOX_CONFIG="$(busybox_config_path)"
+fi
+
+[ -n "$BUSYBOX_CONFIG" ] && [ -f "$BUSYBOX_CONFIG" ] || die "BusyBox .config not found after reconfigure"
+for opt in $BUSYBOX_REQUIRED_OPTS; do
+    grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || die "BusyBox HTTP feature missing after reconfigure: $opt"
+done
+
+# Always regenerate rootfs.ext2 after the BusyBox check.  This guarantees that
+# a repaired BusyBox binary and the current WIFICAM overlay are both inside p2.
+echo
+echo "Generating configured ext4 SD rootfs via Buildroot rootfs-ext2..."
+rm -f "$ROOTFS_EXT"
+(
+    cd "$THINGINO_DIR"
+    env IP= THINGINO_USER_DIR="$USER_ROOT" \
+        make CAMERA="$CAMERA" rootfs-ext2
+)
+
+[ -f "$ROOTFS_EXT" ] || die "rootfs.ext2 missing after rootfs-ext2: $ROOTFS_EXT"
+[ -f "$KERNEL_IMAGE" ] || die "uImage missing: $KERNEL_IMAGE"
+[ -f "$TARGET/usr/share/wificam-web/index.html" ] || die "WIFICAM index missing from Thingino target rootfs"
+[ -x "$TARGET/etc/init.d/S90wificam" ] || die "S90wificam missing/not executable in target rootfs"
+[ -x "$TARGET/usr/share/wificam-web/cgi-bin/api" ] || die "WIFICAM API missing/not executable"
+[ -x "$TARGET/usr/share/wificam-web/cgi-bin/snapshot.jpg" ] || die "snapshot CGI missing/not executable"
+
+grep -q 'PegineLab WIFICAM T23N' "$TARGET/usr/share/wificam-web/index.html" || \
+    die "wrong Web UI staged in target"
+grep -q '^BR2_PACKAGE_THINGINO_KOPT_MMC0_BOOT=y$' "$FINAL_CONFIG" || \
+    die "MMC0_BOOT is not enabled in final Thingino config"
+grep -q '^BR2_PACKAGE_THINGINO_UBOOT_ROOT="/dev/mmcblk0p2"$' "$FINAL_CONFIG" || \
+    die "U-Boot root is not /dev/mmcblk0p2"
+grep -q '^BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y$' "$FINAL_CONFIG" || \
+    die "Thingino BusyBox webserver choice is not enabled"
+
+debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM index is absent from rootfs.ext2"
+debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "S90wificam is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/cgi-bin/api' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM API is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/cgi-bin/snapshot.jpg' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM snapshot CGI is absent from rootfs.ext2"
+
+if command -v dumpe2fs >/dev/null 2>&1; then
+    ROOTFS_FEATURES="$(dumpe2fs -h "$ROOTFS_EXT" 2>/dev/null | sed -n 's/^Filesystem features:[[:space:]]*//p')"
+    case " $ROOTFS_FEATURES " in
+      *" 64bit "*|*" metadata_csum "*|*" orphan_file "*)
+        die "rootfs.ext2 contains ext4 features unsupported by Linux 3.10: $ROOTFS_FEATURES"
+        ;;
+    esac
+fi
+
+# Use the separately pinned T23N MMC SPL/U-Boot, not the sfcnor U-Boot from
+# the 8 MiB SPI image, then assemble a real partitioned SD disk image.
+sh "$REPO_DIR/scripts/build_sd_bootloader.sh"
+
+mkdir -p "$REPO_DIR/Thingino"
+sh "$REPO_DIR/scripts/assemble_thingino_wificam_sd_image.sh" \
+    "$REPO_DIR/out/u-boot-t23n-sd.bin" \
+    "$KERNEL_IMAGE" \
+    "$ROOTFS_EXT" \
+    "$REPO_DIR/Thingino/thingino-t23-sd.bin"
+
+IMAGE_SIZE="$(stat -c '%s' "$REPO_DIR/Thingino/thingino-t23-sd.bin")"
+IMAGE_SHA="$(sha256sum "$REPO_DIR/Thingino/thingino-t23-sd.bin" | awk '{print $1}')"
+
+HISTORICAL_REFERENCE="/mnt/d/Thingino/thingino-t23-sd.bin"
+HISTORICAL_SHA="not-present"
+HISTORICAL_SIZE="not-present"
+if [ -f "$HISTORICAL_REFERENCE" ]; then
+    HISTORICAL_SHA="$(sha256sum "$HISTORICAL_REFERENCE" | awk '{print $1}')"
+    HISTORICAL_SIZE="$(stat -c '%s' "$HISTORICAL_REFERENCE")"
+fi
+
+MAX_GITHUB_SIZE=$((95 * 1024 * 1024))
+[ "$IMAGE_SIZE" -le "$MAX_GITHUB_SIZE" ] || \
+    die "canonical image is $IMAGE_SIZE bytes; refusing Git publish above 95 MiB"
+
+printf '%s  %s\n' "$IMAGE_SHA" "thingino-t23-sd.bin" > "$REPO_DIR/Thingino/thingino-t23-sd.bin.sha256"
+
+cat > "$REPO_DIR/Thingino/IMAGE_INFO.txt" <<EOF
+PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
+
+RU:
+Профиль-кандидат: $CAMERA
+Источник Thingino: $THINGINO_COMMIT
+Файл: Thingino/thingino-t23-sd.bin
+Размер: $IMAGE_SIZE bytes
+SHA256: $IMAGE_SHA
+Исторический локальный reference: $HISTORICAL_REFERENCE
+Reference size: $HISTORICAL_SIZE
+Reference SHA256: $HISTORICAL_SHA
+Web UI: ОБЯЗАТЕЛЬНО ПРОВЕРЕНА в rootfs.ext2
+Web URL после загрузки: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
+
+EN:
+Candidate profile: $CAMERA
+Thingino source: $THINGINO_COMMIT
+File: Thingino/thingino-t23-sd.bin
+Size: $IMAGE_SIZE bytes
+SHA256: $IMAGE_SHA
+Historical local reference: $HISTORICAL_REFERENCE
+Reference size: $HISTORICAL_SIZE
+Reference SHA256: $HISTORICAL_SHA
+Web UI: MANDATORY and VERIFIED inside rootfs.ext2
+Web URL after boot: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
+EOF
+
+echo
+echo "THINGINO WIFICAM SD IMAGE: VERIFIED"
+echo "SPI artifact  : $SPI_IMAGE"
+echo "Canonical     : Thingino/thingino-t23-sd.bin"
+echo "Size          : $IMAGE_SIZE bytes"
+echo "SHA256        : $IMAGE_SHA"
+echo "Historical    : $HISTORICAL_REFERENCE"
+echo "Historical SHA: $HISTORICAL_SHA"
+echo "Web UI        : VERIFIED inside p2 rootfs.ext2"
+echo "Web URL       : http://CAMERA_IP:8080/"
+echo
+
+if [ "$PUBLISH" = "1" ]; then
+    BRANCH="$(git -C "$REPO_DIR" branch --show-current)"
+    [ "$BRANCH" = "mymarrchWFcam" ] || die "refusing publish from branch: $BRANCH"
+
+    git -C "$REPO_DIR" add -f \
+        Thingino/thingino-t23-sd.bin \
+        Thingino/thingino-t23-sd.bin.sha256 \
+        Thingino/IMAGE_INFO.txt
+
+    if git -C "$REPO_DIR" diff --cached --quiet; then
+        echo "Git: canonical image already committed."
+    else
+        git -C "$REPO_DIR" commit -m "firmware(thingino): verify relevant T23N SD image with WIFICAM / проверка релевантного T23N SD образа с WIFICAM"
+    fi
+
+    git -C "$REPO_DIR" push origin "$BRANCH"
+    echo "Git publish: OK ($BRANCH)"
+else
+    echo "Not pushed. To build + commit + push in one run:"
+    echo "  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh"
+fi
+ "$FINAL_CONFIG" || \
+    die "BR2_TARGET_ROOTFS_EXT2_4 is not enabled in final Thingino config"
+grep -Fq "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES=\"$BUSYBOX_WIFICAM_FRAGMENT\"" "$FINAL_CONFIG" || \
+    die "WIFICAM BusyBox fragment path did not reach final Buildroot config"
+
+# FAST builds can reuse an older BusyBox .config from before local.fragment
+# selected BusyBox httpd. The config is not "missing" in that case; it is
+# stale. Reconfigure BusyBox only when one of the four features actually used
 # by PegineLab WIFICAM is absent.
 BUSYBOX_REQUIRED_OPTS="
 CONFIG_HTTPD
