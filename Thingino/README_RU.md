@@ -83,10 +83,12 @@ PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 6. задаёт root `/dev/mmcblk0p2`, ext4;
 7. включает BusyBox httpd для отдельной WIFICAM на TCP 8080;
 8. добавляет WIFICAM непосредственно в Buildroot rootfs overlay;
-9. проверяет WIFICAM в build target и в самом `rootfs.ext2` через `debugfs`;
-10. копирует готовый disk image в `Thingino/thingino-t23-sd.bin`;
-11. создаёт SHA256 и `Thingino/IMAGE_INFO.txt`;
-12. при `PUBLISH=1` делает commit и push в текущую ветку.
+9. если `cleanbuild` не создал `rootfs.ext2`, явно запускает Buildroot target `rootfs-ext2`;
+10. проверяет WIFICAM в build target и в самом `rootfs.ext2` через `debugfs`;
+11. собирает настоящий SD disk image: DOS/MBR + pinned MMC U-Boot на LBA34 + FAT p1 + ext4 p2;
+12. сохраняет его как `Thingino/thingino-t23-sd.bin`;
+13. создаёт SHA256 и `Thingino/IMAGE_INFO.txt`;
+14. при `PUBLISH=1` делает commit и push в текущую ветку.
 
 Если существует исторический файл
 `/mnt/d/Thingino/thingino-t23-sd.bin`, его размер и SHA256 также заносятся в
@@ -97,11 +99,10 @@ PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 Текущий Thingino MMC builder создаёт:
 
 ```text
-byte 0..35      INGE descriptor
 sector 0        DOS/MBR partition table + 55aa
 sector 34       SPL / MSPL
 sector 86       U-Boot proper
-sector 2048     p1 FAT32, /uImage
+sector 2048     p1 FAT16 (16 MiB), /uImage
 sector 34816    p2 ext4, Thingino rootfs + PegineLab WIFICAM
 после image     пока не используется
 ```
@@ -142,7 +143,7 @@ sudo sh scripts/write_thingino_wificam_sd.sh /dev/sde
 THINGINO-WIFICAM:/dev/sde
 ```
 
-Writer проверяет полный SHA readback, `INGE`, `55aa`, `MSPL` на LBA34,
+Writer проверяет полный SHA readback, `55aa`, `MSPL` на LBA34,
 p1 на LBA2048 и p2 на LBA34816.
 
 ## Первый аппаратный тест
