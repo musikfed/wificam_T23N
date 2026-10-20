@@ -44,14 +44,26 @@ The 2026-10-21 hardware test confirmed that this profile boots on the target cam
 ## Mandatory Web UI
 
 PegineLab WIFICAM is a required part of the canonical image, not an optional
-post-install step.
+post-install step. The stock Thingino UI and PegineLab WIFICAM are **two
+separate web services**.
 
-After a successful boot the expected interfaces are:
+After a successful boot:
 
 ```text
-Thingino Web UI       : http://CAMERA_IP/
+Thingino stock UI     : http://CAMERA_IP/ or https://CAMERA_IP/
+Thingino login        : root
+Thingino password     : root
+
 PegineLab WIFICAM     : http://CAMERA_IP:8080/
 ```
+
+If the browser shows `https://CAMERA_IP/login.html` with Thingino branding,
+that is the normal stock Thingino UI. Open `http://CAMERA_IP:8080/`
+explicitly for PegineLab.
+
+The first WIFICAM boot is configured as an unauthenticated local bootstrap:
+`ALLOW_UNAUTHENTICATED_WEB=1`. After a password is set, WIFICAM restarts
+with Basic Auth. The default username used by the password helper is `admin`.
 
 WIFICAM provides:
 
@@ -235,10 +247,19 @@ Acceptance criteria:
 ```text
 1. The board shows Linux boot activity.
 2. Thingino/Wi-Fi comes up.
-3. The normal Thingino Web UI is reachable.
-4. PegineLab WIFICAM MUST be reachable on :8080.
+3. The stock Thingino Web UI is reachable; default login is root/root.
+4. Open http://CAMERA_IP:8080/ separately for PegineLab WIFICAM.
 5. WIFICAM status API responds.
 6. Snapshot preview works once Prudynt is running.
+```
+
+If only the stock Thingino UI works and port 8080 does not respond, SD boot
+is still successful. Diagnose the WIFICAM service itself:
+
+```sh
+ps | grep '[h]ttpd'
+cat /var/log/wificam-httpd.log
+/etc/init.d/S90wificam restart
 ```
 
 Only after this succeeds should the unused capacity of the 32-GB card be
