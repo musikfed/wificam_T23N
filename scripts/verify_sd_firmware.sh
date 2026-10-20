@@ -63,9 +63,12 @@ MAGIC="$(dd if="$DEV" bs=512 skip=34 count=1 status=none | od -An -tx4 -N4 | tr 
 BOOTLOADER_REAL="$(readlink -f "$BOOTLOADER")"
 BOOTLOADER_SIZE="$(wc -c < "$BOOTLOADER_REAL" | tr -d ' ')"
 BOOTLOADER_BLOCKS=$(((BOOTLOADER_SIZE + 511) / 512))
+BOOTLOADER_END_SECTOR=$((34 + BOOTLOADER_BLOCKS - 1))
 BOOTLOADER_SOURCE_SHA="$(sha256sum "$BOOTLOADER_REAL" | awk '{print $1}')"
 [ "$BOOTLOADER_SIZE" -eq "$UPSTREAM_UBOOT_SIZE" ] || die "wrong T23N SD U-Boot size: $BOOTLOADER_SIZE != $UPSTREAM_UBOOT_SIZE"
 [ "$BOOTLOADER_SOURCE_SHA" = "$UPSTREAM_UBOOT_SHA256" ] || die "wrong T23N SD U-Boot SHA256: $BOOTLOADER_SOURCE_SHA"
+[ "$BOOTLOADER_END_SECTOR" -lt "$P1_START" ] || \
+    die "raw SPL/U-Boot overlaps BOOT partition: raw ends at $BOOTLOADER_END_SECTOR, p1 starts at $P1_START"
 
 IMAGE_REAL="$(readlink -f "$IMAGE")"
 KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
@@ -118,6 +121,8 @@ echo "SD FIRMWARE VERIFY: OK"
 echo "DOS/MBR signature     : $MBR_SIG"
 echo "SPL magic             : $MAGIC"
 echo "Raw SPL/U-Boot SHA256 : $BOOTLOADER_SD_SHA"
+echo "Raw U-Boot sector span : 34..$BOOTLOADER_END_SECTOR"
+echo "BOOT partition starts  : sector $P1_START (no overlap)"
 echo "BOOT U-Boot SHA256    : $BOOT_BOOTLOADER_SHA"
 echo "BOOT uImage SHA256       : $BOOT_KERNEL_SHA"
 echo "Kernel boot source       : BOOT partition /uImage"
