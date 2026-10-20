@@ -56,6 +56,11 @@ async function post(op,data={}){
   return call(op,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:formBody(data)});
 }
 
+function refreshPreview(){
+  const img=$('#liveFrame');
+  if(img) img.src='/cgi-bin/snapshot.jpg?t='+Date.now();
+}
+
 async function scan(){
   $('#networks').innerHTML='Scanning…';
   try{
@@ -137,3 +142,4 @@ translate();
 refreshStatus();
 loadServices();
 setInterval(refreshStatus,15000);
+setInterval(()=>{const p=$('#live');if(p&&p.classList.contains('active'))refreshPreview()},2000);
