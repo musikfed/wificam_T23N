@@ -2,7 +2,7 @@ PegineLab WIFICAM T23N — hardware-verified Thingino MMC SD image
 
 STATUS / СТАТУС:
 0.1_test — АППАРАТНО ПОДТВЕРЖДЕНО / HARDWARE VERIFIED
-2026-10-21: загрузка с SD и работа PegineLab WIFICAM подтверждены на целевой камере.
+2026-10-21: загрузка с SD подтверждена на целевой камере; runtime-проверка PegineLab WIFICAM на :8080 ожидается.
 
 RU:
 Профиль: galayou_g2_t23n_sc2336_atbm6012bx
@@ -19,7 +19,7 @@ Root: /dev/mmcblk0p2 ext4
 Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
 
 EN:
-2026-10-21: SD boot and PegineLab WIFICAM operation confirmed on the target camera.
+2026-10-21: SD boot confirmed on the target camera; PegineLab WIFICAM runtime verification on :8080 is still pending.
 Profile: galayou_g2_t23n_sc2336_atbm6012bx
 Thingino source: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
 File: Thingino/thingino-t23-sd.bin
