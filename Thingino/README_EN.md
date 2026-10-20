@@ -58,27 +58,37 @@ verified inside the actual `rootfs.ext2`.
 
 ## Build and publish
 
-After one update of the main project checkout:
+After updating the main project checkout:
 
 ```sh
 cd ~/myipcam/wificam_T23N
+git pull
 PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 ```
 
+There is **no separate manual Thingino clone prerequisite anymore**. The build
+script creates the pinned checkout automatically when it is missing.
+
 The script:
 
-1. uses the Thingino checkout at `~/myipcam/thingino-firmware` or
-   `~/thingino-firmware`;
-2. builds `galayou_g2_t23n_sc2336_atbm6012bx`;
-3. enables MMC0 1-bit boot;
-4. sets root to `/dev/mmcblk0p2`, ext4;
-5. enables BusyBox httpd for the independent WIFICAM service on TCP 8080;
-6. injects WIFICAM directly through Buildroot's rootfs overlay;
-7. verifies WIFICAM in the build target and inside `rootfs.ext2` with
+1. looks for a Thingino checkout at `~/myipcam/thingino-firmware`,
+   `~/thingino-firmware`, or `~/myipcam/Thingino/thingino-firmware`;
+2. if none exists, it **clones**
+   `https://github.com/themactep/thingino-firmware.git` with submodules into
+   `~/myipcam/thingino-firmware`;
+3. it checks out the pinned commit
+   `9925f46f73b9c39ec8d2a65134b18c94e6fdfb97` so upstream changes cannot
+   silently alter the candidate between tests;
+4. builds `galayou_g2_t23n_sc2336_atbm6012bx`;
+5. enables MMC0 1-bit boot;
+6. sets root to `/dev/mmcblk0p2`, ext4;
+7. enables BusyBox httpd for the independent WIFICAM service on TCP 8080;
+8. injects WIFICAM directly through Buildroot's rootfs overlay;
+9. verifies WIFICAM in the build target and inside `rootfs.ext2` with
    `debugfs`;
-8. writes the canonical artifact to `Thingino/thingino-t23-sd.bin`;
-9. creates SHA256 and `Thingino/IMAGE_INFO.txt`;
-10. with `PUBLISH=1`, commits and pushes the canonical artifacts.
+10. writes the canonical artifact to `Thingino/thingino-t23-sd.bin`;
+11. creates SHA256 and `Thingino/IMAGE_INFO.txt`;
+12. with `PUBLISH=1`, commits and pushes the canonical artifacts.
 
 If the historical file `/mnt/d/Thingino/thingino-t23-sd.bin` exists, its size
 and SHA256 are also recorded in `IMAGE_INFO.txt` for provenance comparison.
