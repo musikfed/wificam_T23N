@@ -126,21 +126,42 @@ rootfstype=ext4
 
 ## Запись на SD
 
-Перед записью обязательно определить карту заново:
+В WSL2 USB-кардридер сначала нужно передать из Windows в WSL. Команды
+`usbipd` выполняются **в Windows PowerShell от имени администратора**, не
+внутри Ubuntu/WSL:
+
+```powershell
+usbipd list
+usbipd bind --busid <BUSID>
+usbipd attach --wsl --busid <BUSID>
+```
+
+`<BUSID>` берётся только из реального вывода `usbipd list` для нужного
+кардридера; примерный номер нельзя подставлять вслепую.
+
+После attach в WSL обязательно определить карту заново:
 
 ```sh
+lsusb
 lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
 ```
 
-Для текущего кардридера ожидается примерно:
+Для текущей карты ожидается примерно 29.1 GiB, `TRAN=usb`, `RM=1`.
+Системные WSL Virtual Disk не трогать.
+
+**Критично про смещение:** `Thingino/thingino-t23-sd.bin` — полный disk
+image. Его всегда записывают с **LBA0 / byte 0**, без `seek=`. Нужное
+смещение загрузчика уже находится внутри файла:
 
 ```text
-29.1G  SD/MMC/MS PRO  usb  RM=1
+LBA0      MBR
+LBA34     SPL/MSPL
+LBA86     U-Boot proper
+LBA2048   p1 FAT16 /uImage
+LBA34816  p2 ext4 rootfs
 ```
 
-Системный WSL диск `/dev/sdd` не трогать.
-
-Если карта снова определилась как `/dev/sde`:
+Если карта определилась, например, как `/dev/sde`:
 
 ```sh
 sudo sh scripts/write_thingino_wificam_sd.sh /dev/sde
@@ -152,8 +173,11 @@ sudo sh scripts/write_thingino_wificam_sd.sh /dev/sde
 THINGINO-WIFICAM:/dev/sde
 ```
 
-Writer проверяет полный SHA readback, `55aa`, `MSPL` на LBA34,
-p1 на LBA2048 и p2 на LBA34816.
+Writer **до записи** проверяет sidecar SHA256, MBR `55aa`, MSPL на LBA34 и
+старты p1/p2 в самом image. Затем пишет весь image с LBA0 и после записи
+проверяет полный SHA readback, `55aa`, `MSPL` на LBA34, p1 на LBA2048 и
+p2 на LBA34816. Ручной `dd ... seek=34` для готового
+`thingino-t23-sd.bin` запрещён: он сдвинет весь disk image и сломает MBR.
 
 ## Первый аппаратный тест
 
