@@ -1,0 +1,41 @@
+PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
+
+STATUS / СТАТУС:
+PENDING LOCAL BUILD + VERIFICATION
+
+RU:
+Канонический бинарник должен находиться здесь:
+  Thingino/thingino-t23-sd.bin
+
+Историческая shell history указывает на локальный reference:
+  /mnt/d/Thingino/thingino-t23-sd.bin
+  profile: galayou_g2_t23n_sc2336_atbm6012bx
+
+Старый локальный binary НЕ публикуется вслепую как canonical, потому что
+PegineLab WIFICAM является обязательной частью итогового image.
+
+Canonical image создаётся:
+  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+
+Скрипт сначала встраивает WIFICAM в p2/rootfs.ext2, проверяет её через debugfs,
+создаёт SHA256, сравнивает provenance с историческим локальным reference (если
+он существует), и только после этого commit/push-ит
+Thingino/thingino-t23-sd.bin.
+
+EN:
+The canonical binary must live here:
+  Thingino/thingino-t23-sd.bin
+
+Shell history points to this historical local reference:
+  /mnt/d/Thingino/thingino-t23-sd.bin
+  profile: galayou_g2_t23n_sc2336_atbm6012bx
+
+The old local binary is NOT blindly published as canonical because PegineLab
+WIFICAM is a mandatory part of the final image.
+
+Build and publish the canonical image with:
+  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+
+The script first embeds WIFICAM into p2/rootfs.ext2, verifies it with debugfs,
+creates SHA256, records provenance against the historical local reference when
+present, and only then commits/pushes Thingino/thingino-t23-sd.bin.
