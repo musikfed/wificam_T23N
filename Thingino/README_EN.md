@@ -5,7 +5,7 @@
 **HARDWARE VERIFIED on 2026-10-21.** The canonical
 `Thingino/thingino-t23-sd.bin` was written to SD, passed full readback
 SHA256/MBR/MSPL/partition verification, and booted on the target camera.
-PegineLab WIFICAM was also confirmed working on the real device.
+SD boot is confirmed. Runtime access to PegineLab WIFICAM on `:8080` is verified separately.
 
 Pinned SHA256:
 
