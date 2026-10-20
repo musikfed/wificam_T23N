@@ -166,7 +166,16 @@ FINAL_CONFIG="$OUTDIR/.config"
 [ -f "$FINAL_CONFIG" ] || die "final Thingino .config missing: $FINAL_CONFIG"
 grep -q '^BR2_TARGET_ROOTFS_EXT2=y$' "$FINAL_CONFIG" || \
     die "BR2_TARGET_ROOTFS_EXT2 is not enabled in final Thingino config"
-grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y
+grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y$' "$FINAL_CONFIG" || \
+    die "BR2_TARGET_ROOTFS_EXT2_4 is not enabled in final Thingino config"
+grep -Fq "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES=\"$BUSYBOX_WIFICAM_FRAGMENT\"" "$FINAL_CONFIG" || \
+    die "WIFICAM BusyBox fragment path did not reach final Buildroot config"
+
+# FAST builds can reuse an older BusyBox .config from before local.fragment
+# selected BusyBox httpd. The config is not "missing" in that case; it is
+# stale. Reconfigure BusyBox only when one of the four features actually used
+# by PegineLab WIFICAM is absent.
+BUSYBOX_REQUIRED_OPTS="
 CONFIG_HTTPD
 CONFIG_FEATURE_HTTPD_BASIC_AUTH
 CONFIG_FEATURE_HTTPD_AUTH_MD5
