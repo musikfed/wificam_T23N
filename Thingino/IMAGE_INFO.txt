@@ -46,3 +46,12 @@ image and is no longer copied/published as thingino-t23-sd.bin.
 The fixed pipeline explicitly creates the ext4 rootfs, verifies WIFICAM inside
 it, combines the pinned MMC U-Boot at LBA34 with a FAT16 boot partition and
 ext4 p2, verifies readback hashes, and only then allows publishing.
+
+
+BusyBox FAST self-heal / автоисправление FAST:
+- Current WIFICAM server: BusyBox httpd on TCP 8080.
+- Required BusyBox features only: CONFIG_HTTPD, CONFIG_FEATURE_HTTPD_CGI,
+  CONFIG_FEATURE_HTTPD_BASIC_AUTH, CONFIG_FEATURE_HTTPD_AUTH_MD5.
+- A stale FAST-build BusyBox .config is detected automatically.
+- The wrapper runs br-busybox-reconfigure and then regenerates rootfs.ext2
+  before SD image assembly.
