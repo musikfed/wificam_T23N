@@ -1,6 +1,6 @@
 # PegineLab WIFICAM T23 SD — 0.1_test
 
-**Status:** hardware verified / аппаратно подтверждено  
+**Status:** SD boot hardware verified; WIFICAM :8080 runtime check pending / SD boot аппаратно подтверждён; проверка WIFICAM :8080 ожидается  
 **Date:** 2026-10-21  
 **Branch:** `mymarrchWFcam`
 
