@@ -69,6 +69,7 @@ start() {
 
     ACTIVE_MEDIA="$(pick_media_mount)"
     export ACTIVE_MEDIA
+    printf '%s\n' "$ACTIVE_MEDIA" > /var/run/wificam-media
     RECORDINGS="$ACTIVE_MEDIA/recordings"
     SNAPSHOTS="$ACTIVE_MEDIA/snapshots"
     EVENTS="$ACTIVE_MEDIA/events"
