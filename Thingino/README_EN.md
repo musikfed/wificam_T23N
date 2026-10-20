@@ -137,6 +137,36 @@ usbipd attach --wsl --busid <BUSID>
 
 Use only the actual BUSID reported for the intended card reader.
 
+Verified example for the current Acer/Realtek reader:
+
+```text
+Windows usbipd list:
+BUSID 3-2
+VID:PID 0bda:0177
+DEVICE Realtek USB 2.0 Card Reader
+STATE Shared
+```
+
+When the state is already `Shared`, another `bind` is unnecessary. Run only:
+
+```powershell
+usbipd attach --wsl --busid 3-2
+```
+
+The successful attach for this reader was confirmed inside WSL as:
+
+```text
+lsusb:
+0bda:0177 Realtek Semiconductor Corp. USB2.0-CRW
+
+lsblk:
+sde    /dev/sde   29.1G  SD/MMC/MS PRO  usb  RM=1
+└─sde1 /dev/sde1 128M   BOOT  vfat
+```
+
+`/dev/sde` is confirmed only for this specific session. After reconnecting,
+always verify the size, MODEL, `TRAN=usb`, and `RM=1` again.
+
 After attach, identify the card again inside WSL:
 
 ```sh
