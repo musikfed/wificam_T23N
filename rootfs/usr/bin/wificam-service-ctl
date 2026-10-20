@@ -4,8 +4,8 @@ set -eu
 CONF=/etc/wificam/wificam.conf
 [ -f "$CONF" ] && . "$CONF"
 
-STATE_DIR="${SERVICE_STATE_DIR:-/data/services}"
-VPN_DIR="${VPN_DIR:-/data/vpn}"
+STATE_DIR="${SERVICE_STATE_DIR:-/opt/wificam/services}"
+VPN_DIR="${VPN_DIR:-/opt/wificam/vpn}"
 SSH_PORT="${SSH_PORT:-22}"
 WG_CONF="${WIREGUARD_CONF:-$VPN_DIR/wg0.conf}"
 AWG_CONF="${AMNEZIAWG_CONF:-$VPN_DIR/awg0.conf}"
