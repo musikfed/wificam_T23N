@@ -28,7 +28,7 @@ p1 BOOT FAT32, start sector 2048 (1 MiB), /uImage
 /dev/mmcblk0p2
 ext4 ROOTFS
    ↓
-OpenIPC T23 userspace + WIFICAM/PegineLab
+Thingino T23N userspace + mandatory PegineLab WIFICAM Web UI
 ```
 
 Для этого используется точный upstream-образ
@@ -43,6 +43,48 @@ magic и SHA-256.
 SPL начинается с sector 34 (17 KiB), U-Boot proper после 26 KiB SPL — с
 sector 86. Upstream MMC U-Boot загружает kernel как `/uImage` из FAT32 p1
 и передаёт root `/dev/mmcblk0p2`.
+
+## Текущий основной путь / Current primary path
+
+**Основной следующий образ этой ветки — прямой Thingino MMC/SD image, а не
+`autoupdate-full.bin` и не OpenIPC-rootfs.**
+
+История сборки на этом хосте показала ранее использованный профиль
+`galayou_g2_t23n_sc2336_atbm6012bx` (T23N + SC2336 + ATBM6012BX). Пока это
+**профиль-кандидат**, а не доказанная идентификация платы
+`GV-T23-PTZ-MAIN-V2.0`.
+
+Canonical artifact:
+
+```text
+Thingino/thingino-t23-sd.bin
+Thingino/thingino-t23-sd.bin.sha256
+Thingino/IMAGE_INFO.txt
+```
+
+Он собирается скриптом:
+
+```sh
+PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+```
+
+Скрипт не публикует образ, если не доказано, что PegineLab WIFICAM реально
+находится внутри `p2/rootfs.ext2`. Проверяются `index.html`, init-script,
+CGI API, snapshot CGI и наличие BusyBox `httpd`.
+
+Web UI является **обязательным acceptance criterion**:
+
+```text
+Thingino UI          : http://CAMERA_IP/   (или HTTPS, если включён Thingino TLS)
+PegineLab WIFICAM    : http://CAMERA_IP:8080/
+```
+
+The canonical image is a **direct MMC/SD disk image**. It is written to the
+whole SD card and boots `uImage` from p1 with ext4 root on
+`/dev/mmcblk0p2`. It is **not** an SPI/NOR autoupdate payload.
+
+Русская инструкция: `Thingino/README_RU.md`  
+English instructions: `Thingino/README_EN.md`
 
 ## Разметка SD
 
@@ -85,11 +127,10 @@ MMC environment находится по `0x44400` (sector 546), размер 32 
 исключена; искать нужно раньше/ниже по цепочке BootROM/SD bootstrap или в выборе
 профиля MMC.
 
-Важно: `autoupdate-full.bin` — это механизм установки/обновления Thingino,
-который обычно переносит firmware во внутреннюю flash. В режиме этой ветки
-SPI/NOR физически отсутствует, поэтому `autoupdate-full.bin` не является
-постоянной ОС и не нужен для загрузки. Постоянная SD-only схема здесь —
-upstream MMC U-Boot + `BOOT:/uImage` + ext4 `/dev/mmcblk0p2`.
+Важно: `autoupdate-full.bin` остаётся только историческим recovery/install
+маршрутом. Для текущего основного теста при физически отсутствующей SPI/NOR
+используется прямой Thingino MMC image: raw SD bootstrap + `p1:/uImage` +
+ext4 `/dev/mmcblk0p2`. Никакая запись в SPI для этого пути не требуется.
 
 ## Сборка
 
@@ -251,17 +292,17 @@ sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 
 ## Root filesystem
 
-База userspace — официальный OpenIPC T23 lite rootfs. Поверх него добавляются:
+Для **основного текущего пути** база userspace — Thingino для
+`galayou_g2_t23n_sc2336_atbm6012bx`, дополненный PegineLab WIFICAM прямо в
+`rootfs.ext2`. Старый OpenIPC SD-root путь сохранён как экспериментальный и
+не является текущим аппаратным тестом.
 
-- PegineLab Web UI;
-- `S05peginelab-boot`;
-- WIFICAM service layer;
-- Wi‑Fi management;
-- MEDIA mount;
-- optional SSH/WireGuard/AmneziaWG controls.
+WIFICAM добавляет Web UI/API, отдельный httpd на TCP 8080, управление Wi‑Fi,
+storage, optional SSH/WireGuard/AmneziaWG и интеграцию с Thingino Prudynt для
+status/start/stop, snapshot и recording.
 
-Sensor detection не выполняется вручную Web UI: камера и sensor должны
-инициализироваться kernel/OS camera stack.
+Sensor detection не выполняется Web UI: сенсор и камера должны
+инициализироваться Thingino/kernel camera stack.
 
 ## PegineLab boot branding
 
