@@ -74,16 +74,38 @@ usbipd bind --busid BUSID
 usbipd attach --wsl --busid BUSID
 ```
 
-После этого уже в Ubuntu/WSL:
+После успешного `usbipd attach --wsl ...` **ничего больше в PowerShell для
+этого шага не требуется**. Вернуться в уже открытый Ubuntu/WSL и сразу выполнить:
 
 ```sh
 lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
 ```
 
+Это подтверждённый рабочий порядок на текущем хосте:
+
+```text
+Windows PowerShell:
+  usbipd list
+  usbipd bind --busid BUSID      # только если ещё не Shared
+  usbipd attach --wsl --busid BUSID
+
+Ubuntu/WSL:
+  lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
+```
+
+**Не выполнять `wsl --mount ...` внутри Ubuntu.** Команда `wsl.exe` относится
+к Windows; ошибка `Command 'wsl' not found` внутри Ubuntu ничего не монтирует и
+не нужна. Не устанавливать `sudo apt install wsl` ради этой операции.
+
 Для этой карты ожидаем около `29.1G`, модель кардридера `SD/MMC/MS PRO`,
 `TRAN=usb`, `RM=1`. Имя `/dev/sdX` может меняться после каждого
 переподключения, поэтому его всегда определять заново. Системный WSL-диск
 выбирать нельзя.
+
+Если после подключения видны старые разделы `BOOT/ROOTFS/MEDIA`, это нормально:
+это содержимое предыдущего тестового образа. Скрипт
+`prepare_legacy_thingino_sd.sh` всё равно заново создаст один 128 MiB FAT32
+BOOT-раздел и оставит остальное место неразмеченным.
 
 Не смешивать одновременно `usbipd attach` и `wsl --mount` для одного и того
 же кардридера. Если всё же используется `wsl --mount`, эта команда тоже
