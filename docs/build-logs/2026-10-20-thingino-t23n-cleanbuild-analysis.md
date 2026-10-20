@@ -95,3 +95,24 @@ Incomplete/incorrect:
 
 The corrected pipeline produces/validates ext4 p2 and assembles a separate
 direct SD disk image using the pinned MMC SPL/U-Boot at LBA34.
+
+
+## Follow-up: BusyBox fragment overwrite
+
+A later FAST run proved that `br-busybox-reconfigure` itself worked and
+rebuilt BusyBox 1.38.0, but `CONFIG_FEATURE_HTTPD_BASIC_AUTH` was still absent.
+
+The exact cause is assignment order in the pinned sources:
+
+- Thingino's `package/thingino-webserver/busybox-httpd-override.mk` appends
+  `BUSYBOX_KCONFIG_FRAGMENT_FILES += .../busybox-httpd.config`.
+- The pinned Buildroot `package/busybox/busybox.mk` later assigns
+  `BUSYBOX_KCONFIG_FRAGMENT_FILES = $(call qstrip,$(BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES))`.
+- That assignment overwrites the Thingino append.
+
+Therefore repeatedly running `busybox-reconfigure` without setting the
+Buildroot Kconfig string cannot fix Basic Auth.  The project wrapper now creates
+a minimal WIFICAM BusyBox fragment with only HTTPD, CGI, Basic Auth and MD5
+authentication support and passes it through
+`BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES`.  It verifies that the setting
+reaches the final Buildroot `.config` before reconfiguring BusyBox.
