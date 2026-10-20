@@ -112,7 +112,8 @@ BR2_TARGET_ROOTFS_EXT2_4=y
 BR2_TARGET_ROOTFS_EXT2_MKFS_OPTIONS="-O ^metadata_csum,^64bit,^orphan_file"
 BR2_TARGET_ROOTFS_EXT2_SIZE="64M"
 
-# Thingino BusyBox httpd webserver choice enables CGI + Basic Auth + MD5.
+# PegineLab WIFICAM deliberately uses BusyBox httpd as the smallest CGI server.
+# Required by our current admin: httpd + CGI + Basic Auth + MD5 password hashing.
 BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y
 
 # Mandatory PegineLab/WIFICAM files are embedded directly into p2/rootfs.ext2.
@@ -154,20 +155,59 @@ grep -q '^BR2_TARGET_ROOTFS_EXT2=y$' "$FINAL_CONFIG" || \
 grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y$' "$FINAL_CONFIG" || \
     die "BR2_TARGET_ROOTFS_EXT2_4 is not enabled in final Thingino config"
 
-# Pinned Thingino cleanbuild packages rootfs-squashfs for the normal SPI image.
-# Generate the separately configured ext4 SD rootfs explicitly when necessary.
-if [ ! -f "$ROOTFS_EXT" ]; then
+# FAST builds can reuse an older BusyBox .config from before local.fragment
+# selected BusyBox httpd.  The config is not "missing" in that case; it is
+# stale.  Reconfigure BusyBox only when one of the four features actually used
+# by PegineLab WIFICAM is absent.
+BUSYBOX_REQUIRED_OPTS="
+CONFIG_HTTPD
+CONFIG_FEATURE_HTTPD_BASIC_AUTH
+CONFIG_FEATURE_HTTPD_AUTH_MD5
+CONFIG_FEATURE_HTTPD_CGI
+"
+
+busybox_config_path() {
+    find "$OUTDIR/build" -path '*/busybox-*/.config' -type f | head -n1
+}
+
+BUSYBOX_CONFIG="$(busybox_config_path)"
+BUSYBOX_NEEDS_RECONFIGURE=0
+if [ -z "$BUSYBOX_CONFIG" ] || [ ! -f "$BUSYBOX_CONFIG" ]; then
+    BUSYBOX_NEEDS_RECONFIGURE=1
+else
+    for opt in $BUSYBOX_REQUIRED_OPTS; do
+        grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || BUSYBOX_NEEDS_RECONFIGURE=1
+    done
+fi
+
+if [ "$BUSYBOX_NEEDS_RECONFIGURE" = "1" ]; then
     echo
-    echo "rootfs.ext2 was not emitted by Thingino cleanbuild."
-    echo "Generating configured ext4 SD rootfs via Buildroot rootfs-ext2..."
+    echo "BusyBox HTTP config is stale/incomplete; reconfiguring BusyBox..."
     (
         cd "$THINGINO_DIR"
         env IP= THINGINO_USER_DIR="$USER_ROOT" \
-            make CAMERA="$CAMERA" rootfs-ext2
+            make CAMERA="$CAMERA" br-busybox-reconfigure
     )
+    BUSYBOX_CONFIG="$(busybox_config_path)"
 fi
 
-[ -f "$ROOTFS_EXT" ] || die "rootfs.ext2 still missing after rootfs-ext2: $ROOTFS_EXT"
+[ -n "$BUSYBOX_CONFIG" ] && [ -f "$BUSYBOX_CONFIG" ] || die "BusyBox .config not found after reconfigure"
+for opt in $BUSYBOX_REQUIRED_OPTS; do
+    grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || die "BusyBox HTTP feature missing after reconfigure: $opt"
+done
+
+# Always regenerate rootfs.ext2 after the BusyBox check.  This guarantees that
+# a repaired BusyBox binary and the current WIFICAM overlay are both inside p2.
+echo
+echo "Generating configured ext4 SD rootfs via Buildroot rootfs-ext2..."
+rm -f "$ROOTFS_EXT"
+(
+    cd "$THINGINO_DIR"
+    env IP= THINGINO_USER_DIR="$USER_ROOT" \
+        make CAMERA="$CAMERA" rootfs-ext2
+)
+
+[ -f "$ROOTFS_EXT" ] || die "rootfs.ext2 missing after rootfs-ext2: $ROOTFS_EXT"
 [ -f "$KERNEL_IMAGE" ] || die "uImage missing: $KERNEL_IMAGE"
 [ -f "$TARGET/usr/share/wificam-web/index.html" ] || die "WIFICAM index missing from Thingino target rootfs"
 [ -x "$TARGET/etc/init.d/S90wificam" ] || die "S90wificam missing/not executable in target rootfs"
@@ -182,18 +222,6 @@ grep -q '^BR2_PACKAGE_THINGINO_UBOOT_ROOT="/dev/mmcblk0p2"$' "$FINAL_CONFIG" || 
     die "U-Boot root is not /dev/mmcblk0p2"
 grep -q '^BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y$' "$FINAL_CONFIG" || \
     die "Thingino BusyBox webserver choice is not enabled"
-
-BUSYBOX_CONFIG="$(find "$OUTDIR/build" -path '*/busybox-*/.config' -type f | head -n1)"
-[ -n "$BUSYBOX_CONFIG" ] && [ -f "$BUSYBOX_CONFIG" ] || die "BusyBox .config not found"
-for opt in \
-    CONFIG_HTTPD \
-    CONFIG_FEATURE_HTTPD_BASIC_AUTH \
-    CONFIG_FEATURE_HTTPD_AUTH_MD5 \
-    CONFIG_FEATURE_HTTPD_CGI \
-    CONFIG_FEATURE_HTTPD_CONFIG_WITH_SCRIPT_INTERPR
-do
-    grep -q "^$opt=y$" "$BUSYBOX_CONFIG" || die "BusyBox HTTP feature missing: $opt"
-done
 
 debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "WIFICAM index is absent from rootfs.ext2"
