@@ -62,3 +62,42 @@ mkimage -l ~/myipcam/build/kernel/arch/mips/boot/uImage
 ```
 
 Не прошивать образ во SPI/NOR/NAND до проверки через UART и безопасной загрузки с SD/RAM.
+
+
+## Thingino/MMC — текущая проверенная сборка
+
+Для текущего SD/MMC workflow используется зафиксированный upstream Thingino:
+
+```text
+Thingino commit: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
+Camera profile:  galayou_g2_t23n_sc2336_atbm6012bx
+Target artifact: Thingino/thingino-t23-sd.bin
+```
+
+Web UI PegineLab WIFICAM является обязательной частью итогового образа и не должна исключаться из rootfs/overlay.
+
+Рекомендуемый запуск из корня `wificam_T23N`:
+
+```bash
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+```
+
+### Ошибка Buildroot: PATH contains spaces, TABs, and/or newline
+
+Buildroot отклоняет `PATH`, если в нём присутствуют пробелы, TAB или переносы строк. Типичная ошибка:
+
+```text
+Your PATH contains spaces, TABs, and/or newline (\n) characters.
+This doesn't work. Fix your PATH environment variable.
+```
+
+В этом случае не нужно удалять checkout Thingino или клонировать его заново. Повторите сборку с чистым `PATH`, как в команде выше.
+
+Для диагностики текущего `PATH`:
+
+```bash
+printf '%s\n' "$PATH" | tr ':' '\n' | nl -ba
+```
+
+Pinned commit и профиль камеры должны быть видны в начале build log до запуска Buildroot.
