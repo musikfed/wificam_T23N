@@ -82,6 +82,11 @@ PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 5. включает MMC0 1-bit boot;
 6. задаёт root `/dev/mmcblk0p2`, ext4;
 7. включает BusyBox httpd для отдельной WIFICAM на TCP 8080;
+   Для минимальной PegineLab-админки проверяются только необходимые возможности:
+   `CONFIG_HTTPD`, `CONFIG_FEATURE_HTTPD_CGI`,
+   `CONFIG_FEATURE_HTTPD_BASIC_AUTH`, `CONFIG_FEATURE_HTTPD_AUTH_MD5`.
+   Если FAST-build переиспользовал старый BusyBox `.config`, wrapper сам
+   запускает `br-busybox-reconfigure` и затем заново формирует `rootfs.ext2`;
 8. добавляет WIFICAM непосредственно в Buildroot rootfs overlay;
 9. если `cleanbuild` не создал `rootfs.ext2`, явно запускает Buildroot target `rootfs-ext2`;
 10. проверяет WIFICAM в build target и в самом `rootfs.ext2` через `debugfs`;
