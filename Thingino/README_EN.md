@@ -83,6 +83,11 @@ The script:
 5. enables MMC0 1-bit boot;
 6. sets root to `/dev/mmcblk0p2`, ext4;
 7. enables BusyBox httpd for the independent WIFICAM service on TCP 8080;
+   The minimal PegineLab admin requires only `CONFIG_HTTPD`,
+   `CONFIG_FEATURE_HTTPD_CGI`, `CONFIG_FEATURE_HTTPD_BASIC_AUTH`, and
+   `CONFIG_FEATURE_HTTPD_AUTH_MD5`. If a FAST build reuses a stale BusyBox
+   `.config`, the wrapper automatically runs `br-busybox-reconfigure` and
+   regenerates `rootfs.ext2`;
 8. injects WIFICAM directly through Buildroot's rootfs overlay;
 9. if `cleanbuild` did not emit `rootfs.ext2`, explicitly runs the Buildroot `rootfs-ext2` target;
 10. verifies WIFICAM in the build target and inside `rootfs.ext2` with `debugfs`;
