@@ -56,3 +56,22 @@ SHA256:
 `f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be`
 
 Write it as a complete disk image from LBA0. **Do not use `seek=34`** with the finished image.
+
+
+## Web UI clarification / Уточнение Web UI
+
+The firmware exposes two separate interfaces / В прошивке две отдельные веб-службы:
+
+```text
+Thingino stock UI : http://CAMERA_IP/ or https://CAMERA_IP/
+login/password    : root / root
+
+PegineLab WIFICAM : http://CAMERA_IP:8080/
+```
+
+Seeing `https://CAMERA_IP/login.html` with Thingino branding is expected and
+does not mean PegineLab was replaced. WIFICAM must be tested separately on
+HTTP port 8080.
+
+First WIFICAM boot uses `ALLOW_UNAUTHENTICATED_WEB=1`; once a password is
+configured, the default WIFICAM username is `admin`.
