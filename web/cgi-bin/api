@@ -7,6 +7,9 @@ WIFI_IFACE="${WIFI_IFACE:-wlan0}"
 WPA_CONF="${WPA_CONF:-/data/wpa_supplicant.conf}"
 WPA_BACKUP="${WPA_BACKUP:-/data/wpa_supplicant.conf.last-good}"
 RECORDINGS="${RECORDINGS:-/mnt/media/recordings}"
+if [ -s /var/run/wificam-media ]; then
+    RECORDINGS="$(cat /var/run/wificam-media)/recordings"
+fi
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
 AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
