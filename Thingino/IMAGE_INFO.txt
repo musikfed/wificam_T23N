@@ -32,3 +32,12 @@ Web UI: MANDATORY and VERIFIED inside rootfs.ext2
 Web URL after boot: http://CAMERA_IP:8080/
 Root: /dev/mmcblk0p2 ext4
 Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
+
+
+WEB ACCESS / ДОСТУП К WEB:
+Thingino stock UI: http://CAMERA_IP/ or https://CAMERA_IP/
+Thingino default login/password: root / root
+PegineLab WIFICAM: http://CAMERA_IP:8080/
+WIFICAM first boot: unauthenticated local bootstrap (ALLOW_UNAUTHENTICATED_WEB=1)
+WIFICAM password helper default username: admin
+Note: https://CAMERA_IP/login.html is the stock Thingino UI, not PegineLab WIFICAM.
