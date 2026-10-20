@@ -4,6 +4,10 @@ set -eu
 CONF=/etc/wificam/wificam.conf
 [ -f "$CONF" ] && . "$CONF"
 
+MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
+RECORDINGS="${RECORDINGS:-$MEDIA_MOUNT/recordings}"
+SNAPSHOTS="${SNAPSHOTS:-$MEDIA_MOUNT/snapshots}"
+
 run_cfg() {
     NAME="$1"
     eval "CMD=\${$NAME:-}"
@@ -12,14 +16,14 @@ run_cfg() {
 }
 
 camera_running() {
-    for proc in majestic camera-daemon impstreamer; do
+    for proc in prudynt majestic camera-daemon impstreamer; do
         pidof "$proc" >/dev/null 2>&1 && return 0
     done
     return 1
 }
 
 os_camera_service() {
-    for svc in /etc/init.d/S95majestic /etc/init.d/majestic /etc/init.d/S95camera /etc/init.d/camera; do
+    for svc in /etc/init.d/S31prudynt /etc/init.d/S95majestic /etc/init.d/majestic /etc/init.d/S95camera /etc/init.d/camera; do
         [ -x "$svc" ] && { echo "$svc"; return 0; }
     done
     return 1
@@ -44,18 +48,74 @@ stop_camera() {
     "$svc" stop
 }
 
+snapshot_camera() {
+    if run_cfg CAMERA_SNAPSHOT_CMD; then
+        return 0
+    fi
+
+    if command -v prudyntctl >/dev/null 2>&1; then
+        mkdir -p "$SNAPSHOTS"
+        file="$SNAPSHOTS/snapshot_$(date +%Y%m%d_%H%M%S).jpg"
+        prudyntctl snapshot -c 0 > "$file"
+        [ -s "$file" ] || { rm -f "$file"; echo "prudynt snapshot failed" >&2; return 1; }
+        echo "$file"
+        return 0
+    fi
+
+    echo "snapshot hook not exposed by OS camera service" >&2
+    return 3
+}
+
+record_start() {
+    if run_cfg RECORD_START_CMD; then
+        return 0
+    fi
+
+    mkdir -p "$RECORDINGS"
+
+    if command -v record >/dev/null 2>&1; then
+        record -c 0 -m "$MEDIA_MOUNT" -s recordings start
+        echo "recording-started"
+        return 0
+    fi
+
+    if [ -p /run/prudynt/mp4ctl ]; then
+        printf 'START mount=%s dir=recordings name=%%Y/%%m/%%d/%%H-%%M-%%S dur=60 ch=0 loop=1\n' "$MEDIA_MOUNT" > /run/prudynt/mp4ctl
+        echo "recording-started"
+        return 0
+    fi
+
+    echo "record-start hook not exposed by OS camera service" >&2
+    return 3
+}
+
+record_stop() {
+    if run_cfg RECORD_STOP_CMD; then
+        return 0
+    fi
+
+    if command -v record >/dev/null 2>&1; then
+        record -c 0 stop
+        echo "recording-stopped"
+        return 0
+    fi
+
+    if [ -p /run/prudynt/mp4ctl ]; then
+        printf 'STOP\n' > /run/prudynt/mp4ctl
+        echo "recording-stopped"
+        return 0
+    fi
+
+    echo "record-stop hook not exposed by OS camera service" >&2
+    return 3
+}
+
 case "${1:-}" in
   start) start_camera ;;
   stop) stop_camera ;;
-  snapshot)
-    run_cfg CAMERA_SNAPSHOT_CMD || { echo "snapshot hook not exposed by OS camera service"; exit 3; }
-    ;;
-  record-start)
-    run_cfg RECORD_START_CMD || { echo "record-start hook not exposed by OS camera service"; exit 3; }
-    ;;
-  record-stop)
-    run_cfg RECORD_STOP_CMD || { echo "record-stop hook not exposed by OS camera service"; exit 3; }
-    ;;
+  snapshot) snapshot_camera ;;
+  record-start) record_start ;;
+  record-stop) record_stop ;;
   status)
     if camera_running; then
         echo "running"
