@@ -61,22 +61,32 @@ WIFICAM включает:
 
 ```sh
 cd ~/myipcam/wificam_T23N
+git pull
 PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 ```
 
+**Отдельно клонировать Thingino вручную больше не требуется.** Если каталога
+нет, build-script создаст его сам.
+
 Скрипт:
 
-1. использует Thingino checkout в `~/myipcam/thingino-firmware` или
-   `~/thingino-firmware`;
-2. собирает профиль `galayou_g2_t23n_sc2336_atbm6012bx`;
-3. включает MMC0 1-bit boot;
-4. задаёт root `/dev/mmcblk0p2`, ext4;
-5. включает BusyBox httpd для отдельной WIFICAM на TCP 8080;
-6. добавляет WIFICAM непосредственно в Buildroot rootfs overlay;
-7. проверяет WIFICAM в build target и в самом `rootfs.ext2` через `debugfs`;
-8. копирует готовый disk image в `Thingino/thingino-t23-sd.bin`;
-9. создаёт SHA256 и `Thingino/IMAGE_INFO.txt`;
-10. при `PUBLISH=1` делает commit и push в текущую ветку.
+1. ищет Thingino checkout в `~/myipcam/thingino-firmware`,
+   `~/thingino-firmware` или `~/myipcam/Thingino/thingino-firmware`;
+2. если checkout отсутствует, **сам клонирует**
+   `https://github.com/themactep/thingino-firmware.git` с submodules в
+   `~/myipcam/thingino-firmware`;
+3. checkout переводится на зафиксированный commit
+   `9925f46f73b9c39ec8d2a65134b18c94e6fdfb97`, чтобы upstream не менялся
+   между попытками;
+4. собирает профиль `galayou_g2_t23n_sc2336_atbm6012bx`;
+5. включает MMC0 1-bit boot;
+6. задаёт root `/dev/mmcblk0p2`, ext4;
+7. включает BusyBox httpd для отдельной WIFICAM на TCP 8080;
+8. добавляет WIFICAM непосредственно в Buildroot rootfs overlay;
+9. проверяет WIFICAM в build target и в самом `rootfs.ext2` через `debugfs`;
+10. копирует готовый disk image в `Thingino/thingino-t23-sd.bin`;
+11. создаёт SHA256 и `Thingino/IMAGE_INFO.txt`;
+12. при `PUBLISH=1` делает commit и push в текущую ветку.
 
 Если существует исторический файл
 `/mnt/d/Thingino/thingino-t23-sd.bin`, его размер и SHA256 также заносятся в
