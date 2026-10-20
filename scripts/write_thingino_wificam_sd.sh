@@ -53,10 +53,10 @@ echo "  size   : $IMAGE_SIZE bytes"
 echo "  SHA256 : $IMAGE_SHA"
 echo
 echo "This writes the complete Thingino MMC SD image:"
-echo "  sector 0       : INGE + DOS/MBR partition table"
+echo "  sector 0       : DOS/MBR partition table"
 echo "  sector 34      : SPL/MSPL"
 echo "  sector 86      : U-Boot proper"
-echo "  p1 @ 1 MiB     : FAT32 /uImage"
+echo "  p1 @ 1 MiB     : FAT16 /uImage"
 echo "  p2 @ 17 MiB    : ext4 rootfs with PegineLab WIFICAM"
 echo "  Web UI         : http://CAMERA_IP:8080/"
 echo
@@ -75,8 +75,6 @@ blockdev --flushbufs "$DEV" 2>/dev/null || true
 READ_SHA="$(head -c "$IMAGE_SIZE" "$DEV" | sha256sum | awk '{print $1}')"
 [ "$READ_SHA" = "$IMAGE_SHA" ] || die "full image readback SHA mismatch"
 
-INGE="$(dd if="$DEV" bs=1 count=4 status=none 2>/dev/null)"
-[ "$INGE" = "INGE" ] || die "INGE header missing at byte 0"
 
 MSPL="$(dd if="$DEV" bs=512 skip=34 count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
 [ "$MSPL" = "4d53504c" ] || die "MSPL magic missing at LBA34: $MSPL"
@@ -103,7 +101,6 @@ P2_START="$(lsblk -bn -o START "$P2" | tr -d ' ')"
 echo
 echo "THINGINO WIFICAM SD WRITE: VERIFIED"
 echo "Full readback SHA256 : $READ_SHA"
-echo "Header byte 0       : INGE"
 echo "MBR signature       : $MBR_SIG"
 echo "LBA34 MSPL magic    : $MSPL"
 echo "p1 start            : sector $P1_START"
