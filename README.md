@@ -65,8 +65,15 @@ Thingino/IMAGE_INFO.txt
 Он собирается скриптом:
 
 ```sh
+cd ~/myipcam/wificam_T23N
+git pull
 PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 ```
+
+Отдельный ручной clone Thingino не требуется: если checkout отсутствует,
+скрипт сам клонирует upstream с submodules в
+`~/myipcam/thingino-firmware` и фиксирует его на commit
+`9925f46f73b9c39ec8d2a65134b18c94e6fdfb97`.
 
 Скрипт не публикует образ, если не доказано, что PegineLab WIFICAM реально
 находится внутри `p2/rootfs.ext2`. Проверяются `index.html`, init-script,
@@ -214,10 +221,11 @@ Ubuntu/WSL:
 нельзя. Старые разделы `BOOT/ROOTFS/MEDIA` после подключения допустимы:
 recovery-скрипт сам переразметит карту.
 
-## Этап 1 — воспроизвести исторически работавшую Thingino SD
+## Legacy fallback — исторический Thingino installer path
 
-Сейчас это **основной диагностический сценарий**. До подтверждения загрузки
-камеры не создаём ROOTFS/MEDIA и не запускаем полный SD-root flash.
+Этот сценарий сохранён как **отдельный fallback/диагностика**, если canonical
+direct-MMC Thingino image не стартует. Он больше не является основным путём и
+не должен смешиваться с `Thingino/thingino-t23-sd.bin`.
 
 Точная геометрия:
 
@@ -318,23 +326,18 @@ userspace имеет рабочий framebuffer/audio player. Копии logo/ji
 
 ## Web
 
-После успешной загрузки и получения IP:
+После успешной загрузки canonical Thingino image и получения IP:
 
 ```text
-OpenIPC/Majestic: http://CAMERA_IP/
-WIFICAM:          http://CAMERA_IP:8080/
+Thingino:          http://CAMERA_IP/
+PegineLab WIFICAM: http://CAMERA_IP:8080/
 ```
 
 WIFICAM на первом локальном запуске позволяет задать Web password, затем
 перезапускается с authentication.
 
-SSH, WireGuard и AmneziaWG по умолчанию выключены. Их marker-файлы:
-
-```text
-/data/services/ssh.enabled
-/data/services/wireguard.enabled
-/data/services/amneziawg.enabled
-```
+SSH, WireGuard и AmneziaWG по умолчанию выключены. Persistent marker-файлы
+WIFICAM хранятся под `/opt/wificam/services/`.
 
 ## MEDIA
 
