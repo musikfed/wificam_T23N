@@ -15,7 +15,7 @@
 - U-Boot proper на LBA86;
 - FAT16 boot partition с `/uImage`;
 - ext4 rootfs на `/dev/mmcblk0p2`;
-- PegineLab WIFICAM работает на `http://CAMERA_IP:8080/`.
+- PegineLab WIFICAM включена в rootfs; runtime-проверка `http://CAMERA_IP:8080/` ещё требуется.
 
 Файл:
 `Thingino/thingino-t23-sd.bin`
@@ -44,7 +44,7 @@ Verified on the target camera:
 - U-Boot proper at LBA86;
 - FAT16 boot partition with `/uImage`;
 - ext4 rootfs at `/dev/mmcblk0p2`;
-- PegineLab WIFICAM working at `http://CAMERA_IP:8080/`.
+- PegineLab WIFICAM is embedded in rootfs; runtime verification at `http://CAMERA_IP:8080/` is still required.
 
 Image:
 `Thingino/thingino-t23-sd.bin`
