@@ -1,0 +1,20 @@
+#!/bin/sh
+set -u
+
+echo "Cache-Control: no-store"
+
+if command -v prudyntctl >/dev/null 2>&1; then
+    TMP="$(mktemp /tmp/wificam-snap.XXXXXX.jpg)" || exit 1
+    trap 'rm -f "$TMP"' EXIT INT TERM
+    if prudyntctl snapshot -c 0 >"$TMP" 2>/dev/null && [ -s "$TMP" ]; then
+        echo "Content-Type: image/jpeg"
+        echo
+        cat "$TMP"
+        exit 0
+    fi
+fi
+
+echo "Status: 503 Service Unavailable"
+echo "Content-Type: text/plain; charset=utf-8"
+echo
+echo "snapshot unavailable"
