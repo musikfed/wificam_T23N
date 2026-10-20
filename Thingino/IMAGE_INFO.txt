@@ -1,57 +1,29 @@
 PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
 
-STATUS / СТАТУС:
-BUILD PIPELINE FIXED AFTER 2026-10-20 CLEANBUILD; NEXT LOCAL RUN REQUIRED
-
 RU:
-Канонический файл:
-  Thingino/thingino-t23-sd.bin
-
-Профиль:
-  galayou_g2_t23n_sc2336_atbm6012bx
-
-Pinned Thingino:
-  9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
-
-Лог cleanbuild от 2026-10-20 доказал, что стандартный файл
-  images/thingino-galayou_g2_t23n_sc2336_atbm6012bx.bin
-является 8 MiB SFC/SPI image с MTD-разметкой. Он НЕ является direct-SD image и
-больше не копируется/публикуется под именем thingino-t23-sd.bin.
-
-Исправленный pipeline:
-  1. Thingino cleanbuild/fast;
-  2. явный Buildroot rootfs-ext2, если rootfs.ext2 не был создан;
-  3. проверка PegineLab WIFICAM внутри rootfs.ext2;
-  4. pinned MMC SPL/U-Boot на LBA34;
-  5. p1: FAT16 16 MiB с /uImage;
-  6. p2: ext4 rootfs на LBA34816 (/dev/mmcblk0p2);
-  7. SHA/readback verification;
-  8. только после этого PUBLISH.
+Профиль-кандидат: galayou_g2_t23n_sc2336_atbm6012bx
+Источник Thingino: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
+Файл: Thingino/thingino-t23-sd.bin
+Размер: 84934656 bytes
+SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
+Исторический локальный reference: /mnt/d/Thingino/thingino-t23-sd.bin
+Reference size: 89128960
+Reference SHA256: 038d032f20c90b444f13f936f6f4bbae88b3f07bd148f3cfc733607ca736e30d
+Web UI: ОБЯЗАТЕЛЬНО ПРОВЕРЕНА в rootfs.ext2
+Web URL после загрузки: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
 
 EN:
-Canonical file:
-  Thingino/thingino-t23-sd.bin
-
-Profile:
-  galayou_g2_t23n_sc2336_atbm6012bx
-
-Pinned Thingino:
-  9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
-
-The 2026-10-20 cleanbuild log proves that the normal
-  images/thingino-galayou_g2_t23n_sc2336_atbm6012bx.bin
-is an 8 MiB SFC/SPI flash image with an MTD layout. It is NOT the direct-SD
-image and is no longer copied/published as thingino-t23-sd.bin.
-
-The fixed pipeline explicitly creates the ext4 rootfs, verifies WIFICAM inside
-it, combines the pinned MMC U-Boot at LBA34 with a FAT16 boot partition and
-ext4 p2, verifies readback hashes, and only then allows publishing.
-
-
-BusyBox FAST self-heal / автоисправление FAST:
-- Current WIFICAM server: BusyBox httpd on TCP 8080.
-- Required BusyBox features only: CONFIG_HTTPD, CONFIG_FEATURE_HTTPD_CGI,
-  CONFIG_FEATURE_HTTPD_BASIC_AUTH, CONFIG_FEATURE_HTTPD_AUTH_MD5.
-- A stale FAST-build BusyBox .config is detected automatically.
-- The wrapper runs br-busybox-reconfigure and then regenerates rootfs.ext2
-  before SD image assembly.
+Candidate profile: galayou_g2_t23n_sc2336_atbm6012bx
+Thingino source: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
+File: Thingino/thingino-t23-sd.bin
+Size: 84934656 bytes
+SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
+Historical local reference: /mnt/d/Thingino/thingino-t23-sd.bin
+Reference size: 89128960
+Reference SHA256: 038d032f20c90b444f13f936f6f4bbae88b3f07bd148f3cfc733607ca736e30d
+Web UI: MANDATORY and VERIFIED inside rootfs.ext2
+Web URL after boot: http://CAMERA_IP:8080/
+Root: /dev/mmcblk0p2 ext4
+Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
