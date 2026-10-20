@@ -30,6 +30,16 @@ usage() {
 }
 
 [ -n "$DEV" ] || usage
+
+# Do not overwrite the known-working recovery geometry until real hardware has
+# confirmed BootROM -> SD -> SPL. The full SD-root layout remains experimental.
+[ "${ALLOW_EXPERIMENTAL_SDROOT:-0}" = "1" ] || {
+    echo "REFUSING: full SD-root is gated until the one-partition Thingino recovery test boots on real hardware." >&2
+    echo "Run first: scripts/prepare_legacy_thingino_sd.sh" >&2
+    echo "After hardware confirmation only, retry with ALLOW_EXPERIMENTAL_SDROOT=1." >&2
+    exit 1
+}
+
 [ "$(id -u)" -eq 0 ] || die "run with sudo/root"
 [ -b "$DEV" ] || die "not a block device: $DEV"
 [ "$(lsblk -dn -o TYPE "$DEV" 2>/dev/null)" = "disk" ] || die "$DEV is not a whole disk"
