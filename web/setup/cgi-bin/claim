@@ -53,6 +53,10 @@ supplied="$(param csrf)"
 
 password="$(param password)"
 [ "${#password}" -ge 10 ] || fail "password must be at least 10 characters"
+[ "${#password}" -le 64 ] || fail "password must be at most 64 characters"
+if printf '%s' "$password" | LC_ALL=C grep -q '[^!-~]'; then
+    fail "password must use printable ASCII characters only"
+fi
 
 out="$(printf '%s' "$password" | wificam-set-web-password admin 2>&1)" || fail "$out"
 
