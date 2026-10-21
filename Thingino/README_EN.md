@@ -290,3 +290,15 @@ scripts/verify_legacy_thingino_sd.sh
 ```
 
 Do not mix it with the canonical direct-MMC image. They are separate boot tests.
+
+### PegineLab 0.1_test login
+
+```text
+http://CAMERA_IP:8090/
+user: admin
+password: Wificam12345
+```
+
+These are public LAN-only test credentials. Change them after login from the
+System page. Production builds should disable test auto-provision and use the
+first-boot claim flow.
