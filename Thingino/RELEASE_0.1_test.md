@@ -82,3 +82,22 @@ configured, the default WIFICAM username is `admin`.
 Hardware testing showed that Thingino already owns TCP 8080 for its camera/API
 stack. PegineLab WIFICAM is therefore assigned TCP **8090**. This is a
 userspace-only change and does not require rebuilding the kernel.
+
+
+## Known issue in the first hardware-booted image / известная ошибка первого образа
+
+The image SHA256 `f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be`
+is confirmed to boot from SD, but its baked WIFICAM runtime is older than the
+current source. It contains the original 8080/bootstrap-httpd behavior.
+
+Current source has already fixed the web runtime:
+- PegineLab moved to TCP 8090;
+- BusyBox httpd is isolated from Thingino `/etc/httpd.conf`;
+- first boot exposes only the admin password claim page;
+- BusyBox-incompatible `od -A/-N` use was removed.
+
+Until a refreshed image is assembled, the old card can be recovered over SSH
+by creating the PegineLab `admin` password and restarting the web services as
+documented in `docs/FIRST_BOOT_SSH_RU.md`.
+
+These are userspace/rootfs changes; a Linux kernel rebuild is not required.
