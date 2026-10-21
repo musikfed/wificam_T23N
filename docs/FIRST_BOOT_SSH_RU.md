@@ -1,3 +1,38 @@
+## Тестовый вход 0.1_test
+
+Для текущей тестовой ветки PegineLab WIFICAM использует заранее известные
+LAN-only реквизиты:
+
+```text
+URL:      http://CAMERA_IP:8090/
+login:    admin
+password: Wificam12345
+```
+
+Это **не production-настройка**. Она введена специально для аппаратной
+отладки, чтобы исключить несовместимость MD5-crypt BusyBox/uClibc и каждый
+раз гарантированно попадать в Web UI.
+
+В сборке:
+
+```text
+AUTO_PROVISION_TEST_WEB_AUTH=1
+DEFAULT_WEB_USER=admin
+DEFAULT_WEB_PASSWORD=Wificam12345
+AUTH_PASSWORD_MODE=plain
+```
+
+Если `/opt/wificam/httpd.conf` отсутствует, `S90wificam` создаёт его
+автоматически. После входа пароль можно сменить в разделе **Система**.
+
+Для production вернуть first-boot страницу:
+
+```sh
+sed -i 's/^AUTO_PROVISION_TEST_WEB_AUTH=.*/AUTO_PROVISION_TEST_WEB_AUTH=0/' /etc/wificam/wificam.conf
+rm -f /opt/wificam/httpd.conf
+/etc/init.d/S90wificam restart
+```
+
 # PegineLab WIFICAM — первый запуск, авторизация и SSH
 
 ## Web endpoints
