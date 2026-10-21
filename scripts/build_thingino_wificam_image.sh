@@ -302,7 +302,7 @@ SHA256: $IMAGE_SHA
 Reference size: $HISTORICAL_SIZE
 Reference SHA256: $HISTORICAL_SHA
 Web UI: ОБЯЗАТЕЛЬНО ПРОВЕРЕНА в rootfs.ext2
-Web URL после загрузки: http://CAMERA_IP:8080/
+Web URL после загрузки: http://CAMERA_IP:8090/
 Root: /dev/mmcblk0p2 ext4
 Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
 
@@ -316,7 +316,7 @@ Historical local reference: $HISTORICAL_REFERENCE
 Reference size: $HISTORICAL_SIZE
 Reference SHA256: $HISTORICAL_SHA
 Web UI: MANDATORY and VERIFIED inside rootfs.ext2
-Web URL after boot: http://CAMERA_IP:8080/
+Web URL after boot: http://CAMERA_IP:8090/
 Root: /dev/mmcblk0p2 ext4
 Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
 EOF
@@ -330,7 +330,7 @@ echo "SHA256        : $IMAGE_SHA"
 echo "Historical    : $HISTORICAL_REFERENCE"
 echo "Historical SHA: $HISTORICAL_SHA"
 echo "Web UI        : VERIFIED inside p2 rootfs.ext2"
-echo "Web URL       : http://CAMERA_IP:8080/"
+echo "Web URL       : http://CAMERA_IP:8090/"
 echo
 
 if [ "$PUBLISH" = "1" ]; then
