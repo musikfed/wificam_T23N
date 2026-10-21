@@ -66,7 +66,7 @@
         <h2 data-i18n="optionalServices">Дополнительные сервисы</h2>
         <p class="muted" data-i18n="servicesHint">Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.</p>
         <div class="service-grid">
-          <article class="service-card"><div><h3>SSH</h3><p>Remote shell • TCP 22</p><span id="sshState" class="service-state">—</span></div><button id="sshToggle" onclick="toggleService('ssh')">—</button></article>
+          <article class="service-card"><div><h3>SSH</h3><p>Local recovery shell • TCP 22 • protected</p><span id="sshState" class="service-state">—</span></div><button id="sshToggle" onclick="toggleService('ssh')">—</button></article>
           <article class="service-card"><div><h3>WireGuard</h3><p><code>/data/vpn/wg0.conf</code></p><span id="wireguardState" class="service-state">—</span></div><button id="wireguardToggle" onclick="toggleService('wireguard')">—</button></article>
           <article class="service-card"><div><h3>AmneziaWG</h3><p><code>/data/vpn/awg0.conf</code></p><span id="amneziawgState" class="service-state">—</span></div><button id="amneziawgToggle" onclick="toggleService('amneziawg')">—</button></article>
         </div>
