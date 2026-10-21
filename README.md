@@ -20,9 +20,9 @@ SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
 ```
 
 Подтверждено: запись SD, полный SHA readback, MBR, MSPL на LBA34,
-разделы и фактическая загрузка Thingino с SD. Runtime PegineLab WIFICAM на
-TCP 8090 проверяется отдельно; наличие файлов WIFICAM внутри rootfs уже
-проверяется build pipeline.
+разделы, фактическая загрузка Thingino с SD и вход в PegineLab WIFICAM на
+TCP 8090 с тестовыми реквизитами. На текущем аппаратном тесте статическая UI
+работает; API/snapshot проверяются отдельно.
 
 
 ![PegineLab](web/assets/peginelab-logo.svg)
@@ -115,10 +115,12 @@ PegineLab WIFICAM    : http://CAMERA_IP:8090/
 это **штатная Thingino Web UI**, а не ошибка и не PegineLab. Для WIFICAM нужно
 явно открыть **HTTP port 8090**.
 
-На первом запуске WIFICAM настроена как локальный bootstrap без HTTP-аутентификации
-(`ALLOW_UNAUTHENTICATED_WEB=1`). После задания пароля WIFICAM использует
-отдельную Basic Auth; пользователь по умолчанию для команды установки пароля —
-`admin`.
+Для `0.1_test` используется детерминированный LAN-only вход:
+`admin / Wificam12345`. `S90wificam` автоматически создаёт отдельный
+`/opt/wificam/httpd.conf` с `H:/usr/share/wificam-web`, поэтому Thingino
+`/etc/httpd.conf` больше не может подменить webroot. Production-режим
+first-boot claim сохраняется, но в тестовой ветке отключён auto-provision only
+после аппаратной отладки.
 
 The canonical image is a **direct MMC/SD disk image**. It is written to the
 whole SD card and boots `uImage` from p1 with ext4 root on
@@ -406,8 +408,10 @@ cat /var/log/wificam-httpd.log
 /etc/init.d/S90wificam restart
 ```
 
-SSH, WireGuard и AmneziaWG по умолчанию выключены. Persistent marker-файлы
-WIFICAM хранятся под `/opt/wificam/services/`.
+SSH/Dropbear для `0.1_test` считается обязательным локальным recovery-каналом
+и защищён `SSH_PROTECT=1`: PegineLab не должна случайно выключить SSH.
+WireGuard и AmneziaWG остаются опциональными. Persistent marker-файлы WIFICAM
+хранятся под `/opt/wificam/services/`.
 
 ## MEDIA
 
@@ -454,3 +458,28 @@ password: Wificam12345
 Это публичные LAN-only тестовые реквизиты. После входа пароль меняется в
 разделе **Система**. Для production тестовый auto-provision отключается и
 используется first-boot claim.
+
+
+## Локальное / безоблачное владение
+
+Цель этой ветки — камера, которая остаётся управляемой локально без внешнего
+облака. Для диагностики и восстановления сохраняется SSH/Dropbear на TCP 22.
+Build pipeline теперь проверяет наличие Dropbear и его init-script прямо в
+`rootfs.ext2`; если SSH исчезнет, сборка должна завершиться ошибкой.
+
+Проверенные тестовые доступы:
+
+```text
+Thingino SSH : root / root
+PegineLab UI : admin / Wificam12345
+PegineLab URL: http://CAMERA_IP:8090/
+```
+
+Для старого аппаратно проверенного image `f9f50a...` есть one-shot recovery:
+
+```sh
+scp -O scripts/camera_fix_wificam_0_1_test.sh root@CAMERA_IP:/tmp/
+ssh root@CAMERA_IP 'sh /tmp/camera_fix_wificam_0_1_test.sh'
+```
+
+Скрипт не останавливает и не меняет Dropbear/SSH.
