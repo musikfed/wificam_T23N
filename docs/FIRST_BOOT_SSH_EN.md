@@ -98,3 +98,32 @@ This is a userspace-only change.
 - SSH default: `root/root`, unless changed.
 - Host identification changed: remove stale known_hosts entry only after an
   expected reflash/key change.
+
+
+## Thingino/Raptor still appears on port 8090
+
+This was diagnosed on the first hardware `0.1_test`. The old bootstrap
+started BusyBox `httpd` without `-c`, so BusyBox loaded Thingino's
+`/etc/httpd.conf`. Its `H:/var/www` directive overrides PegineLab's
+`-h /usr/share/wificam-web`, making the PegineLab process serve Thingino.
+
+Current code always passes a private bootstrap config and never reads
+Thingino's `/etc/httpd.conf`.
+
+For an already-flashed old card, create PegineLab authentication first:
+
+```sh
+grep -m1 -E 'PegineLab|WIFICAM' /usr/share/wificam-web/index.html
+printf '%s' 'NEW_PASSWORD_AT_LEAST_10' | wificam-set-web-password admin
+/etc/init.d/S90wificam stop 2>/dev/null || true
+killall httpd 2>/dev/null || true
+/etc/init.d/S90httpd start
+/etc/init.d/S90wificam start
+sleep 2
+curl -s http://127.0.0.1:8090/ | head -n 12
+```
+
+Open `http://CAMERA_IP:8090/`, not Thingino's `/preview.html`.
+
+The BusyBox `od: invalid option -- A` issue is also fixed: current CSRF
+generation uses `dd /dev/urandom | sha256sum` and does not require GNU od.
