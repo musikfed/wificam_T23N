@@ -235,6 +235,13 @@ rm -f "$ROOTFS_EXT"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/snapshot.jpg" ] || die "snapshot CGI missing/not executable"
 [ -f "$TARGET/usr/share/wificam-web/setup/index.html" ] || die "WIFICAM first-boot setup page missing"
 [ -x "$TARGET/usr/share/wificam-web/setup/cgi-bin/claim" ] || die "WIFICAM first-boot claim CGI missing/not executable"
+grep -q 'BOOTSTRAP_CONF=' "$TARGET/etc/init.d/S90wificam" || \
+    die "S90wificam does not isolate bootstrap httpd config from Thingino"
+grep -q 'start_httpd .*BOOTSTRAP_CONF' "$TARGET/etc/init.d/S90wificam" || \
+    die "S90wificam bootstrap does not pass a private -c config"
+if grep -q 'od -A' "$TARGET/etc/init.d/S90wificam"; then
+    die "S90wificam uses BusyBox-incompatible od -A option"
+fi
 
 grep -q 'PegineLab WIFICAM T23N' "$TARGET/usr/share/wificam-web/index.html" || \
     die "wrong Web UI staged in target"
