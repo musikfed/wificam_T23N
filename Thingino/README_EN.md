@@ -1,5 +1,7 @@
 # Thingino T23N SD + PegineLab WIFICAM
 
+Detailed first boot, authentication, Windows/Linux SSH and troubleshooting: `../docs/FIRST_BOOT_SSH_EN.md`.
+
 ## 0.1_test status
 
 **HARDWARE VERIFIED on 2026-10-21.** The canonical
