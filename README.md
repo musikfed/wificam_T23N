@@ -129,6 +129,8 @@ English instructions: `Thingino/README_EN.md`
 
 Первый запуск / SSH / типовые ошибки: `docs/FIRST_BOOT_SSH_RU.md`  
 First boot / SSH / troubleshooting: `docs/FIRST_BOOT_SSH_EN.md`
+Оптимизация загрузки: `docs/BOOT_OPTIMIZATION_RU.md`  
+Boot/runtime optimization: `docs/BOOT_OPTIMIZATION_EN.md`
 
 ## Разметка SD
 
