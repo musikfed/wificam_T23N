@@ -233,6 +233,8 @@ rm -f "$ROOTFS_EXT"
 [ -x "$TARGET/etc/init.d/S90wificam" ] || die "S90wificam missing/not executable in target rootfs"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/api" ] || die "WIFICAM API missing/not executable"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/snapshot.jpg" ] || die "snapshot CGI missing/not executable"
+[ -f "$TARGET/usr/share/wificam-web/setup/index.html" ] || die "WIFICAM first-boot setup page missing"
+[ -x "$TARGET/usr/share/wificam-web/setup/cgi-bin/claim" ] || die "WIFICAM first-boot claim CGI missing/not executable"
 
 grep -q 'PegineLab WIFICAM T23N' "$TARGET/usr/share/wificam-web/index.html" || \
     die "wrong Web UI staged in target"
@@ -251,6 +253,10 @@ debugfs -R 'stat /usr/share/wificam-web/cgi-bin/api' "$ROOTFS_EXT" 2>&1 | grep -
     die "WIFICAM API is absent from rootfs.ext2"
 debugfs -R 'stat /usr/share/wificam-web/cgi-bin/snapshot.jpg' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "WIFICAM snapshot CGI is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/setup/index.html' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM first-boot setup page is absent from rootfs.ext2"
+debugfs -R 'stat /usr/share/wificam-web/setup/cgi-bin/claim' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "WIFICAM first-boot claim CGI is absent from rootfs.ext2"
 
 if command -v dumpe2fs >/dev/null 2>&1; then
     ROOTFS_FEATURES="$(dumpe2fs -h "$ROOTFS_EXT" 2>/dev/null | sed -n 's/^Filesystem features:[[:space:]]*//p')"
