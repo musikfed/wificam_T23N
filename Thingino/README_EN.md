@@ -8,7 +8,7 @@ Boot/runtime optimization and required Raptor services: `../docs/BOOT_OPTIMIZATI
 **HARDWARE VERIFIED on 2026-10-21.** The canonical
 `Thingino/thingino-t23-sd.bin` was written to SD, passed full readback
 SHA256/MBR/MSPL/partition verification, and booted on the target camera.
-SD boot is confirmed. Runtime access to PegineLab WIFICAM on `:8090` is verified separately.
+SD boot and PegineLab WIFICAM login on `:8090` are hardware verified. API/snapshot are checked separately.
 
 Pinned SHA256:
 
@@ -75,8 +75,10 @@ that is the normal stock Thingino UI. Open `http://CAMERA_IP:8090/`
 explicitly for PegineLab.
 
 The first WIFICAM boot is configured as an unauthenticated local bootstrap:
-`ALLOW_UNAUTHENTICATED_WEB=1`. After a password is set, WIFICAM restarts
-with Basic Auth. The default username used by the password helper is `admin`.
+The `0.1_test` branch uses deterministic LAN-only credentials
+`admin / Wificam12345`. BusyBox httpd receives
+`H:/usr/share/wificam-web`, preventing the stock Thingino webroot from
+overriding PegineLab. Production first-boot claim remains a separate mode.
 
 WIFICAM provides:
 
@@ -87,7 +89,7 @@ WIFICAM provides:
 - snapshot and recording controls;
 - Wi-Fi status/configuration;
 - storage status;
-- optional SSH / WireGuard / AmneziaWG controls;
+- protected SSH/Dropbear recovery channel plus optional WireGuard / AmneziaWG controls;
 - persistent WIFICAM state under `/opt/wificam`.
 
 The build script **fails and refuses to publish the image** unless WIFICAM is
@@ -302,3 +304,15 @@ password: Wificam12345
 These are public LAN-only test credentials. Change them after login from the
 System page. Production builds should disable test auto-provision and use the
 first-boot claim flow.
+
+
+## SSH / local ownership
+
+For `0.1_test`, Dropbear SSH on TCP 22 is mandatory and protected:
+
+```text
+SSH_PROTECT=1
+```
+
+The Web UI cannot accidentally disable SSH. The build verifies Dropbear and
+its init script inside `rootfs.ext2`, preserving a local recovery path.
