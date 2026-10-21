@@ -63,3 +63,11 @@ Current source fixes these with WEB_PORT=8090, a private httpd bootstrap config,
 a first-boot admin claim page, and portable CSRF generation.
 A new SD binary must be assembled before claiming these fixes are baked into the image.
 Kernel rebuild is not required for these userspace changes.
+
+
+0.1_TEST WEB LOGIN / ТЕСТОВЫЙ ВХОД:
+URL: http://CAMERA_IP:8090/
+User: admin
+Password: Wificam12345
+Mode: LAN-only test credentials, BusyBox plaintext auth compatibility mode.
+Production: disable AUTO_PROVISION_TEST_WEB_AUTH and use first-boot claim.
