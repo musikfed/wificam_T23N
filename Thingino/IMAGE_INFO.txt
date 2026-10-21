@@ -2,7 +2,7 @@ PegineLab WIFICAM T23N — hardware-verified Thingino MMC SD image
 
 STATUS / СТАТУС:
 0.1_test — АППАРАТНО ПОДТВЕРЖДЕНО / HARDWARE VERIFIED
-2026-10-21: загрузка с SD подтверждена на целевой камере; runtime-проверка PegineLab WIFICAM на :8080 ожидается.
+2026-10-21: загрузка с SD подтверждена на целевой камере; runtime-проверка PegineLab WIFICAM на :8090 ожидается.
 
 RU:
 Профиль: galayou_g2_t23n_sc2336_atbm6012bx
@@ -14,12 +14,12 @@ SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
 Reference size: 89128960
 Reference SHA256: 038d032f20c90b444f13f936f6f4bbae88b3f07bd148f3cfc733607ca736e30d
 Web UI: ОБЯЗАТЕЛЬНО ПРОВЕРЕНА в rootfs.ext2
-Web URL после загрузки: http://CAMERA_IP:8080/
+Web URL после загрузки: http://CAMERA_IP:8090/
 Root: /dev/mmcblk0p2 ext4
 Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
 
 EN:
-2026-10-21: SD boot confirmed on the target camera; PegineLab WIFICAM runtime verification on :8080 is still pending.
+2026-10-21: SD boot confirmed on the target camera; PegineLab WIFICAM runtime verification on :8090 is still pending.
 Profile: galayou_g2_t23n_sc2336_atbm6012bx
 Thingino source: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
 File: Thingino/thingino-t23-sd.bin
@@ -29,7 +29,7 @@ Historical local reference: /mnt/d/Thingino/thingino-t23-sd.bin
 Reference size: 89128960
 Reference SHA256: 038d032f20c90b444f13f936f6f4bbae88b3f07bd148f3cfc733607ca736e30d
 Web UI: MANDATORY and VERIFIED inside rootfs.ext2
-Web URL after boot: http://CAMERA_IP:8080/
+Web URL after boot: http://CAMERA_IP:8090/
 Root: /dev/mmcblk0p2 ext4
 Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
 
@@ -37,7 +37,14 @@ Purpose: direct MMC/SD boot image, NOT an SPI autoupdate payload.
 WEB ACCESS / ДОСТУП К WEB:
 Thingino stock UI: http://CAMERA_IP/ or https://CAMERA_IP/
 Thingino default login/password: root / root
-PegineLab WIFICAM: http://CAMERA_IP:8080/
+PegineLab WIFICAM: http://CAMERA_IP:8090/
 WIFICAM first boot: unauthenticated local bootstrap (ALLOW_UNAUTHENTICATED_WEB=1)
 WIFICAM password helper default username: admin
 Note: https://CAMERA_IP/login.html is the stock Thingino UI, not PegineLab WIFICAM.
+
+
+PORT NOTE / ПРИМЕЧАНИЕ О ПОРТАХ:
+Thingino reserved camera/API port: 8080
+PegineLab WIFICAM port: 8090
+Reason: hardware test showed Thingino/Raptor camera API already occupies 8080.
+Kernel rebuild is NOT required for this port change.
