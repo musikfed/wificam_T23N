@@ -19,14 +19,14 @@ run_cfg() {
 }
 
 camera_running() {
-    for proc in prudynt majestic camera-daemon impstreamer; do
+    for proc in rvd prudynt majestic camera-daemon impstreamer; do
         pidof "$proc" >/dev/null 2>&1 && return 0
     done
     return 1
 }
 
 os_camera_service() {
-    for svc in /etc/init.d/S31prudynt /etc/init.d/S95majestic /etc/init.d/majestic /etc/init.d/S95camera /etc/init.d/camera; do
+    for svc in /etc/init.d/S31raptor /etc/init.d/S31prudynt /etc/init.d/S95majestic /etc/init.d/majestic /etc/init.d/S95camera /etc/init.d/camera; do
         [ -x "$svc" ] && { echo "$svc"; return 0; }
     done
     return 1
@@ -54,6 +54,16 @@ stop_camera() {
 snapshot_camera() {
     if run_cfg CAMERA_SNAPSHOT_CMD; then
         return 0
+    fi
+
+    if command -v raptorctl >/dev/null 2>&1 && pidof rvd >/dev/null 2>&1; then
+        mkdir -p "$SNAPSHOTS"
+        file="$SNAPSHOTS/snapshot_$(date +%Y%m%d_%H%M%S).jpg"
+        if raptorctl rvd save jpeg "$file" 0 >/dev/null 2>&1 && [ -s "$file" ]; then
+            echo "$file"
+            return 0
+        fi
+        rm -f "$file"
     fi
 
     if command -v prudyntctl >/dev/null 2>&1; then
