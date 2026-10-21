@@ -12,6 +12,9 @@ AUTH_CONF="${AUTH_CONF:-$STATE_DIR/httpd.conf}"
 BOOTSTRAP_CONF="${BOOTSTRAP_CONF:-$STATE_DIR/httpd-bootstrap.conf}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_UNAUTHENTICATED_WEB="${ALLOW_UNAUTHENTICATED_WEB:-0}"
+AUTO_PROVISION_TEST_WEB_AUTH="${AUTO_PROVISION_TEST_WEB_AUTH:-0}"
+DEFAULT_WEB_USER="${DEFAULT_WEB_USER:-admin}"
+DEFAULT_WEB_PASSWORD="${DEFAULT_WEB_PASSWORD:-}"
 WEB_PORT="${WEB_PORT:-8090}"
 MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
 MEDIA_FALLBACKS="${MEDIA_FALLBACKS:-/mnt/mmcblk0p1 /mnt/sdcard /mnt/sda0}"
@@ -83,6 +86,15 @@ start() {
     [ -x "$WEBROOT/cgi-bin/snapshot.jpg" ] || chmod 0755 "$WEBROOT/cgi-bin/snapshot.jpg" 2>/dev/null || true
     [ -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ] || chmod 0755 "$BOOTSTRAP_WEBROOT/cgi-bin/claim" 2>/dev/null || true
     make_csrf
+
+    # 0.1_test convenience: provision known LAN-only credentials once when
+    # no auth file exists. Production builds set this flag to 0 and use the
+    # first-boot claim page instead.
+    if [ ! -s "$AUTH_CONF" ] && [ "$AUTO_PROVISION_TEST_WEB_AUTH" = "1" ] && [ -n "$DEFAULT_WEB_PASSWORD" ]; then
+        printf '%s' "$DEFAULT_WEB_PASSWORD" | AUTH_CONF="$AUTH_CONF" AUTH_PASSWORD_MODE=plain \
+            wificam-set-web-password "$DEFAULT_WEB_USER" >/dev/null || return 1
+        echo "PegineLab WIFICAM 0.1_test credentials provisioned for user: $DEFAULT_WEB_USER"
+    fi
 
     # BusyBox httpd reads /etc/httpd.conf by default. Thingino's stock file
     # contains H:/var/www, which would override -h and serve the Thingino UI
