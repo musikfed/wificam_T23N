@@ -5,7 +5,7 @@
 **HARDWARE VERIFIED on 2026-10-21.** The canonical
 `Thingino/thingino-t23-sd.bin` was written to SD, passed full readback
 SHA256/MBR/MSPL/partition verification, and booted on the target camera.
-SD boot is confirmed. Runtime access to PegineLab WIFICAM on `:8080` is verified separately.
+SD boot is confirmed. Runtime access to PegineLab WIFICAM on `:8090` is verified separately.
 
 Pinned SHA256:
 
@@ -41,6 +41,16 @@ built previously and its image was copied to
 
 The 2026-10-21 hardware test confirmed that this profile boots on the target camera.
 
+## PegineLab WIFICAM port
+
+Hardware testing showed that **TCP 8080 is already used by Thingino's
+camera/API stack**. PegineLab WIFICAM therefore runs on **TCP 8090**. This is
+a BusyBox `httpd` userspace setting; changing it does not require a kernel
+rebuild.
+
+On an already booted camera, change `WEB_PORT` in
+`/etc/wificam/wificam.conf` and restart `S90wificam`.
+
 ## Mandatory Web UI
 
 PegineLab WIFICAM is a required part of the canonical image, not an optional
@@ -54,11 +64,11 @@ Thingino stock UI     : http://CAMERA_IP/ or https://CAMERA_IP/
 Thingino login        : root
 Thingino password     : root
 
-PegineLab WIFICAM     : http://CAMERA_IP:8080/
+PegineLab WIFICAM     : http://CAMERA_IP:8090/
 ```
 
 If the browser shows `https://CAMERA_IP/login.html` with Thingino branding,
-that is the normal stock Thingino UI. Open `http://CAMERA_IP:8080/`
+that is the normal stock Thingino UI. Open `http://CAMERA_IP:8090/`
 explicitly for PegineLab.
 
 The first WIFICAM boot is configured as an unauthenticated local bootstrap:
@@ -106,7 +116,7 @@ The script:
 4. builds `galayou_g2_t23n_sc2336_atbm6012bx`;
 5. enables MMC0 1-bit boot;
 6. sets root to `/dev/mmcblk0p2`, ext4;
-7. enables BusyBox httpd for the independent WIFICAM service on TCP 8080;
+7. enables BusyBox httpd for the independent WIFICAM service on TCP 8090;
    The minimal PegineLab admin requires only `CONFIG_HTTPD`,
    `CONFIG_FEATURE_HTTPD_CGI`, `CONFIG_FEATURE_HTTPD_BASIC_AUTH`, and
    `CONFIG_FEATURE_HTTPD_AUTH_MD5`. The minimal HTTP flags are supplied through Buildroot's supported
@@ -248,12 +258,12 @@ Acceptance criteria:
 1. The board shows Linux boot activity.
 2. Thingino/Wi-Fi comes up.
 3. The stock Thingino Web UI is reachable; default login is root/root.
-4. Open http://CAMERA_IP:8080/ separately for PegineLab WIFICAM.
+4. Open http://CAMERA_IP:8090/ separately for PegineLab WIFICAM.
 5. WIFICAM status API responds.
 6. Snapshot preview works once Prudynt is running.
 ```
 
-If only the stock Thingino UI works and port 8080 does not respond, SD boot
+If only the stock Thingino UI works and port 8090 does not respond, SD boot
 is still successful. Diagnose the WIFICAM service itself:
 
 ```sh
