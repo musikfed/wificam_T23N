@@ -4,6 +4,7 @@ CONF=/etc/wificam/wificam.conf
 [ -f "$CONF" ] && . "$CONF"
 
 WEBROOT=/usr/share/wificam-web
+BOOTSTRAP_WEBROOT="${BOOTSTRAP_WEBROOT:-$WEBROOT/setup}"
 PIDFILE=/var/run/wificam-httpd.pid
 LOG=/var/log/wificam-httpd.log
 STATE_DIR="${STATE_DIR:-/opt/wificam}"
@@ -78,6 +79,7 @@ start() {
 
     [ -x "$WEBROOT/cgi-bin/api" ] || chmod 0755 "$WEBROOT/cgi-bin/api" 2>/dev/null || true
     [ -x "$WEBROOT/cgi-bin/snapshot.jpg" ] || chmod 0755 "$WEBROOT/cgi-bin/snapshot.jpg" 2>/dev/null || true
+    [ -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ] || chmod 0755 "$BOOTSTRAP_WEBROOT/cgi-bin/claim" 2>/dev/null || true
     make_csrf
 
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
@@ -94,8 +96,14 @@ start() {
         echo "Starting authenticated PegineLab WIFICAM on port $WEB_PORT..."
         httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" -c "$AUTH_CONF" -r "PegineLab WIFICAM T23N" >>"$LOG" 2>&1 &
     elif [ "$ALLOW_UNAUTHENTICATED_WEB" = "1" ]; then
-        echo "WARNING: starting PegineLab WIFICAM bootstrap UI WITHOUT authentication on port $WEB_PORT"
-        httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" >>"$LOG" 2>&1 &
+        if [ ! -f "$BOOTSTRAP_WEBROOT/index.html" ] || [ ! -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ]; then
+            echo "WIFICAM first-boot setup files are missing under $BOOTSTRAP_WEBROOT" | tee -a "$LOG"
+            return 1
+        fi
+        echo "Starting PegineLab WIFICAM FIRST-BOOT CLAIM page on port $WEB_PORT..."
+        # Before the admin password exists, expose only the setup-only webroot.
+        # The main dashboard/API is not served unauthenticated.
+        httpd_run -f -p "$WEB_PORT" -h "$BOOTSTRAP_WEBROOT" >>"$LOG" 2>&1 &
     else
         echo "WIFICAM web UI not started: no $AUTH_CONF"
         echo "Set a password with:"
