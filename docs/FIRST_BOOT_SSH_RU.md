@@ -51,23 +51,17 @@ TCP 8090.
 
 ## Первое включение PegineLab WIFICAM
 
-Новые сборки содержат отдельную first-boot страницу:
+В ветке `0.1_test` first-boot claim временно заменён детерминированным
+LAN-only входом для аппаратной отладки:
 
 ```text
 http://CAMERA_IP:8090/
+login: admin
+password: Wificam12345
 ```
 
-Пока пароль администратора не создан, web server обслуживает только setup
-страницу, а основная PegineLab админка/API не публикуются без авторизации.
-
-На first-boot странице задаётся пароль не короче 10 символов. Пользователь
-фиксирован как:
-
-```text
-admin
-```
-
-После сохранения WIFICAM перезапускается и браузер запросит HTTP Basic Auth.
+Production-режим с отдельной страницей создания пароля сохранён в исходниках и
+включается отключением test auto-provision.
 
 Файл авторизации:
 
@@ -77,21 +71,27 @@ admin
 
 ### Уже записанная 0.1_test карта
 
-Старая карта, записанная до переноса на 8090 и добавления setup-page, может
-быть исправлена без пересборки kernel:
+Для первого аппаратно проверенного image `f9f50a...` используйте готовый
+recovery-скрипт — он повторяет **реально сработавший на камере** BusyBox
+конфиг и не трогает SSH:
 
-```sh
-sed -i 's/^WEB_PORT=.*/WEB_PORT=8090/' /etc/wificam/wificam.conf
-printf '%s' 'НОВЫЙ_ПАРОЛЬ_НЕ_КОРОЧЕ_10' | wificam-set-web-password admin
-/etc/init.d/S90wificam restart
+```powershell
+scp -O .\scripts\camera_fix_wificam_0_1_test.sh root@CAMERA_IP:/tmp/
+ssh root@CAMERA_IP "sh /tmp/camera_fix_wificam_0_1_test.sh"
 ```
 
-После этого:
+или из Linux/WSL:
+
+```sh
+scp -O scripts/camera_fix_wificam_0_1_test.sh root@CAMERA_IP:/tmp/
+ssh root@CAMERA_IP 'sh /tmp/camera_fix_wificam_0_1_test.sh'
+```
+
+Проверенный конфиг внутри скрипта:
 
 ```text
-http://CAMERA_IP:8090/
-login: admin
-password: заданный пароль
+H:/usr/share/wificam-web
+/:admin:Wificam12345
 ```
 
 ## SSH из Windows PowerShell
@@ -329,3 +329,20 @@ dd if=/dev/urandom bs=32 count=1 2>/dev/null | sha256sum
 ```
 
 Пересборка ядра для этого не требуется.
+
+
+## SSH — обязательный локальный recovery-канал
+
+Для `0.1_test` Dropbear на TCP 22 считается частью acceptance criteria.
+В `/etc/wificam/wificam.conf` установлено:
+
+```text
+SSH_PROTECT=1
+```
+
+Поэтому PegineLab Web UI не должна выключать SSH. Это сделано специально для
+локального/безоблачного владения камерой: даже если Web UI или camera service
+сломаны, владелец должен иметь shell-доступ для диагностики и восстановления.
+
+Build pipeline проверяет `/usr/sbin/dropbear` и init-script Dropbear прямо
+в `rootfs.ext2`. Если SSH исчезнет из будущего image, сборка должна упасть.
