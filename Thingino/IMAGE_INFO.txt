@@ -48,3 +48,18 @@ Thingino reserved camera/API port: 8080
 PegineLab WIFICAM port: 8090
 Reason: hardware test showed Thingino/Raptor camera API already occupies 8080.
 Kernel rebuild is NOT required for this port change.
+
+
+KNOWN ISSUE IN CURRENT CANONICAL BINARY / ИЗВЕСТНАЯ ОШИБКА ТЕКУЩЕГО BIN:
+The committed image with SHA256
+f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
+hardware-boots successfully, but it predates the WIFICAM runtime fixes now in source:
+- old WEB_PORT=8080 conflicted with Thingino camera/API;
+- after manual move to 8090, unauthenticated BusyBox httpd read Thingino
+  /etc/httpd.conf and H:/var/www overrode the PegineLab webroot;
+- old CSRF generation used BusyBox-incompatible od -A/-N options.
+
+Current source fixes these with WEB_PORT=8090, a private httpd bootstrap config,
+a first-boot admin claim page, and portable CSRF generation.
+A new SD binary must be assembled before claiming these fixes are baked into the image.
+Kernel rebuild is not required for these userspace changes.
