@@ -2,7 +2,7 @@ PegineLab WIFICAM T23N — hardware-verified Thingino MMC SD image
 
 STATUS / СТАТУС:
 0.1_test — АППАРАТНО ПОДТВЕРЖДЕНО / HARDWARE VERIFIED
-2026-10-21: загрузка с SD подтверждена на целевой камере; runtime-проверка PegineLab WIFICAM на :8090 ожидается.
+2026-10-21: SD boot и вход в PegineLab WIFICAM на :8090 аппаратно подтверждены; API/snapshot ещё проверяются.
 
 RU:
 Профиль: galayou_g2_t23n_sc2336_atbm6012bx
@@ -19,7 +19,7 @@ Root: /dev/mmcblk0p2 ext4
 Назначение: прямой MMC/SD boot image, НЕ autoupdate payload во SPI.
 
 EN:
-2026-10-21: SD boot confirmed on the target camera; PegineLab WIFICAM runtime verification on :8090 is still pending.
+2026-10-21: SD boot and PegineLab WIFICAM login on :8090 are hardware verified; API/snapshot checks remain.
 Profile: galayou_g2_t23n_sc2336_atbm6012bx
 Thingino source: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
 File: Thingino/thingino-t23-sd.bin
@@ -38,7 +38,7 @@ WEB ACCESS / ДОСТУП К WEB:
 Thingino stock UI: http://CAMERA_IP/ or https://CAMERA_IP/
 Thingino default login/password: root / root
 PegineLab WIFICAM: http://CAMERA_IP:8090/
-WIFICAM first boot: unauthenticated local bootstrap (ALLOW_UNAUTHENTICATED_WEB=1)
+WIFICAM 0.1_test login: admin / Wificam12345 (LAN-only test credentials)
 WIFICAM password helper default username: admin
 Note: https://CAMERA_IP/login.html is the stock Thingino UI, not PegineLab WIFICAM.
 
@@ -71,3 +71,13 @@ User: admin
 Password: Wificam12345
 Mode: LAN-only test credentials, BusyBox plaintext auth compatibility mode.
 Production: disable AUTO_PROVISION_TEST_WEB_AUTH and use first-boot claim.
+
+
+Verified BusyBox auth config / Проверенный формат:
+H:/usr/share/wificam-web
+/:admin:Wificam12345
+
+SSH / ЛОКАЛЬНЫЙ RECOVERY:
+Dropbear TCP 22 is mandatory in 0.1_test.
+SSH_PROTECT=1 prevents accidental Web UI shutdown of SSH.
+Build must fail if Dropbear binary/init script are missing from rootfs.ext2.
