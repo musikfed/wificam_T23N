@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PegineLab WIFICAM — First boot</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#111827;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh;display:grid;place-items:center}
+    .card{width:min(92vw,440px);background:#1f2937;border:1px solid #374151;border-radius:18px;padding:28px;box-shadow:0 20px 60px #0008}
+    h1{margin:0 0 6px;font-size:28px}h1 b{color:#f59e0b}.sub{color:#9ca3af;margin-bottom:24px}
+    label{display:block;margin:14px 0 6px;color:#cbd5e1}input{width:100%;padding:12px;border-radius:10px;border:1px solid #4b5563;background:#111827;color:#fff;font-size:16px}
+    button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:#f59e0b;color:#111827;font-weight:700;font-size:16px;cursor:pointer}
+    button:disabled{opacity:.5;cursor:wait}.note{font-size:13px;color:#9ca3af;margin-top:18px;line-height:1.45}.msg{min-height:24px;margin-top:14px}
+    code{color:#fbbf24}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>PegineLab <b>WIFICAM</b></h1>
+    <div class="sub">Первичная настройка / First boot setup</div>
+    <p>Создайте пароль администратора. После сохранения Web UI перезапустится и браузер запросит HTTP Basic Auth.</p>
+    <form id="claim">
+      <label for="p1">Пароль администратора / Admin password</label>
+      <input id="p1" type="password" minlength="10" autocomplete="new-password" required>
+      <label for="p2">Повторите пароль / Repeat password</label>
+      <input id="p2" type="password" minlength="10" autocomplete="new-password" required>
+      <button id="save" type="submit">Сохранить / Save</button>
+    </form>
+    <div id="msg" class="msg"></div>
+    <div class="note">Пользователь после настройки: <code>admin</code>. Основная PegineLab WIFICAM: <code>http://CAMERA_IP:8090/</code>.</div>
+  </main>
+<script>
+let csrf="";
+const msg=document.getElementById("msg"),btn=document.getElementById("save");
+async function init(){
+  try{
+    const r=await fetch("/cgi-bin/claim",{cache:"no-store"});
+    const j=await r.json();
+    if(!j.ok) throw new Error(j.error||"setup API error");
+    csrf=j.csrf||"";
+    if(j.claimed){
+      msg.textContent="Уже настроено. Перезагрузка Web UI… / Already configured. Restarting…";
+      setTimeout(()=>location.href="/",1200);
+    }
+  }catch(e){msg.textContent=e.message}
+}
+document.getElementById("claim").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const a=document.getElementById("p1").value,b=document.getElementById("p2").value;
+  if(a!==b){msg.textContent="Пароли не совпадают / Passwords do not match";return}
+  if(a.length<10){msg.textContent="Минимум 10 символов / Minimum 10 characters";return}
+  btn.disabled=true;msg.textContent="Сохраняем… / Saving…";
+  try{
+    const body=new URLSearchParams({csrf,password:a}).toString();
+    const r=await fetch("/cgi-bin/claim",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+    const j=await r.json();
+    if(!j.ok) throw new Error(j.error||"claim failed");
+    msg.textContent="Готово. Вход: admin. Перезапуск… / Done. Login: admin. Restarting…";
+    setTimeout(()=>location.href="/",1800);
+  }catch(e){msg.textContent=e.message;btn.disabled=false}
+});
+init();
+</script>
+</body>
+</html>
