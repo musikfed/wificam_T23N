@@ -33,17 +33,16 @@ TCP 8080 belongs to Thingino's camera/API stack. PegineLab uses TCP 8090.
 
 ## First-boot authentication
 
-New builds serve a dedicated setup page at:
+The `0.1_test` branch temporarily uses deterministic LAN-only credentials:
 
 ```text
 http://CAMERA_IP:8090/
+login: admin
+password: Wificam12345
 ```
 
-Until an admin password exists, only the setup webroot is served. The main
-dashboard/API are not exposed unauthenticated.
-
-The fixed PegineLab username is `admin`; password length is at least 10
-characters. After saving, WIFICAM restarts with HTTP Basic Auth.
+The production first-boot claim flow remains in source and can be enabled by
+disabling test auto-provision.
 
 Authentication state is stored in `/opt/wificam/httpd.conf`.
 
@@ -145,3 +144,13 @@ Open `http://CAMERA_IP:8090/`, not Thingino's `/preview.html`.
 
 The BusyBox `od: invalid option -- A` issue is also fixed: current CSRF
 generation uses `dd /dev/urandom | sha256sum` and does not require GNU od.
+
+
+## SSH is a mandatory local recovery channel
+
+For `0.1_test`, Dropbear on TCP 22 is part of the acceptance criteria.
+`SSH_PROTECT=1` prevents PegineLab from accidentally disabling SSH. The build
+also verifies the Dropbear binary and init script inside `rootfs.ext2`.
+
+This is intentional for local/cloudless ownership: the owner keeps shell
+access even when the Web UI or camera services need recovery.
