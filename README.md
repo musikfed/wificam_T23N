@@ -7,6 +7,65 @@
 > Исходники уже исправлены; для получения bin с этими изменениями требуется
 > только обновить rootfs/SD image, пересборка ядра не нужна.
 
+## Готовая прошивка или самостоятельная сборка
+
+Есть два равноправных варианта.
+
+### Вариант A — скачать готовый SD image
+
+Аппаратно проверенный image находится в ветке `mymarrchWFcam`:
+
+```text
+Thingino/thingino-t23-sd.bin
+size:   84934656 bytes
+SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
+```
+
+Проверочная сумма рядом:
+
+```text
+Thingino/thingino-t23-sd.bin.sha256
+```
+
+Этот файл уже хранится в обычном GitHub repository. Его размер около 81 MiB:
+GitHub предупреждает о файлах больше 50 MiB, но текущий image остаётся ниже
+жёсткого лимита 100 MiB для одного обычного Git object.
+
+**Важно:** именно этот первый hardware-booted binary подтверждает SD boot и
+PegineLab UI, но был собран до последних runtime-исправлений API/CGI/Raptor.
+Для полностью обновлённого image нужно собрать новый binary из текущих
+исходников и после аппаратной проверки заменить/выпустить следующий prerelease.
+
+Запись готового image:
+
+```sh
+sudo sh scripts/write_thingino_wificam_sd.sh /dev/sdX
+```
+
+Image записывается целиком с LBA0. Не использовать ручной `seek=34`.
+
+### Вариант B — собрать прошивку самому
+
+```sh
+git clone https://github.com/musikfed/wificam_T23N.git
+cd wificam_T23N
+git switch mymarrchWFcam
+
+THINGINO_FAST=1 PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+```
+
+Канонический результат:
+
+```text
+Thingino/thingino-t23-sd.bin
+Thingino/thingino-t23-sd.bin.sha256
+```
+
+Для распространения готовых проверенных бинарников предпочтительный путь —
+GitHub **Releases/Prereleases**: исходники продолжают жить в Git, а конкретный
+проверенный `.bin` прикладывается к версии вроде `0.1_test`, `0.2_test`
+и т.д.
+
 ## 0.1_test: текущий подтверждённый статус
 
 **2026-10-21: прямой SD boot аппаратно подтверждён на целевой T23N-камере.**
