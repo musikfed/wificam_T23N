@@ -13,6 +13,7 @@ fi
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
 AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
+SSH_PROTECT="${SSH_PROTECT:-0}"
 
 REQUEST_DATA=""
 if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
@@ -156,7 +157,9 @@ service_status_one() {
     state="$(printf '%s' "$raw" | awk '{print $1}')"
     enabled="$(printf '%s' "$raw" | sed -n 's/.*enabled=\([01]\).*/\1/p')"
     [ -n "$enabled" ] || enabled=0
-    printf '"%s":{"state":"%s","enabled":%s}' "$svc" "$(json_escape "$state")" "$enabled"
+    protected=0
+    [ "$svc" = "ssh" ] && [ "$SSH_PROTECT" = "1" ] && protected=1
+    printf '"%s":{"state":"%s","enabled":%s,"protected":%s}' "$svc" "$(json_escape "$state")" "$enabled" "$protected"
 }
 
 services() {
