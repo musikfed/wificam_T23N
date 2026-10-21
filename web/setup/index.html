@@ -21,13 +21,13 @@
     <p>Создайте пароль администратора. После сохранения Web UI перезапустится и браузер запросит HTTP Basic Auth.</p>
     <form id="claim">
       <label for="p1">Пароль администратора / Admin password</label>
-      <input id="p1" type="password" minlength="10" autocomplete="new-password" required>
+      <input id="p1" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" autocomplete="new-password" required>
       <label for="p2">Повторите пароль / Repeat password</label>
-      <input id="p2" type="password" minlength="10" autocomplete="new-password" required>
+      <input id="p2" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" autocomplete="new-password" required>
       <button id="save" type="submit">Сохранить / Save</button>
     </form>
     <div id="msg" class="msg"></div>
-    <div class="note">Пользователь после настройки: <code>admin</code>. Основная PegineLab WIFICAM: <code>http://CAMERA_IP:8090/</code>.</div>
+    <div class="note">Пользователь после настройки: <code>admin</code>. Пароль: 10–64 печатных ASCII-символа без пробелов (латиница/цифры/знаки). Кириллицу не использовать. Основная PegineLab WIFICAM: <code>http://CAMERA_IP:8090/</code>.</div>
   </main>
 <script>
 let csrf="";
@@ -49,6 +49,7 @@ document.getElementById("claim").addEventListener("submit",async e=>{
   const a=document.getElementById("p1").value,b=document.getElementById("p2").value;
   if(a!==b){msg.textContent="Пароли не совпадают / Passwords do not match";return}
   if(a.length<10){msg.textContent="Минимум 10 символов / Minimum 10 characters";return}
+  if(!/^[\x21-\x7E]{10,64}$/.test(a)){msg.textContent="Только печатный ASCII без пробелов, 10–64 / Printable ASCII only, no spaces, 10–64";return}
   btn.disabled=true;msg.textContent="Сохраняем… / Saving…";
   try{
     const body=new URLSearchParams({csrf,password:a}).toString();
