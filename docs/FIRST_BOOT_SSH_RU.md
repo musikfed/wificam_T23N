@@ -218,3 +218,79 @@ busybox httpd -h 2>&1 | head
 ```
 
 Актуальный PegineLab порт: 8090.
+
+
+## Если на 8090 всё равно открывается Thingino/Raptor
+
+Это диагностировано на первой аппаратной `0.1_test`. Причина была не в
+порте 8090: старый PegineLab bootstrap запускал BusyBox `httpd` без `-c`.
+BusyBox автоматически читал штатный Thingino `/etc/httpd.conf`, где есть:
+
+```text
+H:/var/www
+P:/favicon.ico:...
+P:/mjpeg:...
+```
+
+`H:/var/www` подменял наш `-h /usr/share/wificam-web`, поэтому именно
+PegineLab-процесс на 8090 отдавал страницы Thingino.
+
+Характерные строки:
+
+```text
+httpd: config error ... in '/etc/httpd.conf'
+```
+
+В актуальном коде bootstrap всегда получает отдельный пустой
+`/opt/wificam/httpd-bootstrap.conf`, поэтому `/etc/httpd.conf` Thingino
+вообще не читается.
+
+### Быстро исправить уже записанную старую карту
+
+Сначала убедиться, что PegineLab-файлы реально присутствуют:
+
+```sh
+grep -m1 -E 'PegineLab|WIFICAM' /usr/share/wificam-web/index.html
+```
+
+Затем создать PegineLab Basic Auth. Это одновременно переводит старый
+`S90wificam` в ветку с явным `-c /opt/wificam/httpd.conf`:
+
+```sh
+printf '%s' 'НОВЫЙ_ПАРОЛЬ_МИНИМУМ_10' | wificam-set-web-password admin
+```
+
+Очистить старые ошибочно запущенные httpd и поднять обе веб-службы заново
+(SSH-сессия при этом остаётся):
+
+```sh
+/etc/init.d/S90wificam stop 2>/dev/null || true
+killall httpd 2>/dev/null || true
+/etc/init.d/S90httpd start
+/etc/init.d/S90wificam start
+sleep 2
+netstat -lntp 2>/dev/null | grep -E ':80|:8090'
+curl -s http://127.0.0.1:8090/ | head -n 12
+```
+
+Открывать **корень**, не Thingino `/preview.html`:
+
+```text
+http://CAMERA_IP:8090/
+login: admin
+password: заданный выше
+```
+
+Thingino остаётся отдельно на 80/443.
+
+## BusyBox: od: invalid option -- A
+
+Первая версия использовала GNU-совместимый вызов `od -An -N16 -tx1`, но
+BusyBox `od` в этом образе не поддерживает `-A/-N`. В актуальном
+`S90wificam` CSRF генерируется переносимо:
+
+```sh
+dd if=/dev/urandom bs=32 count=1 2>/dev/null | sha256sum
+```
+
+Пересборка ядра для этого не требуется.
