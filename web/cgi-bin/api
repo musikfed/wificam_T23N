@@ -207,10 +207,10 @@ camera_action() {
 
 web_password() {
     require_post
-    # First-boot claim: when AUTH_CONF does not exist yet, the per-boot
-    # CSRF token is sufficient on the local bootstrap UI. Once claimed,
-    # changing the password requires authenticated access.
-    [ -s "$AUTH_CONF" ] && require_auth
+    # First boot is handled by setup/cgi-bin/claim. The main dashboard API
+    # is served only after AUTH_CONF exists and must remain authenticated.
+    [ -s "$AUTH_CONF" ] || fail "first-boot claim required"
+    require_auth
     require_csrf
     password="$(param new_password)"
     [ "${#password}" -ge 10 ] || fail "new web password must be at least 10 characters"
