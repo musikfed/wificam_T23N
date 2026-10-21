@@ -25,7 +25,8 @@ if [ -f "$REPO_DIR/branding/peginelab-logo.png.b64" ]; then
 fi
 
 chmod 0755   "$OUT/etc/init.d/S05peginelab-boot"   "$OUT/etc/init.d/S90wificam"   "$OUT/etc/init.d/S91wificam-services"   "$OUT/usr/bin/wificam-camera-ctl"   "$OUT/usr/bin/wificam-service-ctl"   "$OUT/usr/bin/wificam-set-web-password"   "$OUT/usr/share/wificam-web/cgi-bin/api" \
-  "$OUT/usr/share/wificam-web/cgi-bin/snapshot.jpg"
+  "$OUT/usr/share/wificam-web/cgi-bin/snapshot.jpg" \
+  "$OUT/usr/share/wificam-web/setup/cgi-bin/claim"
 
 chmod 0644 "$OUT/etc/fw_env.config"
 
