@@ -1,135 +1,78 @@
 # PegineLab WIFICAM T23 SD — 0.1_test
 
-**Status:** SD boot + PegineLab UI/login hardware verified; API/snapshot pending / SD boot + вход в PegineLab аппаратно подтверждены; API/snapshot ещё проверяются  
-**Date:** 2026-10-21  
-**Branch:** `mymarrchWFcam`
+**Type:** prerelease / тестовый релиз  
+**Hardware date:** 2026-10-21  
+**Release snapshot:** `release/0.1_test`  
+**Snapshot commit:** `07aebd598f5bbf641d4817f7de924cba41277449`
 
-## RU
+## Что это за релиз
 
-Первый аппаратно подтверждённый тестовый релиз SD-прошивки для T23N.
+Это первый сохранённый бинарный milestone, который **реально загрузился с SD на целевой T23N-камере**.
 
-Подтверждено на реальной камере:
-- загрузка напрямую с SD;
-- корректная разметка MBR;
+Подтверждено на железе:
+- direct SD boot;
+- DOS/MBR;
 - SPL/MSPL на LBA34;
 - U-Boot proper на LBA86;
-- FAT16 boot partition с `/uImage`;
+- FAT16 p1 с `/uImage`;
 - ext4 rootfs на `/dev/mmcblk0p2`;
-- PegineLab WIFICAM реально открылась на `http://CAMERA_IP:8090/` и принимает тестовый вход `admin / Wificam12345`;
+- SSH/Dropbear;
+- PegineLab WIFICAM удалось запустить и открыть на реальной камере.
 
-Файл:
-`Thingino/thingino-t23-sd.bin`
+## Firmware image
 
-Размер:
-`84934656 bytes`
+```text
+Thingino/thingino-t23-sd.bin
+size:   84934656 bytes
+SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
+```
 
-SHA256:
-`f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be`
+Проверочная сумма:
 
-Запись выполняется как полный disk image с LBA0. **Не использовать `seek=34`** для готового `.bin`.
+```text
+Thingino/thingino-t23-sd.bin.sha256
+```
 
-Рекомендуемая команда:
+Записывать как **полный disk image с LBA0**. Для готового `.bin` не использовать `seek=34`.
+
 ```sh
 sudo sh scripts/write_thingino_wificam_sd.sh /dev/sdX
 ```
 
-## EN
+## Важные известные ограничения этого exact binary
 
-First hardware-verified test release of the direct-SD T23N firmware.
+Этот `.bin` был собран **до** последних runtime-исправлений PegineLab. После аппаратного запуска были найдены и исправлены в исходниках:
+- конфликт PegineLab с Thingino на TCP 8080 — PegineLab перенесена на 8090;
+- BusyBox `httpd` подхватывал Thingino `/etc/httpd.conf` и подменял webroot;
+- рабочий формат BusyBox-конфига подтверждён как:
+  ```text
+  H:/usr/share/wificam-web
+  /:admin:Wificam12345
+  ```
+- исправлена несовместимая генерация CSRF через `od -A/-N`;
+- добавлена поддержка Raptor в PegineLab;
+- SSH/Dropbear защищён как обязательный recovery-канал;
+- API/CGI, preview/audio/control ещё требуют доводки и повторной сборки.
 
-Verified on the target camera:
-- direct SD boot;
-- valid DOS/MBR layout;
-- SPL/MSPL at LBA34;
-- U-Boot proper at LBA86;
-- FAT16 boot partition with `/uImage`;
-- ext4 rootfs at `/dev/mmcblk0p2`;
-- PegineLab WIFICAM opened successfully at `http://CAMERA_IP:8090/` and accepts the test login `admin / Wificam12345`;
+Поэтому `0.1_test` — **исторически важный hardware-booted prerelease**, а не финальный пользовательский образ.
 
-Image:
-`Thingino/thingino-t23-sd.bin`
-
-Size:
-`84934656 bytes`
-
-SHA256:
-`f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be`
-
-Write it as a complete disk image from LBA0. **Do not use `seek=34`** with the finished image.
-
-
-## Web UI clarification / Уточнение Web UI
-
-The firmware exposes two separate interfaces / В прошивке две отдельные веб-службы:
+Для старой записанной карты есть recovery-скрипт в актуальной ветке:
 
 ```text
-Thingino stock UI : http://CAMERA_IP/ or https://CAMERA_IP/
-login/password    : root / root
-
-PegineLab WIFICAM : http://CAMERA_IP:8090/
+scripts/camera_fix_wificam_0_1_test.sh
 ```
 
-Seeing `https://CAMERA_IP/login.html` with Thingino branding is expected and
-does not mean PegineLab was replaced. WIFICAM must be tested separately on
-HTTP port 8090.
-
-First WIFICAM boot uses `ALLOW_UNAUTHENTICATED_WEB=1`; once a password is
-configured, the default WIFICAM username is `admin`.
-
-
-## 8080 conflict / конфликт 8080
-
-Hardware testing showed that Thingino already owns TCP 8080 for its camera/API
-stack. PegineLab WIFICAM is therefore assigned TCP **8090**. This is a
-userspace-only change and does not require rebuilding the kernel.
-
-
-## Known issue in the first hardware-booted image / известная ошибка первого образа
-
-The image SHA256 `f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be`
-is confirmed to boot from SD, but its baked WIFICAM runtime is older than the
-current source. It contains the original 8080/bootstrap-httpd behavior.
-
-Current source has already fixed the web runtime:
-- PegineLab moved to TCP 8090;
-- BusyBox httpd is isolated from Thingino `/etc/httpd.conf`;
-- first boot exposes only the admin password claim page;
-- BusyBox-incompatible `od -A/-N` use was removed.
-
-Until a refreshed image is assembled, the old card can be recovered over SSH
-by creating the PegineLab `admin` password and restarting the web services as
-documented in `docs/FIRST_BOOT_SSH_RU.md`.
-
-These are userspace/rootfs changes; a Linux kernel rebuild is not required.
-
-
-## PegineLab test login / тестовый вход
+## Тестовые доступы после recovery
 
 ```text
-URL:      http://CAMERA_IP:8090/
-login:    admin
-password: Wificam12345
+Thingino SSH:
+  root / root
+
+PegineLab WIFICAM:
+  http://CAMERA_IP:8090/
+  admin / Wificam12345
 ```
 
-These credentials are intentionally public for the LAN-only `0.1_test`
-hardware bring-up. The running T23N image showed a persistent 401 when using
-the generated BusyBox MD5-crypt entry, so current source uses the BusyBox
-plaintext httpd.conf format for deterministic test access. Change the password
-from PegineLab **System** after login. Production builds disable test
-auto-provision and use first-boot claim.
+## Next
 
-
-## Hardware-verified BusyBox httpd format
-
-The configuration that actually worked on the target camera is:
-
-```text
-H:/usr/share/wificam-web
-/:admin:Wificam12345
-```
-
-Current source generates this format automatically and starts BusyBox httpd
-with its own `-c /opt/wificam/httpd.conf`. This prevents Thingino's
-`/etc/httpd.conf` from replacing the PegineLab webroot.
-
-SSH/Dropbear remains mandatory and protected for local recovery.
+Следующий prerelease должен быть собран заново из текущего `mymarrchWFcam` и получить новый SHA256 после аппаратной проверки. Предлагаемое имя: `0.2_test`.
