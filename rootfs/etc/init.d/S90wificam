@@ -9,6 +9,7 @@ PIDFILE=/var/run/wificam-httpd.pid
 LOG=/var/log/wificam-httpd.log
 STATE_DIR="${STATE_DIR:-/opt/wificam}"
 AUTH_CONF="${AUTH_CONF:-$STATE_DIR/httpd.conf}"
+BOOTSTRAP_CONF="${BOOTSTRAP_CONF:-$STATE_DIR/httpd-bootstrap.conf}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_UNAUTHENTICATED_WEB="${ALLOW_UNAUTHENTICATED_WEB:-0}"
 WEB_PORT="${WEB_PORT:-8090}"
@@ -21,19 +22,20 @@ httpd_available() {
     return 1
 }
 
-httpd_run() {
+start_httpd() {
     if command -v httpd >/dev/null 2>&1; then
-        httpd "$@"
+        httpd "$@" >>"$LOG" 2>&1 &
     else
-        busybox httpd "$@"
+        busybox httpd "$@" >>"$LOG" 2>&1 &
     fi
+    echo $! > "$PIDFILE"
 }
 
 make_csrf() {
     [ -s "$CSRF_FILE" ] && return 0
     umask 077
-    if [ -r /dev/urandom ]; then
-        od -An -N16 -tx1 /dev/urandom | tr -d ' \n' > "$CSRF_FILE"
+    if [ -r /dev/urandom ] && command -v sha256sum >/dev/null 2>&1; then
+        dd if=/dev/urandom bs=32 count=1 2>/dev/null | sha256sum | awk '{print $1}' > "$CSRF_FILE"
     else
         printf '%s-%s\n' "$(date +%s 2>/dev/null || echo 0)" "$$" > "$CSRF_FILE"
     fi
@@ -82,6 +84,12 @@ start() {
     [ -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ] || chmod 0755 "$BOOTSTRAP_WEBROOT/cgi-bin/claim" 2>/dev/null || true
     make_csrf
 
+    # BusyBox httpd reads /etc/httpd.conf by default. Thingino's stock file
+    # contains H:/var/www, which would override -h and serve the Thingino UI
+    # on the PegineLab port. Always pass our own config, even before auth.
+    umask 077
+    : > "$BOOTSTRAP_CONF"
+
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
         return 0
     fi
@@ -94,7 +102,7 @@ start() {
 
     if [ -s "$AUTH_CONF" ]; then
         echo "Starting authenticated PegineLab WIFICAM on port $WEB_PORT..."
-        httpd_run -f -p "$WEB_PORT" -h "$WEBROOT" -c "$AUTH_CONF" -r "PegineLab WIFICAM T23N" >>"$LOG" 2>&1 &
+        start_httpd -f -p "$WEB_PORT" -h "$WEBROOT" -c "$AUTH_CONF" -r "PegineLab WIFICAM T23N"
     elif [ "$ALLOW_UNAUTHENTICATED_WEB" = "1" ]; then
         if [ ! -f "$BOOTSTRAP_WEBROOT/index.html" ] || [ ! -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ]; then
             echo "WIFICAM first-boot setup files are missing under $BOOTSTRAP_WEBROOT" | tee -a "$LOG"
@@ -102,8 +110,9 @@ start() {
         fi
         echo "Starting PegineLab WIFICAM FIRST-BOOT CLAIM page on port $WEB_PORT..."
         # Before the admin password exists, expose only the setup-only webroot.
-        # The main dashboard/API is not served unauthenticated.
-        httpd_run -f -p "$WEB_PORT" -h "$BOOTSTRAP_WEBROOT" >>"$LOG" 2>&1 &
+        # The main dashboard/API is not served unauthenticated. Passing -c is
+        # mandatory so BusyBox never falls back to Thingino's /etc/httpd.conf.
+        start_httpd -f -p "$WEB_PORT" -h "$BOOTSTRAP_WEBROOT" -c "$BOOTSTRAP_CONF"
     else
         echo "WIFICAM web UI not started: no $AUTH_CONF"
         echo "Set a password with:"
@@ -111,7 +120,6 @@ start() {
         return 0
     fi
 
-    echo $! > "$PIDFILE"
     sleep 1
     if ! kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
         echo "WIFICAM httpd exited during startup; see $LOG" >&2
@@ -122,7 +130,13 @@ start() {
 
 stop() {
     if [ -f "$PIDFILE" ]; then
-        kill "$(cat "$PIDFILE")" 2>/dev/null || true
+        pid="$(cat "$PIDFILE")"
+        kill "$pid" 2>/dev/null || true
+        i=0
+        while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 20 ]; do
+            sleep 1
+            i=$((i + 1))
+        done
         rm -f "$PIDFILE"
     fi
 }
