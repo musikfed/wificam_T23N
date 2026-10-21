@@ -7,6 +7,7 @@ CONF=/etc/wificam/wificam.conf
 STATE_DIR="${SERVICE_STATE_DIR:-/opt/wificam/services}"
 VPN_DIR="${VPN_DIR:-/opt/wificam/vpn}"
 SSH_PORT="${SSH_PORT:-22}"
+SSH_PROTECT="${SSH_PROTECT:-0}"
 WG_CONF="${WIREGUARD_CONF:-$VPN_DIR/wg0.conf}"
 AWG_CONF="${AMNEZIAWG_CONF:-$VPN_DIR/awg0.conf}"
 
@@ -69,6 +70,10 @@ start_ssh() {
 }
 
 stop_ssh() {
+    if [ "$SSH_PROTECT" = "1" ] && [ "${WIFICAM_FORCE_SSH_STOP:-0}" != "1" ]; then
+        echo "SSH is protected by SSH_PROTECT=1; refusing to stop local recovery access" >&2
+        return 5
+    fi
     if [ -n "${SSH_STOP_CMD:-}" ]; then
         sh -c "$SSH_STOP_CMD"
     else
@@ -177,6 +182,10 @@ case "$cmd" in
     : > "$(enabled_file "$svc")"
     ;;
   disable)
+    if [ "$svc" = "ssh" ] && [ "$SSH_PROTECT" = "1" ]; then
+        echo "SSH is protected by SSH_PROTECT=1; disable refused" >&2
+        exit 5
+    fi
     stop_one "$svc"
     rm -f "$(enabled_file "$svc")"
     ;;
