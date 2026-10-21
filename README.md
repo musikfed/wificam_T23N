@@ -442,3 +442,15 @@ rootfs/
 web/
 docs/
 ```
+
+### PegineLab WIFICAM — тестовый вход 0.1_test
+
+```text
+http://CAMERA_IP:8090/
+login: admin
+password: Wificam12345
+```
+
+Это публичные LAN-only тестовые реквизиты. После входа пароль меняется в
+разделе **Система**. Для production тестовый auto-provision отключается и
+используется first-boot claim.
