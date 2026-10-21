@@ -5,7 +5,7 @@
 **АППАРАТНО ПОДТВЕРЖДЕНО 2026-10-21.** Канонический
 `Thingino/thingino-t23-sd.bin` успешно записан на SD, прошёл полный readback
 SHA256/MBR/MSPL/partition verification и загрузился на целевой камере.
-Загрузка SD подтверждена. Runtime-доступ PegineLab WIFICAM на `:8080` проверяется отдельно.
+Загрузка SD подтверждена. Runtime-доступ PegineLab WIFICAM на `:8090` проверяется отдельно.
 
 Зафиксированный SHA256:
 
@@ -40,6 +40,16 @@ Wi-Fi  : ATBM6012BX
 
 Аппаратный тест 2026-10-21 подтвердил загрузку этого профиля на целевой камере.
 
+## Порт PegineLab WIFICAM
+
+Проверка на реальной камере показала, что **TCP 8080 уже используется
+штатным Thingino camera/API stack**. Поэтому PegineLab WIFICAM работает на
+**TCP 8090**. Это userspace-настройка BusyBox `httpd`; ядро для смены порта
+пересобирать не нужно.
+
+Для уже загруженной камеры достаточно изменить `WEB_PORT` в
+`/etc/wificam/wificam.conf` и перезапустить `S90wificam`.
+
 ## Обязательная Web UI
 
 PegineLab WIFICAM — не дополнительный файл «на потом», а обязательная часть
@@ -53,12 +63,12 @@ Thingino stock UI     : http://CAMERA_IP/ или https://CAMERA_IP/
 Thingino login        : root
 Thingino password     : root
 
-PegineLab WIFICAM     : http://CAMERA_IP:8080/
+PegineLab WIFICAM     : http://CAMERA_IP:8090/
 ```
 
 Если браузер показывает `https://CAMERA_IP/login.html` с логотипом Thingino,
 это нормальная штатная Thingino Web UI. Для PegineLab нужно явно открыть
-`http://CAMERA_IP:8080/`.
+`http://CAMERA_IP:8090/`.
 
 Первый запуск WIFICAM настроен как локальный bootstrap без аутентификации:
 `ALLOW_UNAUTHENTICATED_WEB=1`. После задания пароля WIFICAM перезапускается
@@ -105,7 +115,7 @@ PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 4. собирает профиль `galayou_g2_t23n_sc2336_atbm6012bx`;
 5. включает MMC0 1-bit boot;
 6. задаёт root `/dev/mmcblk0p2`, ext4;
-7. включает BusyBox httpd для отдельной WIFICAM на TCP 8080;
+7. включает BusyBox httpd для отдельной WIFICAM на TCP 8090;
    Для минимальной PegineLab-админки проверяются только необходимые возможности:
    `CONFIG_HTTPD`, `CONFIG_FEATURE_HTTPD_CGI`,
    `CONFIG_FEATURE_HTTPD_BASIC_AUTH`, `CONFIG_FEATURE_HTTPD_AUTH_MD5`.
@@ -250,12 +260,12 @@ sync
 1. Камера показывает признаки Linux boot.
 2. Поднимается Thingino/Wi-Fi.
 3. Доступна штатная Thingino Web UI; default login root/root.
-4. Отдельно открыть http://CAMERA_IP:8080/ — это PegineLab WIFICAM.
+4. Отдельно открыть http://CAMERA_IP:8090/ — это PegineLab WIFICAM.
 5. WIFICAM status API отвечает.
 6. Snapshot preview работает при поднятом Prudynt.
 ```
 
-Если открывается только штатный Thingino, а `:8080` не отвечает, это не
+Если открывается только штатный Thingino, а `:8090` не отвечает, это не
 ошибка SD boot. Проверять нужно именно сервис WIFICAM:
 
 ```sh
