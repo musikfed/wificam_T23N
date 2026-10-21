@@ -1,3 +1,21 @@
+## 0.1_test default login
+
+The current hardware-test branch uses known LAN-only PegineLab credentials:
+
+```text
+URL:      http://CAMERA_IP:8090/
+login:    admin
+password: Wificam12345
+```
+
+This is intentionally **not production security**. It avoids the MD5-crypt
+compatibility problem observed on the pinned BusyBox/uClibc hardware image and
+makes Web UI access deterministic during hardware bring-up.
+
+The build uses `AUTO_PROVISION_TEST_WEB_AUTH=1` and plaintext BusyBox
+httpd.conf compatibility mode. Disable auto-provision for production to use
+the first-boot claim page.
+
 # PegineLab WIFICAM — first boot, authentication and SSH
 
 ## Web endpoints
