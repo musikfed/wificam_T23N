@@ -77,7 +77,7 @@
 
     <section id="system" class="page">
       <div class="panel"><h2 data-i18n="system">Система</h2><p>Camera: <b id="cameraState">—</b></p><p>Uptime: <span id="uptime">—</span></p><p>Web user: <b id="webUser">—</b></p><button class="danger" id="rebootBtn" data-i18n="reboot">Перезагрузить</button></div>
-      <div class="panel"><h2 data-i18n="webPassword">Пароль администратора Web UI</h2><form id="webPasswordForm"><label><span data-i18n="newPassword">Новый пароль</span><input id="newWebPassword" type="password" minlength="10" required></label><label><span data-i18n="repeatPassword">Повторить пароль</span><input id="repeatWebPassword" type="password" minlength="10" required></label><button type="submit" data-i18n="changePassword">Сменить пароль</button></form><p class="muted" data-i18n="authHint">После смены пароля HTTP-аутентификация перезапустится.</p></div>
+      <div class="panel"><h2 data-i18n="webPassword">Пароль администратора Web UI</h2><form id="webPasswordForm"><label><span data-i18n="newPassword">Новый пароль</span><input id="newWebPassword" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" required></label><label><span data-i18n="repeatPassword">Повторить пароль</span><input id="repeatWebPassword" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" required></label><button type="submit" data-i18n="changePassword">Сменить пароль</button></form><p class="muted" data-i18n="authHint">После смены пароля HTTP-аутентификация перезапустится.</p></div>
     </section>
 
     <section id="firmware" class="page"><div class="panel"><h2 data-i18n="firmware">Обновление</h2><p data-i18n="fwHint">Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.</p></div></section>
