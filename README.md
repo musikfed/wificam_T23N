@@ -14,7 +14,7 @@ SHA256: f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be
 
 Подтверждено: запись SD, полный SHA readback, MBR, MSPL на LBA34,
 разделы и фактическая загрузка Thingino с SD. Runtime PegineLab WIFICAM на
-TCP 8080 проверяется отдельно; наличие файлов WIFICAM внутри rootfs уже
+TCP 8090 проверяется отдельно; наличие файлов WIFICAM внутри rootfs уже
 проверяется build pipeline.
 
 
@@ -101,12 +101,12 @@ Web UI является **обязательным acceptance criterion**, но 
 ```text
 Thingino stock UI    : http://CAMERA_IP/ или https://CAMERA_IP/
 Thingino login       : root / root (заводское значение текущего образа)
-PegineLab WIFICAM    : http://CAMERA_IP:8080/
+PegineLab WIFICAM    : http://CAMERA_IP:8090/
 ```
 
 Если браузер показывает `https://CAMERA_IP/login.html` с логотипом Thingino,
 это **штатная Thingino Web UI**, а не ошибка и не PegineLab. Для WIFICAM нужно
-явно открыть **HTTP port 8080**.
+явно открыть **HTTP port 8090**.
 
 На первом запуске WIFICAM настроена как локальный bootstrap без HTTP-аутентификации
 (`ALLOW_UNAUTHENTICATED_WEB=1`). После задания пароля WIFICAM использует
@@ -328,7 +328,7 @@ sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 `rootfs.ext2`. Старый OpenIPC SD-root путь сохранён как экспериментальный и
 не является текущим аппаратным тестом.
 
-WIFICAM добавляет Web UI/API, отдельный httpd на TCP 8080, управление Wi‑Fi,
+WIFICAM добавляет Web UI/API, отдельный httpd на TCP 8090, управление Wi‑Fi,
 storage, optional SSH/WireGuard/AmneziaWG и интеграцию с Thingino Prudynt для
 status/start/stop, snapshot и recording.
 
@@ -347,6 +347,16 @@ Splash/audio запускаются неблокирующе. Они появя�
 userspace имеет рабочий framebuffer/audio player. Копии logo/jingle также лежат
 на p1 BOOT, но T23 BootROM их сам не отображает и не проигрывает.
 
+## Почему PegineLab не на 8080
+
+На аппаратном тесте 2026-10-21 подтверждено, что TCP **8080 уже занят штатным
+Thingino camera/API stack** (в частности Thingino использует
+`http://127.0.0.1:8080/api/v1/config`; Raptor preview также зависит от этого
+backend). Поэтому PegineLab WIFICAM перенесена на **TCP 8090**.
+
+Это изменение только userspace-конфигурации BusyBox `httpd`: пересборка
+Linux kernel не требуется.
+
 ## Web
 
 После успешной загрузки canonical Thingino image и получения IP:
@@ -357,12 +367,12 @@ Thingino TLS UI   : https://CAMERA_IP/
 Thingino login    : root
 Thingino password : root
 
-PegineLab WIFICAM : http://CAMERA_IP:8080/
+PegineLab WIFICAM : http://CAMERA_IP:8090/
 ```
 
 **Не путать интерфейсы.** Страница `/login.html` по HTTPS с логотипом
 Thingino — это штатная Web UI. PegineLab WIFICAM специально запущена вторым
-BusyBox `httpd` на TCP 8080 и открывается по **HTTP**.
+BusyBox `httpd` на TCP 8090 и открывается по **HTTP**.
 
 Первый запуск WIFICAM:
 
@@ -370,12 +380,12 @@ BusyBox `httpd` на TCP 8080 и открывается по **HTTP**.
 ALLOW_UNAUTHENTICATED_WEB=1
 ```
 
-То есть если `/opt/wificam/httpd.conf` ещё не создан, WIFICAM на 8080
+То есть если `/opt/wificam/httpd.conf` ещё не создан, WIFICAM на 8090
 стартует без логина для локальной первичной настройки. После задания пароля
 она перезапускается с Basic Auth. Команда по умолчанию создаёт пользователя
 `admin`.
 
-Если `http://CAMERA_IP:8080/` не отвечает, SD boot всё равно может быть
+Если `http://CAMERA_IP:8090/` не отвечает, SD boot всё равно может быть
 успешен. Тогда проверяется именно сервис WIFICAM:
 
 ```sh
