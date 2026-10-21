@@ -10,7 +10,7 @@ STATE_DIR="${STATE_DIR:-/opt/wificam}"
 AUTH_CONF="${AUTH_CONF:-$STATE_DIR/httpd.conf}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_UNAUTHENTICATED_WEB="${ALLOW_UNAUTHENTICATED_WEB:-0}"
-WEB_PORT="${WEB_PORT:-8080}"
+WEB_PORT="${WEB_PORT:-8090}"
 MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
 MEDIA_FALLBACKS="${MEDIA_FALLBACKS:-/mnt/mmcblk0p1 /mnt/sdcard /mnt/sda0}"
 
