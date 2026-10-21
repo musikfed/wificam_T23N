@@ -126,7 +126,8 @@ BR2_TARGET_ROOTFS_EXT2_MKFS_OPTIONS="-O ^metadata_csum,^64bit,^orphan_file"
 BR2_TARGET_ROOTFS_EXT2_SIZE="64M"
 
 # PegineLab WIFICAM deliberately uses BusyBox httpd as the smallest CGI server.
-# Required by our current admin: httpd + CGI + Basic Auth + MD5 password hashing.
+# Required by our current admin: httpd + CGI + Basic Auth. The verified
+# 0.1_test credentials use BusyBox plaintext httpd.conf compatibility mode.
 BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y
 BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES="$BUSYBOX_WIFICAM_FRAGMENT"
 
@@ -178,7 +179,6 @@ grep -Fq "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES=\"$BUSYBOX_WIFICAM_FRAGMENT\
 BUSYBOX_REQUIRED_OPTS="
 CONFIG_HTTPD
 CONFIG_FEATURE_HTTPD_BASIC_AUTH
-CONFIG_FEATURE_HTTPD_AUTH_MD5
 CONFIG_FEATURE_HTTPD_CGI
 "
 
@@ -211,7 +211,7 @@ fi
 for opt in $BUSYBOX_REQUIRED_OPTS; do
     if ! grep -q "^$opt=y$" "$BUSYBOX_CONFIG"; then
         echo "BusyBox HTTP config after reconfigure:" >&2
-        grep -E '^(# )?CONFIG_(HTTPD|FEATURE_HTTPD_(CGI|BASIC_AUTH|AUTH_MD5))' "$BUSYBOX_CONFIG" >&2 || true
+        grep -E '^(# )?CONFIG_(HTTPD|FEATURE_HTTPD_(CGI|BASIC_AUTH))' "$BUSYBOX_CONFIG" >&2 || true
         die "BusyBox HTTP feature missing after reconfigure: $opt"
     fi
 done
