@@ -1,6 +1,6 @@
 # PegineLab WIFICAM T23 SD — 0.1_test
 
-**Status:** SD boot hardware verified; WIFICAM :8080 runtime check pending / SD boot аппаратно подтверждён; проверка WIFICAM :8080 ожидается  
+**Status:** SD boot hardware verified; WIFICAM :8090 runtime check pending / SD boot аппаратно подтверждён; проверка WIFICAM :8090 ожидается  
 **Date:** 2026-10-21  
 **Branch:** `mymarrchWFcam`
 
@@ -15,7 +15,7 @@
 - U-Boot proper на LBA86;
 - FAT16 boot partition с `/uImage`;
 - ext4 rootfs на `/dev/mmcblk0p2`;
-- PegineLab WIFICAM включена в rootfs; runtime-проверка `http://CAMERA_IP:8080/` ещё требуется.
+- PegineLab WIFICAM включена в rootfs; runtime-проверка `http://CAMERA_IP:8090/` ещё требуется.
 
 Файл:
 `Thingino/thingino-t23-sd.bin`
@@ -44,7 +44,7 @@ Verified on the target camera:
 - U-Boot proper at LBA86;
 - FAT16 boot partition with `/uImage`;
 - ext4 rootfs at `/dev/mmcblk0p2`;
-- PegineLab WIFICAM is embedded in rootfs; runtime verification at `http://CAMERA_IP:8080/` is still required.
+- PegineLab WIFICAM is embedded in rootfs; runtime verification at `http://CAMERA_IP:8090/` is still required.
 
 Image:
 `Thingino/thingino-t23-sd.bin`
@@ -66,12 +66,19 @@ The firmware exposes two separate interfaces / В прошивке две отд
 Thingino stock UI : http://CAMERA_IP/ or https://CAMERA_IP/
 login/password    : root / root
 
-PegineLab WIFICAM : http://CAMERA_IP:8080/
+PegineLab WIFICAM : http://CAMERA_IP:8090/
 ```
 
 Seeing `https://CAMERA_IP/login.html` with Thingino branding is expected and
 does not mean PegineLab was replaced. WIFICAM must be tested separately on
-HTTP port 8080.
+HTTP port 8090.
 
 First WIFICAM boot uses `ALLOW_UNAUTHENTICATED_WEB=1`; once a password is
 configured, the default WIFICAM username is `admin`.
+
+
+## 8080 conflict / конфликт 8080
+
+Hardware testing showed that Thingino already owns TCP 8080 for its camera/API
+stack. PegineLab WIFICAM is therefore assigned TCP **8090**. This is a
+userspace-only change and does not require rebuilding the kernel.
