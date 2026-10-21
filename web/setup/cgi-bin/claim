@@ -1,0 +1,61 @@
+#!/bin/sh
+set -u
+
+CONF=/etc/wificam/wificam.conf
+[ -f "$CONF" ] && . "$CONF"
+AUTH_CONF="${AUTH_CONF:-/opt/wificam/httpd.conf}"
+CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
+
+REQUEST_DATA=""
+if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
+    IFS= read -r REQUEST_DATA || true
+fi
+
+urldecode() {
+    printf '%b' "$(printf '%s' "$1" | sed 's/+/ /g; s/%/\\x/g')"
+}
+
+param() {
+    key="$1"
+    data="${QUERY_STRING:-}"
+    [ -z "$REQUEST_DATA" ] || data="$data&$REQUEST_DATA"
+    printf '%s' "$data" | tr '&' '\n' | while IFS='=' read -r k v; do
+        [ "$k" = "$key" ] && { urldecode "$v"; break; }
+    done
+}
+
+header() {
+    echo "Content-Type: application/json; charset=utf-8"
+    echo "Cache-Control: no-store"
+    echo
+}
+
+fail() {
+    header
+    printf '{"ok":false,"error":"%s"}\n' "$1"
+    exit 0
+}
+
+if [ "${REQUEST_METHOD:-GET}" = "GET" ]; then
+    csrf="$(cat "$CSRF_FILE" 2>/dev/null || true)"
+    header
+    if [ -s "$AUTH_CONF" ]; then claimed=true; else claimed=false; fi
+    printf '{"ok":true,"claimed":%s,"csrf":"%s"}\n' "$claimed" "$csrf"
+    exit 0
+fi
+
+[ "${REQUEST_METHOD:-}" = "POST" ] || fail "POST required"
+[ ! -s "$AUTH_CONF" ] || fail "already claimed"
+
+expected="$(cat "$CSRF_FILE" 2>/dev/null || true)"
+supplied="$(param csrf)"
+[ -n "$expected" ] && [ "$supplied" = "$expected" ] || fail "CSRF check failed"
+
+password="$(param password)"
+[ "${#password}" -ge 10 ] || fail "password must be at least 10 characters"
+
+out="$(printf '%s' "$password" | wificam-set-web-password admin 2>&1)" || fail "$out"
+
+header
+printf '{"ok":true,"message":"claimed"}\n'
+(sleep 1; /etc/init.d/S90wificam restart) >/dev/null 2>&1 &
