@@ -1,6 +1,7 @@
 # Thingino T23N SD + PegineLab WIFICAM
 
 Подробно про первый запуск, авторизацию, SSH Windows/Linux и ошибки: `../docs/FIRST_BOOT_SSH_RU.md`.
+Оптимизация загрузки и список обязательных Raptor-сервисов: `../docs/BOOT_OPTIMIZATION_RU.md`.
 
 ## Статус 0.1_test
 
