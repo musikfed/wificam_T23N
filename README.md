@@ -120,6 +120,9 @@ whole SD card and boots `uImage` from p1 with ext4 root on
 Русская инструкция: `Thingino/README_RU.md`  
 English instructions: `Thingino/README_EN.md`
 
+Первый запуск / SSH / типовые ошибки: `docs/FIRST_BOOT_SSH_RU.md`  
+First boot / SSH / troubleshooting: `docs/FIRST_BOOT_SSH_EN.md`
+
 ## Разметка SD
 
 Канонический `Thingino/thingino-t23-sd.bin` — **полный disk image**. Он
