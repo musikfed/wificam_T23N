@@ -3,6 +3,19 @@ set -u
 
 echo "Cache-Control: no-store"
 
+if command -v raptorctl >/dev/null 2>&1 && pidof rvd >/dev/null 2>&1; then
+    TMP="$(mktemp /tmp/wificam-snap.XXXXXX.jpg)" || exit 1
+    trap 'rm -f "$TMP"' EXIT INT TERM
+    if raptorctl rvd save jpeg "$TMP" 0 >/dev/null 2>&1 && [ -s "$TMP" ]; then
+        echo "Content-Type: image/jpeg"
+        echo
+        cat "$TMP"
+        exit 0
+    fi
+    rm -f "$TMP"
+    trap - EXIT INT TERM
+fi
+
 if command -v prudyntctl >/dev/null 2>&1; then
     TMP="$(mktemp /tmp/wificam-snap.XXXXXX.jpg)" || exit 1
     trap 'rm -f "$TMP"' EXIT INT TERM
