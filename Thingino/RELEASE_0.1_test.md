@@ -1,6 +1,6 @@
 # PegineLab WIFICAM T23 SD — 0.1_test
 
-**Status:** SD boot hardware verified; WIFICAM :8090 runtime check pending / SD boot аппаратно подтверждён; проверка WIFICAM :8090 ожидается  
+**Status:** SD boot + PegineLab UI/login hardware verified; API/snapshot pending / SD boot + вход в PegineLab аппаратно подтверждены; API/snapshot ещё проверяются  
 **Date:** 2026-10-21  
 **Branch:** `mymarrchWFcam`
 
@@ -15,7 +15,7 @@
 - U-Boot proper на LBA86;
 - FAT16 boot partition с `/uImage`;
 - ext4 rootfs на `/dev/mmcblk0p2`;
-- PegineLab WIFICAM включена в rootfs; runtime-проверка `http://CAMERA_IP:8090/` ещё требуется.
+- PegineLab WIFICAM реально открылась на `http://CAMERA_IP:8090/` и принимает тестовый вход `admin / Wificam12345`;
 
 Файл:
 `Thingino/thingino-t23-sd.bin`
@@ -44,7 +44,7 @@ Verified on the target camera:
 - U-Boot proper at LBA86;
 - FAT16 boot partition with `/uImage`;
 - ext4 rootfs at `/dev/mmcblk0p2`;
-- PegineLab WIFICAM is embedded in rootfs; runtime verification at `http://CAMERA_IP:8090/` is still required.
+- PegineLab WIFICAM opened successfully at `http://CAMERA_IP:8090/` and accepts the test login `admin / Wificam12345`;
 
 Image:
 `Thingino/thingino-t23-sd.bin`
@@ -117,3 +117,19 @@ the generated BusyBox MD5-crypt entry, so current source uses the BusyBox
 plaintext httpd.conf format for deterministic test access. Change the password
 from PegineLab **System** after login. Production builds disable test
 auto-provision and use first-boot claim.
+
+
+## Hardware-verified BusyBox httpd format
+
+The configuration that actually worked on the target camera is:
+
+```text
+H:/usr/share/wificam-web
+/:admin:Wificam12345
+```
+
+Current source generates this format automatically and starts BusyBox httpd
+with its own `-c /opt/wificam/httpd.conf`. This prevents Thingino's
+`/etc/httpd.conf` from replacing the PegineLab webroot.
+
+SSH/Dropbear remains mandatory and protected for local recovery.
