@@ -101,3 +101,19 @@ by creating the PegineLab `admin` password and restarting the web services as
 documented in `docs/FIRST_BOOT_SSH_RU.md`.
 
 These are userspace/rootfs changes; a Linux kernel rebuild is not required.
+
+
+## PegineLab test login / тестовый вход
+
+```text
+URL:      http://CAMERA_IP:8090/
+login:    admin
+password: Wificam12345
+```
+
+These credentials are intentionally public for the LAN-only `0.1_test`
+hardware bring-up. The running T23N image showed a persistent 401 when using
+the generated BusyBox MD5-crypt entry, so current source uses the BusyBox
+plaintext httpd.conf format for deterministic test access. Change the password
+from PegineLab **System** after login. Production builds disable test
+auto-provision and use first-boot claim.
