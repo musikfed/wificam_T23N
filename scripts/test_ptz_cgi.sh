@@ -18,6 +18,7 @@ chmod +x "$TMP/bin/wificam-ptz-ctl"
 export PATH="$TMP/bin:$PATH"
 API="$ROOT/web/cgi-bin/api"
 QUERY_STRING='op=ptz_status' REQUEST_METHOD=GET sh "$API" > "$TMP/status"
+echo "DEBUG CGI status output:"; cat "$TMP/status"
 grep -q '^Content-Type: application/json' "$TMP/status"
 grep -q '"ptz":true' "$TMP/status"
 printf '%s\n' 'direction=left' |
