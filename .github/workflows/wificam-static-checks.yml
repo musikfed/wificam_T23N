@@ -26,5 +26,7 @@ jobs:
         run: sh scripts/test_ptz_sim.sh
       - name: PTZ CGI JSON and auth tests
         run: sh scripts/test_ptz_cgi.sh
-      - name: JavaScript syntax
-        run: node --check web/app.js
+      - name: JavaScript syntax and browser lazy-stream lifecycle
+        run: |
+          node --check web/app.js
+          node scripts/test_web_lazy_preview.js
