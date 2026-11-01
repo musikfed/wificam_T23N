@@ -25,6 +25,6 @@ jobs:
       - name: Simulated physical PTZ commands and reverse axes
         run: sh scripts/test_ptz_sim.sh
       - name: PTZ CGI JSON and auth tests
-        run: sh scripts/test_ptz_cgi.sh
+        run: sh -x scripts/test_ptz_cgi.sh
       - name: JavaScript syntax
         run: node --check web/app.js
