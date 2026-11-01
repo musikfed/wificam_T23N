@@ -147,3 +147,19 @@ WIFICAM собирается на Acer в **WSL Ubuntu 24.04 на Windows дис
 `.109` — DEXP с AmneziaWG и Docker Compose, `.100` — GPU CORE для LLM.
 Остальная архитектура, CPU, RAM, Python/uv и правила безопасности:
 [PEGINELAB_LAB_ARCHITECTURE_RU.md](PEGINELAB_LAB_ARCHITECTURE_RU.md).
+
+## Ориентация и речь для Hombo3
+
+Зеркалирование/переворот и digital zoom в вебморде T23N меняют
+**только браузерный просмотр**; pan/tilt reverse настраивается
+отдельно, сохраняется и влияет на физический привод мотора.
+Для Hombo3 есть отдельные mirror/flip, ручной ONVIF focus near/far
+(короткий импульс + Stop), запрос автофокуса и оптического zoom.
+Аппаратная фокусировка и оптический zoom на Galayou G2 не доказаны.
+
+Голосовой контур Hombo3: микрофон RTSP → Acer Windows FFmpeg →
+доверенный Whisper-STT `.100` → Ollama LLM → Acer SAPI TTS →
+динамик T23N через SSH `play/rac`. Это opt-in ручное 5-секундное
+распознавание, по умолчанию выключено. До проверки реальной
+аудиодорожки и динамика не называть это рабочим.
+[Инструкция PTZ/аудио](https://github.com/musikfed/Hombo3_3.0.0/blob/main/docs/CAMERA_PTZ_AUDIO_RU.md).
