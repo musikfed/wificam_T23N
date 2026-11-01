@@ -1,0 +1,65 @@
+#!/bin/sh
+# Safe, bounded local PTZ commands for Galayou/Thingino motors.
+# Direction changes do not reload drivers or reboot the camera.
+set -eu
+STATE_DIR=/opt/wificam
+[ -f /etc/wificam/wificam.conf ] && . /etc/wificam/wificam.conf
+STATE_DIR="${STATE_DIR:-/opt/wificam}"
+CONF="$STATE_DIR/ptz-controls.conf"
+PTZ_STEP="${PTZ_STEP:-50}"
+case "$PTZ_STEP" in ''|*[!0-9]*) PTZ_STEP=50 ;; esac
+[ "$PTZ_STEP" -le 150 ] && [ "$PTZ_STEP" -ge 1 ] || PTZ_STEP=50
+
+inverted() {
+    value="$(sed -n "s/^$1=//p" "$CONF" 2>/dev/null | tail -n1)"
+    [ "$value" = 1 ] && echo 1 || echo 0
+}
+has_motors() {
+    command -v motors >/dev/null 2>&1 &&
+    { pidof motors-daemon >/dev/null 2>&1 || [ -S /run/motors.sock ]; }
+}
+status() {
+    pan="$(inverted PAN_INVERT)"
+    tilt="$(inverted TILT_INVERT)"
+    available=false
+    has_motors && available=true
+    printf '{"ok":true,"ptz":%s,"pan_invert":%s,"tilt_invert":%s,"step":%s,"autofocus":false,"optical_zoom":false}\n' \
+       "$available" "$([ "$pan" = 1 ] && echo true || echo false)" \
+       "$([ "$tilt" = 1 ] && echo true || echo false)" "$PTZ_STEP"
+}
+move() {
+    has_motors || { echo "Thingino motors daemon is unavailable" >&2; exit 3; }
+    direction="$1"
+    pan="$(inverted PAN_INVERT)"
+    tilt="$(inverted TILT_INVERT)"
+    case "$direction" in
+      left)  x="-$PTZ_STEP"; [ "$pan" = 1 ] && x="$PTZ_STEP"; motors -d g -x "$x" ;;
+      right) x="$PTZ_STEP";  [ "$pan" = 1 ] && x="-$PTZ_STEP"; motors -d g -x "$x" ;;
+      up)    y="-$PTZ_STEP"; [ "$tilt" = 1 ] && y="$PTZ_STEP"; motors -d g -y "$y" ;;
+      down)  y="$PTZ_STEP";  [ "$tilt" = 1 ] && y="-$PTZ_STEP"; motors -d g -y "$y" ;;
+      *) echo "Unknown PTZ direction" >&2; exit 2 ;;
+    esac
+}
+set_invert() {
+    axis="$1"
+    value="$2"
+    case "$axis" in pan|tilt) ;; *) exit 2 ;; esac
+    case "$value" in 0|1) ;; *) exit 2 ;; esac
+    mkdir -p "$STATE_DIR"
+    pan="$(inverted PAN_INVERT)"
+    tilt="$(inverted TILT_INVERT)"
+    [ "$axis" != pan ] || pan="$value"
+    [ "$axis" != tilt ] || tilt="$value"
+    tmp="$CONF.tmp.$$"
+    umask 077
+    trap 'rm -f "$tmp"' EXIT HUP INT TERM
+    printf 'PAN_INVERT=%s\nTILT_INVERT=%s\n' "$pan" "$tilt" > "$tmp"
+    mv "$tmp" "$CONF"
+    trap - EXIT HUP INT TERM
+}
+case "${1:-}" in
+ status) status ;;
+ move) [ "$#" -eq 2 ] || exit 2; move "$2" ;;
+ invert) [ "$#" -eq 3 ] || exit 2; set_invert "$2" "$3"; status ;;
+ *) echo "Usage: $0 {status|move left|right|up|down|invert pan|tilt 0|1}" >&2; exit 2 ;;
+esac
