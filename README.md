@@ -551,3 +551,12 @@ ssh root@CAMERA_IP 'sh /tmp/camera_fix_wificam_0_1_test.sh'
 
 Важно: `0.1_test` — сохранённый аппаратный baseline, но новый BusyBox CGI
 фикс ещё не записан на SD и не испытан на железе.
+
+## Архитектура лаборатории PegineLab / Lab infrastructure
+
+**Не путать среды:** прошивка Thingino WIFICAM собирается в **Ubuntu 24.04 внутри WSL (дистрибутив на D:)** на Acer Swift 3; **Hombo3 запускается нативно в Windows 11 Pro** на этом же Acer. Сам Acer — центральный посредник и пульт. **.109 DEXP** — Docker Compose/AmneziaWG VPN/edge/2FA; **.100 Huananzhi X79 + RTX 3060** — GPU LLM CORE; **.103 Ardor** — GRAPHICS; **.101 Tenda E205** — управляемый коммутатор. Tenda TX12 — роутер. Сценарии без облака производителя камеры, локальный SSH recovery, видеокадры на Acer, тяжёлый LLM на CORE.
+
+Инвентаризация оборудования (CPU/RAM/SSD/GPU), Windows/WSL/Python/uv, топология сети, архитектурные принципы и ограничения безопасности записаны:
+[RU — архитектура лаборатории](docs/PEGINELAB_LAB_ARCHITECTURE_RU.md) ·
+[EN — Lab architecture](docs/PEGINELAB_LAB_ARCHITECTURE_EN.md).
+Для дальнейших изменений также читать [AGENTS.md](AGENTS.md).
