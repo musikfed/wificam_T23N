@@ -1,28 +1,41 @@
 #!/bin/sh
 set -eu
 
+REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 MEDIA_GIB="${MEDIA_GIB:-20}"
+
+# T23 BootROM/U-Boot raw SD layout.
+RAW_RESERVE_MIB=1
+SD_UBOOT_SECTOR=34
+SD_UBOOT_ENV_SECTOR=546
+
 BOOT_MIB=128
 MEDIA_MIB=$((MEDIA_GIB * 1024))
-RESERVE_MIB=8
+END_RESERVE_MIB=8
 MIN_ROOTFS_MIB=2048
 
 usage() {
-    echo "Usage: sudo $0 /dev/sdX --yes [uImage] [FULL-rootfs.tar.gz]"
-    echo "DESTROYS ALL DATA on the selected device."
-    echo "Layout: BOOT 128 MiB + ROOTFS all remaining space + MEDIA ${MEDIA_GIB} GiB."
-    echo "The rootfs archive must be a COMPLETE bootable userspace."
+    echo "Usage: sudo $0 /dev/sdX --yes T23N-SD-u-boot.bin uImage [FULL-rootfs.tar.gz]" >&2
+    echo "DESTROYS ALL DATA on the selected SD card." >&2
+    echo "This layout is for a T23/T23N camera with NO SPI/NOR boot flash." >&2
     exit 2
 }
 
-[ "$#" -ge 2 ] || usage
+[ "$#" -ge 4 ] || usage
 DEV="$1"
 CONFIRM="$2"
-IMAGE="${3:-}"
-ROOTFS_TAR="${4:-}"
+BOOTLOADER="$3"
+IMAGE="$4"
+ROOTFS_TAR="${5:-}"
 
 [ "$CONFIRM" = "--yes" ] || usage
+[ "$(id -u)" -eq 0 ] || { echo "Run as root/sudo" >&2; exit 1; }
 [ -b "$DEV" ] || { echo "Not a block device: $DEV" >&2; exit 1; }
+[ -f "$BOOTLOADER" ] || { echo "SD U-Boot not found: $BOOTLOADER" >&2; exit 1; }
+[ -f "$IMAGE" ] || { echo "uImage not found: $IMAGE" >&2; exit 1; }
+command -v readlink >/dev/null 2>&1 || { echo "Missing host tool: readlink" >&2; exit 1; }
+IMAGE_REAL="$(readlink -f "$IMAGE")"
+[ -f "$IMAGE_REAL" ] || { echo "Resolved uImage not found: $IMAGE_REAL" >&2; exit 1; }
 
 case "$DEV" in
   /dev/sd[a-z]|/dev/mmcblk[0-9]) ;;
@@ -34,6 +47,10 @@ case "$ROOT_SRC" in
   "$DEV"*) echo "REFUSING: $DEV contains the running root filesystem" >&2; exit 1 ;;
 esac
 
+for cmd in blockdev sfdisk wipefs mkfs.vfat mkfs.ext4 dd od sha256sum stat mount umount lsblk python3; do
+    command -v "$cmd" >/dev/null 2>&1 || { echo "Missing host tool: $cmd" >&2; exit 1; }
+done
+
 part() {
     case "$DEV" in
       /dev/mmcblk*) echo "${DEV}p$1" ;;
@@ -42,83 +59,178 @@ part() {
 }
 
 BYTES="$(blockdev --getsize64 "$DEV")"
-TOTAL_MIB=$((BYTES / 1024 / 1024))
-ROOTFS_MIB=$((TOTAL_MIB - 1 - BOOT_MIB - MEDIA_MIB - RESERVE_MIB))
+SECTOR_SIZE="$(blockdev --getss "$DEV")"
+TOTAL_SECTORS=$((BYTES / SECTOR_SIZE))
 
-[ "$ROOTFS_MIB" -ge "$MIN_ROOTFS_MIB" ] || {
-    echo "REFUSING: card is too small." >&2
-    echo "Total: ${TOTAL_MIB} MiB; requested MEDIA: ${MEDIA_MIB} MiB; ROOTFS would be only ${ROOTFS_MIB} MiB." >&2
+[ "$SECTOR_SIZE" -eq 512 ] || {
+    echo "REFUSING: T23 raw SD boot layout is defined for 512-byte sectors; got $SECTOR_SIZE" >&2
     exit 1
 }
 
+SECTORS_PER_MIB=2048
+RAW_RESERVE_SECTORS=$((RAW_RESERVE_MIB * SECTORS_PER_MIB))
+BOOT_START=$RAW_RESERVE_SECTORS
+BOOT_SECTORS=$((BOOT_MIB * SECTORS_PER_MIB))
+MEDIA_SECTORS=$((MEDIA_MIB * SECTORS_PER_MIB))
+END_RESERVE_SECTORS=$((END_RESERVE_MIB * SECTORS_PER_MIB))
+
+ROOTFS_START=$((BOOT_START + BOOT_SECTORS))
+ROOTFS_SECTORS=$((TOTAL_SECTORS - ROOTFS_START - MEDIA_SECTORS - END_RESERVE_SECTORS))
+ROOTFS_SECTORS=$((ROOTFS_SECTORS / SECTORS_PER_MIB * SECTORS_PER_MIB))
+MEDIA_START=$((ROOTFS_START + ROOTFS_SECTORS))
+
+ROOTFS_MIB=$((ROOTFS_SECTORS / SECTORS_PER_MIB))
+TOTAL_MIB=$((BYTES / 1024 / 1024))
+
+[ "$ROOTFS_MIB" -ge "$MIN_ROOTFS_MIB" ] || {
+    echo "REFUSING: card is too small." >&2
+    echo "Total: ${TOTAL_MIB} MiB; ROOTFS would be only ${ROOTFS_MIB} MiB." >&2
+    exit 1
+}
+
+# Validate the specially built MMC SPL/U-Boot image.
+UBOOT_MAGIC="$(od -An -tx4 -N4 "$BOOTLOADER" | tr -d ' \n')"
+[ "$UBOOT_MAGIC" = "4d53504c" ] || {
+    echo "REFUSING: $BOOTLOADER is not a T23 MMC SPL image (magic=$UBOOT_MAGIC)" >&2
+    exit 1
+}
+UBOOT_SIZE="$(stat -c '%s' "$BOOTLOADER")"
+UBOOT_MAX=$(((SD_UBOOT_ENV_SECTOR - SD_UBOOT_SECTOR) * 512))
+[ "$UBOOT_SIZE" -le "$UBOOT_MAX" ] || {
+    echo "REFUSING: bootloader overlaps the SD U-Boot environment area." >&2
+    exit 1
+}
+
+# uImage is normally a symlink to uImage.lzma. Resolve it once and size
+# the opened target file, avoiding symlink-size ambiguity.
+KERNEL_SIZE="$(wc -c < "$IMAGE_REAL" | tr -d ' ')"
+
+# Generate PegineLab jingle if needed.
+if [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "$REPO_DIR/tools/generate_boot_jingle.py"
+fi
+
 echo "WARNING: ALL DATA ON $DEV WILL BE DESTROYED"
 echo
-echo "Planned layout:"
-echo "  BOOT   : ${BOOT_MIB} MiB FAT32"
-echo "  ROOTFS : ${ROOTFS_MIB} MiB ext4"
-echo "  MEDIA  : ${MEDIA_MIB} MiB ext4 (${MEDIA_GIB} GiB)"
+echo "AUTONOMOUS T23N SD layout (no SPI/NOR):"
+echo "  raw 0..1 MiB  : DOS/MBR + SPL/U-Boot + environment"
+echo "  SPL/U-Boot    : sector $SD_UBOOT_SECTOR (17 KiB)"
+echo "  kernel boot   : BOOT FAT32 /uImage"
+echo "  BOOT          : ${BOOT_MIB} MiB FAT32, starts at ${RAW_RESERVE_MIB} MiB"
+echo "  ROOTFS        : ${ROOTFS_MIB} MiB ext4 (/dev/mmcblk0p2)"
+echo "  MEDIA         : ${MEDIA_MIB} MiB ext4 (${MEDIA_GIB} GiB)"
 echo
-lsblk "$DEV"
+lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS "$DEV"
 sleep 2
 
 for n in 1 2 3; do
     umount "$(part "$n")" 2>/dev/null || true
 done
 
-wipefs -a "$DEV"
+# Recreate the proven installer-compatible boot area. Partition 1 starts at 1 MiB.
+dd if=/dev/zero of="$DEV" bs=1M count="$RAW_RESERVE_MIB" conv=fsync status=none
+wipefs -a "$DEV" >/dev/null 2>&1 || true
 
 sfdisk "$DEV" <<EOF
 label: dos
-unit: MiB
+unit: sectors
 
-start=1, size=$BOOT_MIB, type=c, bootable
-         size=$ROOTFS_MIB, type=83
-         size=$MEDIA_MIB, type=83
+start=$BOOT_START, size=$BOOT_SECTORS, type=0c, bootable
+start=$ROOTFS_START, size=$ROOTFS_SECTORS, type=83
+start=$MEDIA_START, size=$MEDIA_SECTORS, type=83
 EOF
+
 
 sync
 partprobe "$DEV" 2>/dev/null || true
 sleep 2
 
-mkfs.vfat -F 32 -n BOOT "$(part 1)"
-mkfs.ext4 -F -L ROOTFS "$(part 2)"
-mkfs.ext4 -F -L MEDIA "$(part 3)"
+P1="$(part 1)"
+P2="$(part 2)"
+P3="$(part 3)"
+[ -b "$P1" ] && [ -b "$P2" ] && [ -b "$P3" ] || {
+    echo "Partition nodes did not appear: $P1 $P2 $P3" >&2
+    exit 1
+}
 
+mkfs.vfat -F 32 -n BOOT "$P1"
+
+# Linux 3.10 must mount ROOTFS before any userspace is available. Do not use
+# Ubuntu 24.04's newer default ext4 incompat features (notably orphan_file and
+# metadata checksums/64-bit layout) on either filesystem the camera mounts.
+EXT4_COMPAT_OPTS="-O ^64bit,^metadata_csum,^orphan_file"
+mkfs.ext4 -F $EXT4_COMPAT_OPTS -L ROOTFS "$P2"
+mkfs.ext4 -F $EXT4_COMPAT_OPTS -L MEDIA "$P3"
+
+echo "Writing T23N SD SPL/U-Boot at sector $SD_UBOOT_SECTOR ..."
+dd if="$BOOTLOADER" of="$DEV" bs=512 seek="$SD_UBOOT_SECTOR" conv=notrunc,fsync status=none
+
+DISK_MAGIC="$(dd if="$DEV" bs=512 skip="$SD_UBOOT_SECTOR" count=1 status=none | od -An -tx4 -N4 | tr -d ' \n')"
+[ "$DISK_MAGIC" = "4d53504c" ] || {
+    echo "REFUSING: SPL readback magic mismatch: $DISK_MAGIC" >&2
+    exit 1
+}
+
+EXPECTED_KERNEL_SHA="$(sha256sum "$IMAGE_REAL" | awk '{print $1}')"
+
+VERIFY="$(mktemp)"
 MNT="$(mktemp -d)"
-trap 'umount "$MNT" 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true' EXIT
+cleanup() {
+    umount "$MNT" 2>/dev/null || true
+    rm -f "$VERIFY"
+    rmdir "$MNT" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
-if [ -n "$IMAGE" ]; then
-    [ -f "$IMAGE" ] || { echo "uImage not found: $IMAGE" >&2; exit 1; }
-    mount "$(part 1)" "$MNT"
-    cp "$IMAGE" "$MNT/uImage"
-    sync
-    umount "$MNT"
+mount "$P1" "$MNT"
+cp "$IMAGE_REAL" "$MNT/uImage"
+cp "$BOOTLOADER" "$MNT/u-boot-t23n-sd.bin"
+if [ -f "$REPO_DIR/branding/peginelab-logo.png.b64" ]; then
+    base64 -d "$REPO_DIR/branding/peginelab-logo.png.b64" > "$MNT/peginelab-logo.png"
 fi
+[ -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && cp "$REPO_DIR/web/assets/boot-jingle.wav" "$MNT/boot-jingle.wav"
+cat > "$MNT/SD-BOOT-MAP.txt" <<EOF
+T23N autonomous SD boot map
+SPI/NOR required: NO
+BootROM block 0: DOS/MBR
+SPL/U-Boot raw start: sector 34 (17 KiB)
+U-Boot proper raw start: sector 86
+U-Boot environment raw start: sector 546 (0x44400)
+Kernel boot source: BOOT FAT32 /uImage
+Root filesystem: /dev/mmcblk0p2, ext4
+BOOT partition: p1, FAT32, starts at 1 MiB (sector 2048)
+MEDIA partition: p3, ext4
+uImage SHA256: $EXPECTED_KERNEL_SHA
+EOF
+sync
+umount "$MNT"
 
 if [ -n "$ROOTFS_TAR" ]; then
     [ -f "$ROOTFS_TAR" ] || { echo "rootfs archive not found: $ROOTFS_TAR" >&2; exit 1; }
-    mount "$(part 2)" "$MNT"
+    mount "$P2" "$MNT"
     tar -C "$MNT" -xzf "$ROOTFS_TAR"
-    [ -x "$MNT/bin/sh" ] || {
-        umount "$MNT"
-        echo "REFUSING: archive does not look like a complete rootfs (/bin/sh missing)" >&2
-        exit 1
-    }
+    [ -x "$MNT/bin/sh" ] || { echo "REFUSING: rootfs missing /bin/sh" >&2; exit 1; }
+    [ -x "$MNT/init" ] || { echo "REFUSING: rootfs missing /init" >&2; exit 1; }
     mkdir -p "$MNT/data" "$MNT/mnt/media"
     sync
     umount "$MNT"
 fi
 
-mount "$(part 3)" "$MNT"
+mount "$P3" "$MNT"
 mkdir -p "$MNT/recordings" "$MNT/snapshots" "$MNT/events"
 sync
 umount "$MNT"
 
+sync
+
 echo
-echo "SD card prepared:"
+echo "AUTONOMOUS SD CARD PREPARED:"
 lsblk -f "$DEV"
 echo
-echo "MEDIA contains: recordings/ snapshots/ events/"
-echo "ROOTFS gets every remaining MiB outside BOOT and MEDIA."
-echo "Next: validate U-Boot printenv and load uImage from BOOT into RAM."
-echo "Do NOT erase the factory SPI/NOR/NAND yet."
+echo "DOS/MBR + FAT32 installer-compatible layout: OK"
+echo "SPL/U-Boot raw boot: OK (sector 34)"
+echo "BOOT/uImage is the active kernel boot source"
+echo "ROOTFS: $P2"
+echo "MEDIA: recordings/ snapshots/ events/"
+echo
+echo "This card is intended to boot the T23N with the SPI/NOR flash physically absent."

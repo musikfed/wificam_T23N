@@ -1,76 +1,79 @@
-# SD-карта, запись и сервисы — русский
+# SD-карта, запись и optional services
 
-## Новая разметка SD
+## SD — единственный persistent storage
 
-Вместо нескольких маленьких системных разделов используется простая схема:
+Для этой T23/T23N конфигурации внешняя SPI/NOR отсутствует. SD содержит raw
+boot area, Linux rootfs и media.
 
-| Раздел | Размер | FS | Назначение |
+| Область | Размер | FS | Назначение |
 |---|---:|---|---|
-| BOOT | 128 MiB | FAT32 | `uImage` и загрузочные файлы |
-| ROOTFS | всё оставшееся место кроме MEDIA | ext4 | Linux, приложения, настройки, VPN, SSH, логи |
-| MEDIA | 20 GiB | ext4 | фото, видео, события камеры |
+| raw boot | 16 MiB | — | SPL/U-Boot/env/uImage |
+| p1 BOOT | 128 MiB | FAT32 | backup boot artifacts + PegineLab assets |
+| p2 ROOTFS | всё свободное до MEDIA | ext4 | Linux, apps, configs, VPN, SSH, logs |
+| p3 MEDIA | 20 GiB | ext4 | recordings, snapshots, events |
 
-Для обычной 32 GB карты ROOTFS получится примерно 9–10 GiB из-за реальной емкости карты. Для карты большего размера всё дополнительное место автоматически получает ROOTFS.
+На типичной 32 GB карте p2 получается примерно 9 GiB.
 
-MEDIA монтируется в:
+## Запись
+
+Основной сценарий:
+
+```sh
+sh scripts/build_all.sh
+lsblk -o NAME,PATH,SIZE,LABEL,FSTYPE,MODEL,TRAN,RM,MOUNTPOINTS
+sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
+```
+
+`prepare_sd.sh` является внутренним низкоуровневым writer и требует сразу
+T23N MMC bootloader, kernel и complete rootfs archive:
+
+```sh
+sudo sh scripts/prepare_sd.sh /dev/sdX --yes \
+  out/u-boot-t23n-sd.bin \
+  ~/myipcam/build/kernel/arch/mips/boot/uImage \
+  complete-rootfs.tar.gz
+```
+
+Обычно вызывать его напрямую не нужно.
+
+Размер MEDIA можно переопределить:
+
+```sh
+MEDIA_GIB=20 sudo -E sh scripts/flash_full_firmware_sd.sh /dev/sdX
+```
+
+## MEDIA
+
+После boot `S90wificam` монтирует label `MEDIA` в `/mnt/media`.
 
 ```text
-/mnt/media
+/mnt/media/
 ├── recordings/
 ├── snapshots/
 └── events/
 ```
 
-## Форматирование
+## Optional services
 
-```sh
-sudo sh scripts/prepare_sd.sh /dev/sdX --yes uImage full-rootfs.tar.gz
-```
+SSH, WireGuard и AmneziaWG не должны запускаться постоянно, если отключены.
 
-По умолчанию:
-
-```text
-MEDIA_GIB=20
-```
-
-Можно изменить только при необходимости:
-
-```sh
-MEDIA_GIB=20 sudo -E sh scripts/prepare_sd.sh ...
-```
-
-Скрипт проверяет, что устройство не содержит текущий root filesystem, требует явный `--yes` и отказывается работать, если после выделения MEDIA для ROOTFS остается слишком мало места.
-
-## Принцип сервисов: выключено = процесс не запущен
-
-Дополнительные функции не должны постоянно занимать CPU/RAM.
-
-Поэтому:
-
-- SSH выключен по умолчанию;
-- WireGuard выключен по умолчанию;
-- AmneziaWG выключен по умолчанию;
-- включение из Web UI запускает сервис/интерфейс и создает marker в `/data/services`;
-- выключение останавливает сервис и удаляет marker;
-- при следующей загрузке стартуют только сервисы с marker.
-
-`S91wificam-services` не запускает ничего лишнего.
-
-## Конфиги
+Markers:
 
 ```text
 /data/services/ssh.enabled
 /data/services/wireguard.enabled
 /data/services/amneziawg.enabled
+```
 
+VPN configs:
+
+```text
 /data/vpn/wg0.conf
 /data/vpn/awg0.conf
 ```
 
-Для embedded rootfs конкретные команды можно переопределить в `/etc/wificam/wificam.conf`.
+`S91wificam-services` запускает только сервисы с marker-файлами. В полном
+SD rootfs штатный auto-start Dropbear отключается, чтобы SSH оставался
+действительно optional.
 
-WireGuard и AmneziaWG рассматриваются как сетевые интерфейсы, а не как обязательные постоянно работающие приложения. Если используется kernel implementation, после `wg-quick/awg-quick up` сам helper завершается; CPU расходуется в основном при фактическом VPN-трафике.
-
-## Камера
-
-Определение сенсора не является задачей Web UI. Драйверы/штатный camera userspace ОС подхватывают камеру при загрузке. Web UI только показывает состояние и посылает команды уже работающему camera service.
+Sensor identification остаётся задачей OS camera stack.

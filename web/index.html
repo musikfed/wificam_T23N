@@ -3,14 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>WIFICAM T23N</title>
+  <title>PegineLab WIFICAM T23N</title>
+  <link rel="icon" href="assets/peginelab-logo.svg">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand">WIFICAM <b>T23N</b></div>
-    <div class="sub">Ingenic camera control</div>
+    <div class="brand-lockup">
+      <img src="assets/peginelab-logo.svg" alt="PegineLab">
+      <div><div class="brand">WIFICAM <b>T23N</b></div><div class="sub">PegineLab • Ingenic camera control</div></div>
+    </div>
     <nav id="nav">
       <button data-page="dashboard" class="active">⌂ <span data-i18n="dashboard">Главная</span></button>
       <button data-page="live">▶ <span data-i18n="live">Видео</span></button>
@@ -26,9 +29,13 @@
   </aside>
 
   <main>
-    <header><div><h1 id="pageTitle">Главная</h1><p id="pageHint">Состояние камеры</p></div><div id="online" class="pill">● …</div></header>
+    <header><div><h1 id="pageTitle">Главная</h1><p id="pageHint">PegineLab WIFICAM • состояние камеры</p></div><div id="online" class="pill">● …</div></header>
 
     <section id="dashboard" class="page active">
+      <div class="brand-panel">
+        <img src="assets/peginelab-logo.svg" alt="PegineLab PL">
+        <div><strong>PegineLab WIFICAM T23N</strong><span>Embedded camera firmware • MIPS / Ingenic</span></div>
+      </div>
       <div class="grid cards">
         <article><small data-i18n="model">Модель</small><strong>T23/T23N</strong><span>Ingenic XBurst</span></article>
         <article><small>Kernel</small><strong id="kernel">—</strong><span>Linux</span></article>
@@ -41,36 +48,51 @@
       </div>
     </section>
 
-    <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2><div class="video">LIVE VIEW<br><small data-i18n="cameraOsHint">Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.</small></div><div class="actions"><button onclick="apiAction('camera_start')">Start camera</button><button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div></div></section>
-
+    <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2>
+      <div class="video live-view"><img id="liveFrame" alt="Camera preview" loading="lazy" decoding="async" style="object-fit:contain;max-width:100%;transform-origin:center center">
+      <small id="previewMode" aria-live="polite">Видео выключено: вебморда не расходует канал камеры</small></div>
+      <div class="actions">
+        <button id="previewStart" onclick="startPreview()">▶ Смотреть видео / Start preview</button>
+        <button id="previewStop" class="secondary" onclick="stopPreview()" disabled>■ Отключить видео / Stop preview</button>
+      </div>
+      <p class="muted">Hombo3 RTSP и камера продолжают работать независимо. При переключении вкладки или сворачивании окна вебпросмотр отключается автоматически.</p>
+      <div class="panel" style="margin-top:12px">
+       <h3 data-i18n="ptzTitle">Поворот камеры / PTZ</h3>
+       <p class="muted" id="ptzCapability">Проверяем доступность моторов…</p>
+       <div class="actions"><button class="ptz-control" data-direction="left" onclick="ptzMove('left')">←</button>
+       <button class="ptz-control" data-direction="up" onclick="ptzMove('up')">↑</button>
+       <button class="ptz-control" data-direction="down" onclick="ptzMove('down')">↓</button>
+       <button class="ptz-control" data-direction="right" onclick="ptzMove('right')">→</button></div>
+       <label style="display:inline-block;margin:8px"><input type="checkbox" id="panInvert" onchange="ptzInvert('pan',this.checked)"> <span data-i18n="reversePan">Реверс лево / право</span></label>
+       <label style="display:inline-block;margin:8px"><input type="checkbox" id="tiltInvert" onchange="ptzInvert('tilt',this.checked)"> <span data-i18n="reverseTilt">Реверс верх / низ</span></label>
+       <div class="actions"><button onclick="digitalZoom(-1)">− Zoom</button><button onclick="digitalZoom(1)">+ Zoom</button>
+       <button onclick="digitalZoom(0)">1×</button><button id="focusBtn" onclick="apiAction('ptz_autofocus')" disabled data-i18n="autoFocus">Автофокус (если поддерживается)</button></div>
+       <div class="actions">
+       <label><input type="checkbox" id="previewMirror" onchange="setPreviewOrientation('mirror',this.checked)"> Зеркало по горизонтали / Mirror</label>
+       <label><input type="checkbox" id="previewFlip" onchange="setPreviewOrientation('flip',this.checked)"> Переворот по вертикали / Flip</label>
+       </div>
+       <small class="muted">Зеркало и переворот меняют только этот вебпросмотр, не RTSP Hombo3 и не команды моторчиков.</small>
+       <p class="muted" id="zoomState">1× — digital preview zoom; optical zoom/autofocus require supported hardware.</p>
+      </div>
+      </div></section>
     <section id="recording" class="page"><div class="panel"><h2 data-i18n="recording">Запись</h2><p>Video: <code>/mnt/media/recordings</code></p><p>Photos: <code>/mnt/media/snapshots</code></p><div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div></section>
-
     <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Web UI использует camera service, который ОС подняла при загрузке.</p></div></section>
 
     <section id="network" class="page">
       <div class="panel">
         <h2 data-i18n="network">Сеть / Wi‑Fi</h2>
-        <div class="kv">
-          <div><small>SSID</small><b id="netSsid">—</b></div>
-          <div><small>IPv4</small><b id="netIp">—</b></div>
-          <div><small data-i18n="gateway">Шлюз</small><b id="netGateway">—</b></div>
-          <div><small>DNS</small><b id="netDns">—</b></div>
-        </div>
+        <div class="kv"><div><small>SSID</small><b id="netSsid">—</b></div><div><small>IPv4</small><b id="netIp">—</b></div><div><small data-i18n="gateway">Шлюз</small><b id="netGateway">—</b></div><div><small>DNS</small><b id="netDns">—</b></div></div>
         <p data-i18n="wifiSafe">Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.</p>
         <div class="actions"><button id="scanBtn" data-i18n="scan">Сканировать сети</button></div>
         <div id="networks" class="networks"></div>
-        <form id="wifiForm">
-          <label>SSID<input id="wifiSsid" name="ssid" maxlength="32" required></label>
-          <label><span data-i18n="password">Пароль</span><input id="wifiPassword" name="password" type="password" minlength="8" required></label>
-          <button type="submit" data-i18n="testSwitch">Проверить и переключить</button>
-        </form>
+        <form id="wifiForm"><label>SSID<input id="wifiSsid" name="ssid" maxlength="32" required></label><label><span data-i18n="password">Пароль</span><input id="wifiPassword" name="password" type="password" minlength="8" required></label><button type="submit" data-i18n="testSwitch">Проверить и переключить</button></form>
       </div>
 
       <div class="panel">
         <h2 data-i18n="optionalServices">Дополнительные сервисы</h2>
         <p class="muted" data-i18n="servicesHint">Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.</p>
         <div class="service-grid">
-          <article class="service-card"><div><h3>SSH</h3><p>Remote shell • TCP 22</p><span id="sshState" class="service-state">—</span></div><button id="sshToggle" onclick="toggleService('ssh')">—</button></article>
+          <article class="service-card"><div><h3>SSH</h3><p>Local recovery shell • TCP 22 • protected</p><span id="sshState" class="service-state">—</span></div><button id="sshToggle" onclick="toggleService('ssh')">—</button></article>
           <article class="service-card"><div><h3>WireGuard</h3><p><code>/data/vpn/wg0.conf</code></p><span id="wireguardState" class="service-state">—</span></div><button id="wireguardToggle" onclick="toggleService('wireguard')">—</button></article>
           <article class="service-card"><div><h3>AmneziaWG</h3><p><code>/data/vpn/awg0.conf</code></p><span id="amneziawgState" class="service-state">—</span></div><button id="amneziawgToggle" onclick="toggleService('amneziawg')">—</button></article>
         </div>
@@ -81,7 +103,7 @@
 
     <section id="system" class="page">
       <div class="panel"><h2 data-i18n="system">Система</h2><p>Camera: <b id="cameraState">—</b></p><p>Uptime: <span id="uptime">—</span></p><p>Web user: <b id="webUser">—</b></p><button class="danger" id="rebootBtn" data-i18n="reboot">Перезагрузить</button></div>
-      <div class="panel"><h2 data-i18n="webPassword">Пароль администратора Web UI</h2><form id="webPasswordForm"><label><span data-i18n="newPassword">Новый пароль</span><input id="newWebPassword" type="password" minlength="10" required></label><label><span data-i18n="repeatPassword">Повторить пароль</span><input id="repeatWebPassword" type="password" minlength="10" required></label><button type="submit" data-i18n="changePassword">Сменить пароль</button></form><p class="muted" data-i18n="authHint">После смены пароля HTTP-аутентификация перезапустится.</p></div>
+      <div class="panel"><h2 data-i18n="webPassword">Пароль администратора Web UI</h2><form id="webPasswordForm"><label><span data-i18n="newPassword">Новый пароль</span><input id="newWebPassword" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" required></label><label><span data-i18n="repeatPassword">Повторить пароль</span><input id="repeatWebPassword" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" required></label><button type="submit" data-i18n="changePassword">Сменить пароль</button></form><p class="muted" data-i18n="authHint">После смены пароля HTTP-аутентификация перезапустится.</p></div>
     </section>
 
     <section id="firmware" class="page"><div class="panel"><h2 data-i18n="firmware">Обновление</h2><p data-i18n="fwHint">Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.</p></div></section>

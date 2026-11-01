@@ -4,53 +4,176 @@ CONF=/etc/wificam/wificam.conf
 [ -f "$CONF" ] && . "$CONF"
 
 WEBROOT=/usr/share/wificam-web
+BOOTSTRAP_WEBROOT="${BOOTSTRAP_WEBROOT:-$WEBROOT/setup}"
 PIDFILE=/var/run/wificam-httpd.pid
 LOG=/var/log/wificam-httpd.log
-AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
+STATE_DIR="${STATE_DIR:-/opt/wificam}"
+AUTH_CONF="${AUTH_CONF:-$STATE_DIR/httpd.conf}"
+BOOTSTRAP_CONF="${BOOTSTRAP_CONF:-$STATE_DIR/httpd-bootstrap.conf}"
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_UNAUTHENTICATED_WEB="${ALLOW_UNAUTHENTICATED_WEB:-0}"
+AUTO_PROVISION_TEST_WEB_AUTH="${AUTO_PROVISION_TEST_WEB_AUTH:-0}"
+DEFAULT_WEB_USER="${DEFAULT_WEB_USER:-admin}"
+DEFAULT_WEB_PASSWORD="${DEFAULT_WEB_PASSWORD:-}"
+WEB_PORT="${WEB_PORT:-8090}"
 MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
+MEDIA_FALLBACKS="${MEDIA_FALLBACKS:-/mnt/mmcblk0p1 /mnt/sdcard /mnt/sda0}"
+
+httpd_available() {
+    command -v httpd >/dev/null 2>&1 && return 0
+    busybox httpd -h 2>&1 | grep -qi httpd && return 0
+    return 1
+}
+
+start_httpd() {
+    if command -v httpd >/dev/null 2>&1; then
+        httpd "$@" >>"$LOG" 2>&1 &
+    else
+        busybox httpd "$@" >>"$LOG" 2>&1 &
+    fi
+    echo $! > "$PIDFILE"
+}
 
 make_csrf() {
     [ -s "$CSRF_FILE" ] && return 0
     umask 077
-    if [ -r /dev/urandom ]; then
-        od -An -N16 -tx1 /dev/urandom | tr -d ' \n' > "$CSRF_FILE"
+    if [ -r /dev/urandom ] && command -v sha256sum >/dev/null 2>&1; then
+        dd if=/dev/urandom bs=32 count=1 2>/dev/null | sha256sum | awk '{print $1}' > "$CSRF_FILE"
     else
         printf '%s-%s\n' "$(date +%s 2>/dev/null || echo 0)" "$$" > "$CSRF_FILE"
     fi
 }
 
+pick_media_mount() {
+    # Final autonomous SD-root: mount dedicated LABEL=MEDIA if available.
+    if mountpoint -q "$MEDIA_MOUNT" 2>/dev/null; then
+        echo "$MEDIA_MOUNT"
+        return 0
+    fi
+
+    mkdir -p "$MEDIA_MOUNT"
+    if mount -L MEDIA "$MEDIA_MOUNT" 2>/dev/null; then
+        echo "$MEDIA_MOUNT"
+        return 0
+    fi
+
+    # Thingino/recovery fallback: reuse whichever SD mount the OS already owns.
+    for p in $MEDIA_FALLBACKS; do
+        if [ -d "$p" ] && mountpoint -q "$p" 2>/dev/null; then
+            echo "$p"
+            return 0
+        fi
+    done
+
+    # UI must still start even with no writable media mounted.
+    mkdir -p /tmp/wificam-media
+    echo /tmp/wificam-media
+}
+
 start() {
-    mkdir -p /var/run /var/log /data /data/services /data/vpn "$MEDIA_MOUNT"
-    mountpoint -q "$MEDIA_MOUNT" 2>/dev/null || mount -L MEDIA "$MEDIA_MOUNT" 2>/dev/null || true
-    mkdir -p "$MEDIA_MOUNT/recordings" "$MEDIA_MOUNT/snapshots" "$MEDIA_MOUNT/events"
+    mkdir -p /var/run /var/log "$STATE_DIR" "$STATE_DIR/services" "$STATE_DIR/vpn"
+
+    ACTIVE_MEDIA="$(pick_media_mount)"
+    export ACTIVE_MEDIA
+    printf '%s\n' "$ACTIVE_MEDIA" > /var/run/wificam-media
+    RECORDINGS="$ACTIVE_MEDIA/recordings"
+    SNAPSHOTS="$ACTIVE_MEDIA/snapshots"
+    EVENTS="$ACTIVE_MEDIA/events"
+    export RECORDINGS SNAPSHOTS EVENTS MEDIA_MOUNT="$ACTIVE_MEDIA"
+    mkdir -p "$RECORDINGS" "$SNAPSHOTS" "$EVENTS" 2>/dev/null || true
 
     [ -x "$WEBROOT/cgi-bin/api" ] || chmod 0755 "$WEBROOT/cgi-bin/api" 2>/dev/null || true
+    [ -x "$WEBROOT/cgi-bin/snapshot.jpg" ] || chmod 0755 "$WEBROOT/cgi-bin/snapshot.jpg" 2>/dev/null || true
+    [ -x "$WEBROOT/cgi-bin/live.mjpg" ] || chmod 0755 "$WEBROOT/cgi-bin/live.mjpg" 2>/dev/null || true
+    [ -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ] || chmod 0755 "$BOOTSTRAP_WEBROOT/cgi-bin/claim" 2>/dev/null || true
     make_csrf
+
+    # 0.1_test convenience: provision known LAN-only credentials once when
+    # no auth file exists. Production builds set this flag to 0 and use the
+    # first-boot claim page instead.
+    if [ ! -s "$AUTH_CONF" ] && [ "$AUTO_PROVISION_TEST_WEB_AUTH" = "1" ] && [ -n "$DEFAULT_WEB_PASSWORD" ]; then
+        printf '%s' "$DEFAULT_WEB_PASSWORD" | AUTH_CONF="$AUTH_CONF" AUTH_PASSWORD_MODE=plain \
+            wificam-set-web-password "$DEFAULT_WEB_USER" >/dev/null || return 1
+        echo "PegineLab WIFICAM 0.1_test credentials provisioned for user: $DEFAULT_WEB_USER"
+    fi
+
+    # BusyBox httpd reads /etc/httpd.conf by default. Thingino's stock file
+    # contains H:/var/www, which would override -h and serve the Thingino UI
+    # on the PegineLab port. Always pass our own config, even before auth.
+    umask 077
+    : > "$BOOTSTRAP_CONF"
 
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
         return 0
     fi
 
+    if ! httpd_available; then
+        echo "WIFICAM web UI not started: BusyBox httpd applet is unavailable" | tee -a "$LOG"
+        echo "Thingino integration must build BR2_PACKAGE_BUSYBOX_HTTPD=y" | tee -a "$LOG"
+        return 1
+    fi
+
     if [ -s "$AUTH_CONF" ]; then
-        echo "Starting authenticated WIFICAM web interface..."
-        httpd -f -p 80 -h "$WEBROOT" -c "$AUTH_CONF" -r "WIFICAM T23N" >>"$LOG" 2>&1 &
+        echo "Starting authenticated PegineLab WIFICAM on port $WEB_PORT..."
+        start_httpd -f -p "$WEB_PORT" -h "$WEBROOT" -c "$AUTH_CONF" -r "PegineLab WIFICAM T23N"
     elif [ "$ALLOW_UNAUTHENTICATED_WEB" = "1" ]; then
-        echo "WARNING: starting WIFICAM web interface WITHOUT authentication"
-        httpd -f -p 80 -h "$WEBROOT" >>"$LOG" 2>&1 &
+        if [ ! -f "$BOOTSTRAP_WEBROOT/index.html" ] || [ ! -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ]; then
+            echo "WIFICAM first-boot setup files are missing under $BOOTSTRAP_WEBROOT" | tee -a "$LOG"
+            return 1
+        fi
+        echo "Starting PegineLab WIFICAM FIRST-BOOT CLAIM page on port $WEB_PORT..."
+        # Before the admin password exists, expose only the setup-only webroot.
+        # The main dashboard/API is not served unauthenticated. Passing -c is
+        # mandatory so BusyBox never falls back to Thingino's /etc/httpd.conf.
+        start_httpd -f -p "$WEB_PORT" -h "$BOOTSTRAP_WEBROOT" -c "$BOOTSTRAP_CONF"
     else
         echo "WIFICAM web UI not started: no $AUTH_CONF"
-        echo "Provision over UART:"
+        echo "Set a password with:"
         echo "  printf '%s' 'NEW_PASSWORD' | wificam-set-web-password admin"
         return 0
     fi
-    echo $! > "$PIDFILE"
+
+    sleep 1
+    if ! kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "WIFICAM httpd exited during startup; see $LOG" >&2
+        rm -f "$PIDFILE"
+        return 1
+    fi
+
+    # Hardware regression test: 0.1_test served "#!/bin/sh" verbatim from
+    # /cgi-bin/api because the cached BusyBox binary lacked functioning CGI.
+    # Check authenticated JSON on the known test account. Never serve raw CGI
+    # source on the network: stop our listener if this check fails.
+    if [ "$AUTO_PROVISION_TEST_WEB_AUTH" = "1" ] &&
+       [ -n "$DEFAULT_WEB_PASSWORD" ] &&
+       grep -Fqx "/:$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" "$AUTH_CONF" 2>/dev/null; then
+        if ! command -v curl >/dev/null 2>&1; then
+            echo "WIFICAM CGI smoke check requires curl; refusing untested httpd" | tee -a "$LOG" >&2
+            stop
+            return 1
+        fi
+        response="$(curl --silent --max-time 4 --user "$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" \
+            "http://127.0.0.1:$WEB_PORT/cgi-bin/api?op=status" 2>/dev/null || true)"
+        case "$response" in
+            '{"ok":true,'*) echo "WIFICAM CGI: status JSON verified on port $WEB_PORT" ;;
+            *)
+                echo "WIFICAM CGI FAILED: /cgi-bin/api did not execute as JSON; refusing to expose CGI source" | tee -a "$LOG" >&2
+                stop
+                return 1
+                ;;
+        esac
+    fi
 }
 
 stop() {
     if [ -f "$PIDFILE" ]; then
-        kill "$(cat "$PIDFILE")" 2>/dev/null || true
+        pid="$(cat "$PIDFILE")"
+        kill "$pid" 2>/dev/null || true
+        i=0
+        while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 20 ]; do
+            sleep 1
+            i=$((i + 1))
+        done
         rm -f "$PIDFILE"
     fi
 }

@@ -7,8 +7,13 @@ WIFI_IFACE="${WIFI_IFACE:-wlan0}"
 WPA_CONF="${WPA_CONF:-/data/wpa_supplicant.conf}"
 WPA_BACKUP="${WPA_BACKUP:-/data/wpa_supplicant.conf.last-good}"
 RECORDINGS="${RECORDINGS:-/mnt/media/recordings}"
+if [ -s /var/run/wificam-media ]; then
+    RECORDINGS="$(cat /var/run/wificam-media)/recordings"
+fi
 CSRF_FILE="${CSRF_FILE:-/var/run/wificam-csrf}"
 ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
+AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
+SSH_PROTECT="${SSH_PROTECT:-0}"
 
 REQUEST_DATA=""
 if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
@@ -27,7 +32,9 @@ param() {
     key="$1"
     data="${QUERY_STRING:-}"
     [ -z "$REQUEST_DATA" ] || data="$data&$REQUEST_DATA"
-    printf '%s' "$data" | tr '&' '\n' | while IFS='=' read -r k v; do
+    # Always terminate the final field: POSIX read skips an unterminated
+    # single query parameter (e.g. ?op=status), causing "unknown operation".
+    printf '%s\n' "$data" | tr '&' '\n' | while IFS='=' read -r k v; do
         [ "$k" = "$key" ] && { urldecode "$v"; break; }
     done
 }
@@ -152,7 +159,9 @@ service_status_one() {
     state="$(printf '%s' "$raw" | awk '{print $1}')"
     enabled="$(printf '%s' "$raw" | sed -n 's/.*enabled=\([01]\).*/\1/p')"
     [ -n "$enabled" ] || enabled=0
-    printf '"%s":{"state":"%s","enabled":%s}' "$svc" "$(json_escape "$state")" "$enabled"
+    protected=0
+    [ "$svc" = "ssh" ] && [ "$SSH_PROTECT" = "1" ] && protected=1
+    printf '"%s":{"state":"%s","enabled":%s,"protected":%s}' "$svc" "$(json_escape "$state")" "$enabled" "$protected"
 }
 
 services() {
@@ -203,6 +212,9 @@ camera_action() {
 
 web_password() {
     require_post
+    # First boot is handled by setup/cgi-bin/claim. The main dashboard API
+    # is served only after AUTH_CONF exists and must remain authenticated.
+    [ -s "$AUTH_CONF" ] || fail "first-boot claim required"
     require_auth
     require_csrf
     password="$(param new_password)"
@@ -210,6 +222,45 @@ web_password() {
     out="$(printf '%s' "$password" | wificam-set-web-password admin 2>&1)" || fail "$out"
     ok ',"message":"web password changed; authentication will restart"'
     (sleep 1; /etc/init.d/S90wificam restart) >/dev/null 2>&1 &
+}
+
+ptz_status() {
+    command -v wificam-ptz-ctl >/dev/null 2>&1 || fail "PTZ controller not installed"
+    output="$(wificam-ptz-ctl status 2>&1)" || fail "$output"
+    header
+    printf '%s\n' "$output"
+}
+
+ptz_action() {
+    require_post
+    require_auth
+    require_csrf
+    command -v wificam-ptz-ctl >/dev/null 2>&1 || fail "PTZ controller not installed"
+    direction="$(param direction)"
+    case "$direction" in left|right|up|down) ;; *) fail "invalid PTZ direction" ;; esac
+    output="$(wificam-ptz-ctl move "$direction" 2>&1)" || fail "$output"
+    ok ',"message":"PTZ step sent"'
+}
+
+ptz_invert() {
+    require_post
+    require_auth
+    require_csrf
+    command -v wificam-ptz-ctl >/dev/null 2>&1 || fail "PTZ controller not installed"
+    axis="$(param axis)"
+    value="$(param enabled)"
+    case "$axis" in pan|tilt) ;; *) fail "invalid PTZ axis" ;; esac
+    case "$value" in 0|1) ;; *) fail "invalid PTZ invert value" ;; esac
+    output="$(wificam-ptz-ctl invert "$axis" "$value" 2>&1)" || fail "$output"
+    header
+    printf '%s\n' "$output"
+}
+
+ptz_autofocus() {
+    require_post
+    require_auth
+    require_csrf
+    fail "Autofocus not exposed by this camera profile; manual DW9714 focus is not autofocus"
 }
 
 op="$(param op)"
@@ -221,6 +272,10 @@ case "$op" in
   storage) storage ;;
   services) services ;;
   service_toggle) service_toggle ;;
+  ptz_status) ptz_status ;;
+  ptz_move) ptz_action ;;
+  ptz_invert) ptz_invert ;;
+  ptz_autofocus) ptz_autofocus ;;
   camera_start) camera_action start ;;
   camera_stop) camera_action stop ;;
   record_start) camera_action record-start ;;

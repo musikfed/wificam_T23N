@@ -1,103 +1,82 @@
-# Kernel build — Ingenic T23/T23N
+# T23/T23N autonomous-SD build
 
-## Current result
+## Kernel
 
-Linux 3.10.14 for MIPS/Ingenic builds successfully:
+For direct `root=/dev/mmcblk0p2`, the MMC host driver and EXT4 must be built
+**into** the kernel, not loaded as modules after the root filesystem mount.
 
-```text
-Image Name:   Linux-3.10.14__isvp_pike_1.0__
-Image Type:   MIPS Linux Kernel Image (lzma compressed)
-Data Size:    1739320 Bytes
-Load Address: 80010000
-Entry Point:  803c7960
+```sh
+sh scripts/build_kernel.sh
 ```
 
-Resulting image:
+The script verifies:
+
+```text
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_JZMMC_V12=y
+CONFIG_JZMMC_V12_MMC0=y
+CONFIG_EXT4_FS=y
+CONFIG_MSDOS_PARTITION=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+```
+
+Result:
 
 ```text
 ~/myipcam/build/kernel/arch/mips/boot/uImage
 ```
 
-Known-good SHA-256:
+The active kernel is loaded by upstream U-Boot from the FAT32 BOOT partition as
+`/uImage`. A redundant copy is also stored at raw sector `0x1800`; the
+normal boot path does not read that backup.
+
+## SD SPL/U-Boot
+
+A SPI/SFC U-Boot image is not used for this layout.
+
+```sh
+sh scripts/build_sd_bootloader.sh
+```
+
+The script downloads and verifies this exact release asset:
 
 ```text
-7ba1c4b0a3ea28d3a7a89cd14330fe1968a0ac63166b08c2d9e715541432565f
+gtxaspec/ingenic-u-boot-xburst1
+release: uboot-xb1-2025-09-11
+file:    u-boot-isvp_t23n_msc0_mmc1bit.bin
+size:    189685 bytes
+sha256:  4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5
 ```
 
-## Build
-
-Kernel sources:
+The MMC image starts with the Ingenic BootROM descriptor:
 
 ```text
-~/myipcam/kernel/openipc-linux
+block 0         INGE + uint32_le(26624) + 24*00 + 4*ff
+sector 34       SPL / combined image
+sector 86       U-Boot proper
+sector 546      U-Boot environment (0x44400), 32 KiB
+BOOT:/uImage    active kernel
+/dev/mmcblk0p2  ext4 rootfs
 ```
 
-After configuring the MIPS cross-toolchain and kernel configuration, run the project's build script or the equivalent `make` command.
-
-A successful build ends with:
+Kernel load path:
 
 ```text
-LD      vmlinux
-OBJCOPY arch/mips/boot/vmlinux.bin
-LZMA    arch/mips/boot/vmlinux.bin.lzma
-UIMAGE  arch/mips/boot/uImage.lzma
-Image arch/mips/boot/uImage is ready
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
 ```
 
-## Preserve a known-good build
+## Build everything
 
-```bash
-mkdir -p ~/myipcam/deploy/t23-kernel-known-good
-cp -L ~/myipcam/build/kernel/arch/mips/boot/uImage ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/vmlinux ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/System.map ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/.config ~/myipcam/deploy/t23-kernel-known-good/kernel.config
-sha256sum ~/myipcam/deploy/t23-kernel-known-good/*
+```sh
+sh scripts/build_all.sh
 ```
 
-## Verify uImage
+Then write the complete card with:
 
-```bash
-mkimage -l ~/myipcam/build/kernel/arch/mips/boot/uImage
+```sh
+sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 ```
-
-Do not write this image to SPI/NOR/NAND until UART and a non-destructive SD/RAM boot have been validated.
-
-
-## Thingino/MMC — current validated build path
-
-The current SD/MMC workflow uses a pinned upstream Thingino revision:
-
-```text
-Thingino commit: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
-Camera profile:  galayou_g2_t23n_sc2336_atbm6012bx
-Target artifact: Thingino/thingino-t23-sd.bin
-```
-
-The PegineLab WIFICAM Web UI is a mandatory part of the final image and must not be omitted from the rootfs/overlay.
-
-Recommended invocation from the `wificam_T23N` repository root:
-
-```bash
-PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
-```
-
-### Buildroot error: PATH contains spaces, TABs, and/or newline
-
-Buildroot rejects `PATH` values containing spaces, TABs, or newline characters. A typical failure is:
-
-```text
-Your PATH contains spaces, TABs, and/or newline (\n) characters.
-This doesn't work. Fix your PATH environment variable.
-```
-
-Do not delete or reclone the Thingino checkout for this error. Re-run the build with the clean `PATH` shown above.
-
-To inspect the current `PATH`:
-
-```bash
-printf '%s\n' "$PATH" | tr ':' '\n' | nl -ba
-```
-
-The pinned commit and camera profile should be visible near the start of the build log before Buildroot starts.

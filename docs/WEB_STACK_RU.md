@@ -1,9 +1,10 @@
 # Web UI и API — русский
 
-Минимальный embedded web-стек для T23/T23N:
+PegineLab WIFICAM — обязательный web-стек canonical Thingino MMC/SD image для T23/T23N:
 
 ```text
-BusyBox httpd
+Thingino Web UI         : 80/443
+PegineLab WIFICAM httpd : 8080
   └─ HTML/CSS/JS
       └─ CGI JSON API
           ├─ Wi-Fi/IP
@@ -65,3 +66,28 @@ printf '%s' 'МОЙ_НОВЫЙ_ПАРОЛЬ' | wificam-set-web-password admin
 SSH, WireGuard и AmneziaWG выключены по умолчанию. Web UI может включить их сейчас и оставить marker для следующей загрузки. При выключении процесс/интерфейс останавливается.
 
 Это рассчитано на локальную сеть камеры. Публичный Интернет требует дополнительного TLS/auth hardening.
+
+
+## Интеграция с Thingino
+
+Canonical Thingino image собирается `scripts/build_thingino_wificam_image.sh`.
+Скрипт включает BusyBox `httpd`, добавляет WIFICAM непосредственно в
+`p2/rootfs.ext2` и не публикует image, если `debugfs` не подтверждает наличие
+Web UI внутри ext4 rootfs.
+
+Thingino camera backend поддержан через Prudynt:
+
+```text
+service              /etc/init.d/S31prudynt
+snapshot             prudyntctl snapshot -c 0
+recording            Thingino record / /run/prudynt/mp4ctl
+WIFICAM live preview /cgi-bin/snapshot.jpg
+```
+
+Persistent WIFICAM state хранится под `/opt/wificam`. Для storage сначала
+используется отдельный `/mnt/media`, а на первом Thingino-тесте допускается
+уже смонтированная ОС SD (`/mnt/mmcblk0p1`, `/mnt/sdcard`, `/mnt/sda0`).
+
+Аппаратный acceptance criterion: после загрузки должна открываться не только
+штатная Thingino UI, но и **PegineLab WIFICAM на
+`http://CAMERA_IP:8080/`**.

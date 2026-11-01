@@ -1,103 +1,84 @@
-# Сборка ядра — Ingenic T23/T23N
+# Сборка T23/T23N для автономной SD
 
-## Текущий результат
+## Kernel
 
-Успешно собран Linux 3.10.14 для MIPS/Ingenic:
+Для прямого `root=/dev/mmcblk0p2` MMC host driver и EXT4 должны быть
+**встроены** в kernel, а не загружаться модулями после mount rootfs.
 
-```text
-Image Name:   Linux-3.10.14__isvp_pike_1.0__
-Image Type:   MIPS Linux Kernel Image (lzma compressed)
-Data Size:    1739320 Bytes
-Load Address: 80010000
-Entry Point:  803c7960
+```sh
+sh scripts/build_kernel.sh
 ```
 
-Готовый образ:
+Скрипт проверяет:
+
+```text
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_JZMMC_V12=y
+CONFIG_JZMMC_V12_MMC0=y
+CONFIG_EXT4_FS=y
+CONFIG_MSDOS_PARTITION=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+```
+
+Результат:
 
 ```text
 ~/myipcam/build/kernel/arch/mips/boot/uImage
 ```
 
-SHA-256 успешной сборки:
+Активный kernel загружается upstream U-Boot с FAT32-раздела BOOT как
+`/uImage`. В raw sector `0x1800` сохраняется резервная копия; основной boot
+path её не читает.
+
+## SD SPL/U-Boot
+
+SPI/SFC U-Boot для этой схемы не используется.
+
+```sh
+sh scripts/build_sd_bootloader.sh
+```
+
+Скрипт получает точный release asset:
 
 ```text
-7ba1c4b0a3ea28d3a7a89cd14330fe1968a0ac63166b08c2d9e715541432565f
+gtxaspec/ingenic-u-boot-xburst1
+release: uboot-xb1-2025-09-11
+file:    u-boot-isvp_t23n_msc0_mmc1bit.bin
+size:    189685 bytes
+sha256:  4d4d4ff27acce1e5e59577c35ef98a505ae42a0bbb07583380463a81cdbfd6a5
 ```
 
-## Сборка
+И проверяет размер, SHA-256 и MSPL magic.
 
-Исходники ядра находятся в:
+MMC image layout начинается с BootROM descriptor:
 
 ```text
-~/myipcam/kernel/openipc-linux
+block 0         INGE + uint32_le(26624) + 24*00 + 4*ff
+sector 34       SPL / combined image
+sector 86       U-Boot proper
+sector 546      U-Boot environment (0x44400), 32 KiB
+BOOT:/uImage    активный kernel
+/dev/mmcblk0p2  ext4 rootfs
 ```
 
-После настройки toolchain и конфигурации ядра выполняется штатный build-скрипт проекта либо `make` с MIPS cross-compiler.
-
-Успешное завершение должно содержать:
+Kernel загружается так:
 
 ```text
-LD      vmlinux
-OBJCOPY arch/mips/boot/vmlinux.bin
-LZMA    arch/mips/boot/vmlinux.bin.lzma
-UIMAGE  arch/mips/boot/uImage.lzma
-Image arch/mips/boot/uImage is ready
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
 ```
 
-## Сохранение контрольной сборки
+## Полная сборка
 
-```bash
-mkdir -p ~/myipcam/deploy/t23-kernel-known-good
-cp -L ~/myipcam/build/kernel/arch/mips/boot/uImage ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/vmlinux ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/System.map ~/myipcam/deploy/t23-kernel-known-good/
-cp ~/myipcam/build/kernel/.config ~/myipcam/deploy/t23-kernel-known-good/kernel.config
-sha256sum ~/myipcam/deploy/t23-kernel-known-good/*
+```sh
+sh scripts/build_all.sh
 ```
 
-## Проверка uImage
+После этого полная запись карты:
 
-```bash
-mkimage -l ~/myipcam/build/kernel/arch/mips/boot/uImage
+```sh
+sudo sh scripts/flash_full_firmware_sd.sh /dev/sdX
 ```
-
-Не прошивать образ во SPI/NOR/NAND до проверки через UART и безопасной загрузки с SD/RAM.
-
-
-## Thingino/MMC — текущая проверенная сборка
-
-Для текущего SD/MMC workflow используется зафиксированный upstream Thingino:
-
-```text
-Thingino commit: 9925f46f73b9c39ec8d2a65134b18c94e6fdfb97
-Camera profile:  galayou_g2_t23n_sc2336_atbm6012bx
-Target artifact: Thingino/thingino-t23-sd.bin
-```
-
-Web UI PegineLab WIFICAM является обязательной частью итогового образа и не должна исключаться из rootfs/overlay.
-
-Рекомендуемый запуск из корня `wificam_T23N`:
-
-```bash
-PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
-```
-
-### Ошибка Buildroot: PATH contains spaces, TABs, and/or newline
-
-Buildroot отклоняет `PATH`, если в нём присутствуют пробелы, TAB или переносы строк. Типичная ошибка:
-
-```text
-Your PATH contains spaces, TABs, and/or newline (\n) characters.
-This doesn't work. Fix your PATH environment variable.
-```
-
-В этом случае не нужно удалять checkout Thingino или клонировать его заново. Повторите сборку с чистым `PATH`, как в команде выше.
-
-Для диагностики текущего `PATH`:
-
-```bash
-printf '%s\n' "$PATH" | tr ':' '\n' | nl -ba
-```
-
-Pinned commit и профиль камеры должны быть видны в начале build log до запуска Buildroot.

@@ -1,55 +1,83 @@
-# Совместимость платы и безопасная проверка
+# Плата T23/T23N и загрузка только с SD
 
-## Для какой платы подходит
+## Аппаратное состояние
 
-Сборка предназначена для камер на **Ingenic T23/T23N** с MIPS/XBurst и Linux 3.10.x.
+Целевая камера использует **Ingenic T23/T23N**, а внешняя SPI/NOR flash
+**физически выпаяна**. Проект не должен зависеть от bootloader, environment,
+kernel или rootfs во внешней flash.
 
-Совместимость конкретной платы окончательно подтверждается только загрузкой через UART/U-Boot и проверкой RAM, flash, Wi-Fi и GPIO. Определение сенсора не является ручным этапом нашей Web UI: драйверы/штатный camera userspace ОС должны подхватить камеру при загрузке.
+SD является единственным постоянным загрузочным носителем.
 
-## Перед снятием или отключением SPI-flash
-
-Сначала использовать обратимую загрузку через UART/SD.
-
-1. Снять полный дамп штатной flash.
-2. Сохранить копии и SHA-256.
-3. Сохранить маркировку flash и напряжение.
-4. Сохранить U-Boot `printenv` и boot log.
-5. Не стирать штатную flash до успешной SD/RAM загрузки.
-
-## U-Boot
+## Цепочка загрузки
 
 ```text
-version
-printenv
-bdinfo
-mmc list
-part list mmc 0
-help fatload
-help ext4load
-help bootm
+T23 BootROM
+  ↓
+SD sector 34 — MMC SPL (MSC0 1-bit)
+  ↓
+SD sector 86 — upstream T23N U-Boot
+  ↓
+p1 BOOT FAT32 — /uImage
+  ↓
+/dev/mmcblk0p2 — ext4 ROOTFS
 ```
 
-## Актуальная разметка SD
+Используется upstream
+`u-boot-isvp_t23n_msc0_mmc1bit.bin`. Его normal kernel path:
+
+```text
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
+```
+
+Root:
+
+```text
+root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
+```
+
+## Первый 1 MiB
+
+```text
+0             DOS/MBR partition table
+17 KiB        SPL/U-Boot combined image (sector 34)
+43 KiB        U-Boot proper (sector 86)
+273 KiB       U-Boot env (sector 546 / 0x44400)
+3 MiB         резервная raw-копия uImage
+1 MiB         p1 BOOT begins (sector 2048); /uImage здесь является активным kernel
+```
+
+## Kernel requirements
+
+Для root-on-SD должны быть встроены:
+
+```text
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_JZMMC_V12=y
+CONFIG_JZMMC_V12_MMC0=y
+CONFIG_EXT4_FS=y
+CONFIG_MSDOS_PARTITION=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+```
+
+## Разделы
 
 | Раздел | Размер | FS | Назначение |
 |---|---:|---|---|
-| p1 BOOT | 128 MiB | FAT32 | `uImage`, boot files |
-| p2 ROOTFS | всё оставшееся место | ext4 | Linux, приложения, настройки, VPN, SSH, логи |
-| p3 MEDIA | 20 GiB | ext4 | видео, фото, события камеры |
+| raw boot area | 1 MiB | — | MBR + SPL/U-Boot/env |
+| p1 BOOT | 128 MiB | FAT32 | активный /uImage, копия U-Boot, branding |
+| p2 ROOTFS | всё свободное до MEDIA | ext4 | Linux/userspace/settings |
+| p3 MEDIA | 20 GiB | ext4 | recordings/snapshots/events |
 
-`scripts/prepare_sd.sh` вычисляет размер ROOTFS автоматически: карта минус BOOT, 20 GiB MEDIA и небольшой технический запас.
+## Первый power-on
 
-MEDIA:
+После полной offline-проверки SD камера полностью обесточивается, карта
+вставляется и затем подаётся питание. UART не является обязательной частью
+этого workflow.
 
-```text
-/mnt/media/
-├── recordings/
-├── snapshots/
-└── events/
-```
-
-Настройки Wi-Fi, web auth, VPN и marker-файлы сервисов находятся в `/data` внутри большого ROOTFS.
-
-## Первый запуск
-
-Первый тест — загрузить `uImage` с SD в RAM и выполнить `bootm`, не изменяя штатную flash.
+Если BootROM не начинает читать SD, проверяются питание SD slot,
+card-detect/strap и разводка конкретной платы. При физически отсутствующей
+SPI/NOR это уже ранний аппаратный вопрос, а не повод возвращаться к SPI boot.

@@ -1,0 +1,25 @@
+#!/bin/sh
+# One persistent Raptor MJPEG reader avoids cold-starting JPEG for each frame.
+# Served under the same protected BusyBox httpd :8090 Basic Auth webroot.
+set -u
+if ! command -v raptorctl >/dev/null 2>&1 || ! pidof rhd >/dev/null 2>&1 ||
+   ! command -v curl >/dev/null 2>&1; then
+    printf 'Status: 503 Service Unavailable\r\nContent-Type: text/plain\r\n\r\n'
+    printf 'Raptor native MJPEG unavailable\n'
+    exit 0
+fi
+config() { raptorctl config get http "$1" 2>/dev/null | tr -d ' \t\r\n'; }
+PORT="$(config port)"
+case "$PORT" in ''|*[!0-9]*) PORT=8443 ;; esac
+[ "$PORT" -gt 0 ] && [ "$PORT" -le 65535 ] || PORT=8443
+SCHEME=https
+[ "$(config https)" = false ] && SCHEME=http
+USER_NAME="$(config username)"
+PASSWORD="$(config password)"
+URL="$SCHEME://127.0.0.1:$PORT/mjpeg?stream=0"
+printf 'Content-Type: multipart/x-mixed-replace; boundary=raptorframe\r\n'
+printf 'Cache-Control: no-store\r\n\r\n'
+if [ -n "$USER_NAME" ] || [ -n "$PASSWORD" ]; then
+    exec curl -fsSkN --connect-timeout 3 -u "$USER_NAME:$PASSWORD" "$URL"
+fi
+exec curl -fsSkN --connect-timeout 3 "$URL"

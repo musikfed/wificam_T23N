@@ -1,55 +1,82 @@
-# Board compatibility and safe validation
+# T23/T23N hardware: SD-only boot
 
-## Target hardware
+## Hardware state
 
-This build targets **Ingenic T23/T23N** cameras using MIPS/XBurst and Linux 3.10.x.
+The target camera uses **Ingenic T23/T23N** and the external SPI/NOR flash is
+**physically removed**. The project must not depend on a bootloader,
+environment, kernel or root filesystem stored in external flash.
 
-A board is finally validated only after UART/U-Boot boot testing plus RAM, flash, Wi-Fi and GPIO checks. Sensor identification is not a manual Web UI step: the OS drivers/camera userspace should discover and initialize the camera during boot.
+The SD card is the only persistent boot medium.
 
-## Before removing or disabling SPI flash
-
-Prefer reversible UART/SD boot first.
-
-1. Dump the original flash.
-2. Store copies and SHA-256 hashes.
-3. Record flash marking and voltage.
-4. Save U-Boot `printenv` and boot log.
-5. Do not erase factory flash until SD/RAM boot succeeds.
-
-## U-Boot
+## Boot chain
 
 ```text
-version
-printenv
-bdinfo
-mmc list
-part list mmc 0
-help fatload
-help ext4load
-help bootm
+T23 BootROM
+  ↓
+SD sector 34 — MMC SPL (MSC0 1-bit)
+  ↓
+SD sector 86 — upstream T23N U-Boot
+  ↓
+p1 BOOT FAT32 — /uImage
+  ↓
+/dev/mmcblk0p2 — ext4 ROOTFS
 ```
 
-## Current SD layout
+The exact upstream `u-boot-isvp_t23n_msc0_mmc1bit.bin` is used. Its normal
+kernel path is:
 
-| Partition | Size | FS | Purpose |
+```text
+mmc rescan
+fatload mmc 0:1 ${baseaddr} uImage
+bootm ${baseaddr}
+```
+
+Root:
+
+```text
+root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait init=/init
+```
+
+## First 1 MiB
+
+```text
+0             DOS/MBR partition table
+17 KiB        combined SPL/U-Boot image (sector 34)
+43 KiB        U-Boot proper (sector 86)
+273 KiB       U-Boot env (sector 546 / 0x44400)
+3 MiB         redundant raw uImage copy
+1 MiB         p1 BOOT begins (sector 2048); /uImage is the active kernel
+```
+
+## Kernel requirements
+
+Direct SD root requires these features built into the kernel:
+
+```text
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_JZMMC_V12=y
+CONFIG_JZMMC_V12_MMC0=y
+CONFIG_EXT4_FS=y
+CONFIG_MSDOS_PARTITION=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+```
+
+## Partitions
+
+| Area | Size | FS | Purpose |
 |---|---:|---|---|
-| p1 BOOT | 128 MiB | FAT32 | `uImage`, boot files |
-| p2 ROOTFS | all remaining space | ext4 | Linux, applications, settings, VPN, SSH, logs |
-| p3 MEDIA | 20 GiB | ext4 | camera video, photos and events |
+| raw boot area | 1 MiB | — | MBR + SPL/U-Boot/env |
+| p1 BOOT | 128 MiB | FAT32 | active /uImage, U-Boot copy, branding |
+| p2 ROOTFS | remaining space before MEDIA | ext4 | Linux/userspace/settings |
+| p3 MEDIA | 20 GiB | ext4 | recordings/snapshots/events |
 
-`scripts/prepare_sd.sh` computes ROOTFS automatically from card size minus BOOT, 20 GiB MEDIA and a small alignment reserve.
+## First power-on
 
-MEDIA:
+After complete offline SD verification, fully power off the camera, insert the
+card, then apply power. UART is not a mandatory part of this workflow.
 
-```text
-/mnt/media/
-├── recordings/
-├── snapshots/
-└── events/
-```
-
-Wi-Fi, web authentication, VPN configs and service marker files live under `/data` inside the large ROOTFS.
-
-## First boot
-
-Load `uImage` from SD into RAM and execute `bootm` without modifying the factory flash.
+If BootROM does not begin reading the SD card, investigate SD-slot power,
+card-detect/strap state and board routing. With SPI/NOR physically absent this
+is an early hardware boot-path issue, not a reason to fall back to SPI boot.
