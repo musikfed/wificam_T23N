@@ -100,7 +100,7 @@ echo "  sector 34      : SPL/MSPL"
 echo "  sector 86      : U-Boot proper"
 echo "  p1 @ 1 MiB     : FAT16 /uImage"
 echo "  p2 @ 17 MiB    : ext4 rootfs with PegineLab WIFICAM"
-echo "  Web UI         : http://CAMERA_IP:8080/"
+echo "  Web UI         : http://CAMERA_IP:8090/"
 echo
 printf "Type THINGINO-WIFICAM:%s to continue: " "$DEV"
 read answer
