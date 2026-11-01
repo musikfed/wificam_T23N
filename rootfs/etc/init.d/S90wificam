@@ -84,6 +84,7 @@ start() {
 
     [ -x "$WEBROOT/cgi-bin/api" ] || chmod 0755 "$WEBROOT/cgi-bin/api" 2>/dev/null || true
     [ -x "$WEBROOT/cgi-bin/snapshot.jpg" ] || chmod 0755 "$WEBROOT/cgi-bin/snapshot.jpg" 2>/dev/null || true
+    [ -x "$WEBROOT/cgi-bin/live.mjpg" ] || chmod 0755 "$WEBROOT/cgi-bin/live.mjpg" 2>/dev/null || true
     [ -x "$BOOTSTRAP_WEBROOT/cgi-bin/claim" ] || chmod 0755 "$BOOTSTRAP_WEBROOT/cgi-bin/claim" 2>/dev/null || true
     make_csrf
 
