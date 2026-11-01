@@ -110,6 +110,8 @@ cat > "$BUSYBOX_WIFICAM_FRAGMENT" <<'EOF'
 CONFIG_HTTPD=y
 CONFIG_FEATURE_HTTPD_CGI=y
 CONFIG_FEATURE_HTTPD_BASIC_AUTH=y
+# CGI requires fork+exec: FEATURE_FORCE_APPLETS and CGI are incompatible.
+# CONFIG_FEATURE_FORCE_APPLETS is not set
 EOF
 
 cat > "$USER_CAM/local.fragment" <<EOF
@@ -216,6 +218,18 @@ for opt in $BUSYBOX_REQUIRED_OPTS; do
         die "BusyBox HTTP feature missing after reconfigure: $opt"
     fi
 done
+
+# A valid BusyBox .config is NOT proof that the cached MIPS binary includes
+# CGI. We saw this on the hardware-booted 0.1_test: /cgi-bin/api was served
+# literally as "#!/bin/sh", despite the .config checks passing. Force an
+# incremental BusyBox rebuild before packaging p2; no kernel rebuild needed.
+echo
+echo "Rebuilding target BusyBox to ensure CGI is compiled into the actual binary..."
+(
+    cd "$THINGINO_DIR"
+    env IP= THINGINO_USER_DIR="$USER_ROOT" \
+        make CAMERA="$CAMERA" br-busybox-rebuild
+)
 
 # Always regenerate rootfs.ext2 after the BusyBox check.  This guarantees that
 # a repaired BusyBox binary and the current WIFICAM overlay are both inside p2.
