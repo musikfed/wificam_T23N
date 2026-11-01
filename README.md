@@ -588,3 +588,21 @@ LLM → Windows TTS → SSH `play` динамика T23N. Автоматичес
 STT-сервис и рабочий динамик. Полная документация
 [Hombo3: PTZ + Voice](https://github.com/musikfed/Hombo3_3.0.0/blob/main/docs/CAMERA_PTZ_AUDIO_RU.md).
 Выпущенный `0.1_test` binary не обновлялся.
+
+## Установка на SD из WSL + секретный Wi-Fi файл
+
+**T23N без SPI/NOR:** прошивка загружается исключительно с SD, MSPL на
+LBA34 внутри полного disk image, запись целиком с LBA0.
+Для Acer Swift 3 (Windows 11 + WSL Ubuntu 24.04) подготовлен
+[пошаговый план RU](docs/ACER_WSL_SD_WIFI_RU.md) /
+[EN](docs/ACER_WSL_SD_WIFI_EN.md).
+
+Реальные настройки 2.4 GHz WPA2 Wi-Fi задаются **только локально** в
+`local/wifi.env` (пример с вымышленными данными:
+[`local/wifi.env.example`](local/wifi.env.example)).
+Файл исключён из Git, пароли не выводятся в логи.
+При его наличии персональная SD прошивка строится в
+`out/private-sd/thingino-t23-sd.bin`, а `PUBLISH=1` запрещён.
+Встроенная сеть помогает обойти ручную настройку AP; при неправильном
+пароле камера **не обязана** автоматически переключиться в AP.
+Проверить пароль и диапазон до записи. Не загружать личный образ в Git.
