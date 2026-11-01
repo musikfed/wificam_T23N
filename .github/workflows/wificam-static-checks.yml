@@ -1,0 +1,23 @@
+name: WIFICAM static checks
+on:
+  push:
+    branches: [mymarrchWFcam]
+  pull_request:
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax (no target hardware needed)
+        run: |
+          set -eu
+          sh -n scripts/build_thingino_wificam_image.sh
+          sh -n scripts/package_rootfs_overlay.sh
+          sh -n scripts/camera_diagnostics.sh
+          sh -n rootfs/etc/init.d/S90wificam
+          sh -n rootfs/usr/bin/wificam-set-web-password
+          sh -n web/cgi-bin/api
+          sh -n web/cgi-bin/snapshot.jpg
+          sh -n web/setup/cgi-bin/claim
+      - name: JavaScript syntax
+        run: node --check web/app.js
