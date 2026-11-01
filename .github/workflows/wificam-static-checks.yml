@@ -14,6 +14,7 @@ jobs:
           sh -n scripts/build_thingino_wificam_image.sh
           sh -n scripts/package_rootfs_overlay.sh
           sh -n scripts/camera_diagnostics.sh
+          sh -n scripts/camera_preview_fps.sh
           sh -n rootfs/usr/bin/wificam-ptz-ctl
           sh -n web/cgi-bin/live.mjpg
           sh -n rootfs/etc/init.d/S90wificam
