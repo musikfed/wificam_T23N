@@ -328,3 +328,12 @@ Web UI не может случайно выключить SSH. Build pipeline �
 `scripts/camera_preview_fps.sh`, не трогая ядро и SSH.
 Подробности: `docs/HOMBO3_INTEGRATION_RU.md`.
 **0.1_test образ ещё не содержит эти правки.**
+
+## Среда разработки и инфраструктура PegineLab
+
+Сборка WIFICAM выполняется в **Ubuntu 24.04 (WSL 3.0.3 на Windows 11 Pro,
+дистрибутив на D:)** ноутбука Acer Swift 3, а Hombo3 работает **нативно
+в Windows** на этом Acer. GPU LLM сервер — `.100` (RTX 3060),
+внешний AmneziaWG/2FA вход — DEXP `.109`.
+Полная архитектура и характеристики:
+[PEGINELAB_LAB_ARCHITECTURE_RU.md](../docs/PEGINELAB_LAB_ARCHITECTURE_RU.md).
