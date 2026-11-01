@@ -49,11 +49,13 @@
     </section>
 
     <section id="live" class="page"><div class="panel"><h2 data-i18n="live">Видео</h2>
-      <div class="video live-view"><img id="liveFrame" alt="Camera preview" style="object-fit:contain;max-width:100%;transform-origin:center center">
-      <small id="previewMode" data-i18n="cameraOsHint">Сенсор и камера инициализируются ОС при загрузке.</small></div>
-      <div class="actions"><button onclick="refreshPreview()">Обновить кадр / Refresh</button>
-      <button onclick="apiAction('camera_start')">Start camera</button>
-      <button class="secondary" onclick="apiAction('camera_stop')">Stop camera</button></div>
+      <div class="video live-view"><img id="liveFrame" alt="Camera preview" loading="lazy" decoding="async" style="object-fit:contain;max-width:100%;transform-origin:center center">
+      <small id="previewMode" aria-live="polite">Видео выключено: вебморда не расходует канал камеры</small></div>
+      <div class="actions">
+        <button id="previewStart" onclick="startPreview()">▶ Смотреть видео / Start preview</button>
+        <button id="previewStop" class="secondary" onclick="stopPreview()" disabled>■ Отключить видео / Stop preview</button>
+      </div>
+      <p class="muted">Hombo3 RTSP и камера продолжают работать независимо. При переключении вкладки или сворачивании окна вебпросмотр отключается автоматически.</p>
       <div class="panel" style="margin-top:12px">
        <h3 data-i18n="ptzTitle">Поворот камеры / PTZ</h3>
        <p class="muted" id="ptzCapability">Проверяем доступность моторов…</p>
