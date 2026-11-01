@@ -334,3 +334,16 @@ Build WIFICAM in **Ubuntu 24.04 under WSL 3.0.3** on Acer Windows 11 Pro
 GPU LLM server: `.100` RTX 3060 CORE; VPN/2FA ingress: DEXP `.109`.
 Full host/network inventory and architecture:
 [PEGINELAB_LAB_ARCHITECTURE_EN.md](../docs/PEGINELAB_LAB_ARCHITECTURE_EN.md).
+
+## Private preconfigured Wi-Fi SD image (Acer WSL)
+
+**SPI/NOR was physically removed**. Keep the known MMC SPL LBA34,
+U-Boot LBA86, BOOT LBA2048, and rootfs LBA34816 unchanged; write the
+whole disk image from LBA0. Copy example `local/wifi.env.example` to
+`local/wifi.env` locally and `chmod 600`; the WPA2 PSK will be
+embedded into `/etc/wpa_supplicant.conf` in the rootfs.
+`local/wifi.env` stays Git-ignored and the personalized binary is
+written under ignored `out/private-sd/`. `PUBLISH=1` is forbidden
+in private Wi-Fi mode. Incorrect credentials may prevent station
+association without any automatic AP fallback.
+[Full guide](../docs/ACER_WSL_SD_WIFI_EN.md).
