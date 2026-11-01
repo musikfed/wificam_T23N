@@ -5,6 +5,12 @@ let csrf='';
 let cameraPreviewMode='idle';
 let previewPollTimer=null;
 let previewZoom=1;
+let previewMirror=false;
+let previewFlip=false;
+try{
+  previewMirror=localStorage.getItem('wificam.preview.mirror')==='1';
+  previewFlip=localStorage.getItem('wificam.preview.flip')==='1';
+}catch(_){} 
 const serviceInfo={};
 
 const tr={
@@ -129,11 +135,23 @@ function startPreview(){
   img.src='/cgi-bin/live.mjpg?t='+Date.now();
 }
 function refreshPreview(){startPreview();}
+function applyPreviewOrientation(){
+  const img=$('#liveFrame');
+  if(img)img.style.transform='scale('+previewZoom+') scaleX('+(previewMirror?-1:1)+') scaleY('+(previewFlip?-1:1)+')';
+  $('#zoomState').textContent=previewZoom.toFixed(2)+'× digital zoom • '+(previewMirror?'mirror ':'')+(previewFlip?'vertical flip ':'')+'(browser only)';
+}
+function setPreviewOrientation(axis,enabled){
+  if(axis==='mirror')previewMirror=!!enabled;
+  if(axis==='flip')previewFlip=!!enabled;
+  try{
+    localStorage.setItem('wificam.preview.mirror',previewMirror?'1':'0');
+    localStorage.setItem('wificam.preview.flip',previewFlip?'1':'0');
+  }catch(_){}
+  applyPreviewOrientation();
+}
 function digitalZoom(delta){
   previewZoom=delta===0?1:Math.min(3,Math.max(1,Math.round((previewZoom+delta*0.25)*100)/100));
-  const img=$('#liveFrame');
-  if(img)img.style.transform='scale('+previewZoom+')';
-  $('#zoomState').textContent=previewZoom.toFixed(2)+'× digital preview zoom (NOT optical)';
+  applyPreviewOrientation();
 }
 async function loadPtzStatus(){
   try{
@@ -250,6 +268,9 @@ $('#rebootBtn').onclick=()=>{if(confirm(lang==='ru'?'Перезагрузить 
 // only runs on status-related pages while the browser is visible.
 translate();
 previewButtons();
+$('#previewMirror').checked=previewMirror;
+$('#previewFlip').checked=previewFlip;
+applyPreviewOrientation();
 refreshStatus();
 function visibleStatusPage(){
   const active=$$('.page').find(p=>p.classList.contains('active'));
