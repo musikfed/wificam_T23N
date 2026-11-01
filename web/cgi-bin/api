@@ -32,7 +32,9 @@ param() {
     key="$1"
     data="${QUERY_STRING:-}"
     [ -z "$REQUEST_DATA" ] || data="$data&$REQUEST_DATA"
-    printf '%s' "$data" | tr '&' '\n' | while IFS='=' read -r k v; do
+    # Always terminate the final field: POSIX read skips an unterminated
+    # single query parameter (e.g. ?op=status), causing "unknown operation".
+    printf '%s\n' "$data" | tr '&' '\n' | while IFS='=' read -r k v; do
         [ "$k" = "$key" ] && { urldecode "$v"; break; }
     done
 }
