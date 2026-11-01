@@ -20,8 +20,14 @@ function log(msg){const b=$('#logBox');if(b)b.textContent=new Date().toLocaleTim
 async function call(op,options={}){
   const url='/cgi-bin/api?op='+encodeURIComponent(op);
   const r=await fetch(url,{cache:'no-store',credentials:'same-origin',...options});
-  const j=await r.json();
-  if(!j.ok)throw new Error(j.error||'API error');
+  const body=await r.text();
+  if(body.trimStart().startsWith('#!')){
+    throw new Error('BusyBox CGI disabled: /cgi-bin/api is exposed as source instead of executed');
+  }
+  let j;
+  try{j=JSON.parse(body)}
+  catch{throw new Error('CGI returned non-JSON HTTP '+r.status+'; check camera httpd/CGI logs')}
+  if(!r.ok||!j.ok)throw new Error(j.error||'API HTTP '+r.status);
   return j;
 }
 function formBody(data){return new URLSearchParams({...data,csrf}).toString()}
