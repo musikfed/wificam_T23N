@@ -13,3 +13,7 @@ web/assets/boot-jingle.wav
 !Thingino/thingino-t23-sd.bin
 !Thingino/thingino-t23-sd.bin.sha256
 !Thingino/IMAGE_INFO.txt
+
+# Private Acer Wi-Fi bootstrap credentials; NEVER commit any local credentials.
+local/*
+!local/wifi.env.example
