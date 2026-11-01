@@ -20,7 +20,8 @@ API="$ROOT/web/cgi-bin/api"
 QUERY_STRING='op=ptz_status' REQUEST_METHOD=GET sh "$API" > "$TMP/status"
 grep -q '^Content-Type: application/json' "$TMP/status"
 grep -q '"ptz":true' "$TMP/status"
-QUERY_STRING='op=ptz_move' REQUEST_METHOD=POST sh "$API" <<<'direction=left' > "$TMP/no-auth"
+printf '%s\n' 'direction=left' |
+  QUERY_STRING='op=ptz_move' REQUEST_METHOD=POST sh "$API" > "$TMP/no-auth"
 grep -q 'web authentication required' "$TMP/no-auth"
 printf 'token42\n' > "$TMP/csrf"
 printf '%s\n' 'direction=left&csrf=token42' |
