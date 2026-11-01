@@ -326,3 +326,11 @@ browser preview zoom is digital. Use the reversible
 `scripts/camera_preview_fps.sh` for optional 8–15 FPS JPEG tuning;
 do not disable camera, motor, MMC, Wi-Fi or SSH kernel drivers/services.
 The existing `0.1_test` binary does NOT contain these changes.
+
+## Development environment and PegineLab infrastructure
+
+Build WIFICAM in **Ubuntu 24.04 under WSL 3.0.3** on Acer Windows 11 Pro
+(WSL distribution stored on D:); run Hombo3 **natively on Acer Windows**.
+GPU LLM server: `.100` RTX 3060 CORE; VPN/2FA ingress: DEXP `.109`.
+Full host/network inventory and architecture:
+[PEGINELAB_LAB_ARCHITECTURE_EN.md](../docs/PEGINELAB_LAB_ARCHITECTURE_EN.md).
