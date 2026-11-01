@@ -13,6 +13,17 @@ THINGINO_URL="${THINGINO_URL:-https://github.com/themactep/thingino-firmware.git
 PUBLISH="${PUBLISH:-0}"
 FAST="${THINGINO_FAST:-0}"
 
+# A personalized image contains a Wi-Fi network key (WPA2 derived PSK).
+# Keep it in gitignored out/private-sd, never overwrite the versioned
+# public Thingino/thingino-t23-sd.bin with private LAN credentials.
+LOCAL_WIFI="$REPO_DIR/local/wifi.env"
+IMAGE_DIR="$REPO_DIR/Thingino"
+if [ -e "$LOCAL_WIFI" ] || [ -L "$LOCAL_WIFI" ]; then
+    [ "$PUBLISH" != 1 ] || { echo "ERROR: refusing PUBLISH=1 with embedded Wi-Fi credentials" >&2; exit 1; }
+    IMAGE_DIR="$REPO_DIR/out/private-sd"
+fi
+IMAGE_PATH="$IMAGE_DIR/thingino-t23-sd.bin"
+
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 for cmd in git make sha256sum stat find grep debugfs; do
@@ -77,7 +88,10 @@ echo "Project checkout  : $REPO_DIR"
 echo "Thingino checkout : $THINGINO_DIR"
 echo "Pinned Thingino   : $THINGINO_REF"
 echo "Camera profile    : $CAMERA"
-echo "Target artifact   : $REPO_DIR/Thingino/thingino-t23-sd.bin"
+echo "Target artifact   : $IMAGE_PATH"
+if [ "$IMAGE_DIR" != "$REPO_DIR/Thingino" ]; then
+    echo "SECURITY: private Wi-Fi PSK image under gitignored out/; PUBLISH=1 blocked."
+fi
 echo
 echo "RU: Web UI является обязательной частью этого образа."
 echo "EN: The PegineLab WIFICAM Web UI is a mandatory part of this image."
@@ -323,15 +337,15 @@ fi
 # the 8 MiB SPI image, then assemble a real partitioned SD disk image.
 sh "$REPO_DIR/scripts/build_sd_bootloader.sh"
 
-mkdir -p "$REPO_DIR/Thingino"
+mkdir -p "$IMAGE_DIR"
 sh "$REPO_DIR/scripts/assemble_thingino_wificam_sd_image.sh" \
     "$REPO_DIR/out/u-boot-t23n-sd.bin" \
     "$KERNEL_IMAGE" \
     "$ROOTFS_EXT" \
-    "$REPO_DIR/Thingino/thingino-t23-sd.bin"
+    "$IMAGE_PATH"
 
-IMAGE_SIZE="$(stat -c '%s' "$REPO_DIR/Thingino/thingino-t23-sd.bin")"
-IMAGE_SHA="$(sha256sum "$REPO_DIR/Thingino/thingino-t23-sd.bin" | awk '{print $1}')"
+IMAGE_SIZE="$(stat -c '%s' "$IMAGE_PATH")"
+IMAGE_SHA="$(sha256sum "$IMAGE_PATH" | awk '{print $1}')"
 
 HISTORICAL_REFERENCE="/mnt/d/Thingino/thingino-t23-sd.bin"
 HISTORICAL_SHA="not-present"
@@ -345,15 +359,15 @@ MAX_GITHUB_SIZE=$((95 * 1024 * 1024))
 [ "$IMAGE_SIZE" -le "$MAX_GITHUB_SIZE" ] || \
     die "canonical image is $IMAGE_SIZE bytes; refusing Git publish above 95 MiB"
 
-printf '%s  %s\n' "$IMAGE_SHA" "thingino-t23-sd.bin" > "$REPO_DIR/Thingino/thingino-t23-sd.bin.sha256"
+printf '%s  %s\n' "$IMAGE_SHA" "thingino-t23-sd.bin" > "$IMAGE_PATH.sha256"
 
-cat > "$REPO_DIR/Thingino/IMAGE_INFO.txt" <<EOF
+cat > "$IMAGE_DIR/IMAGE_INFO.txt" <<EOF
 PegineLab WIFICAM T23N — canonical Thingino MMC SD candidate
 
 RU:
 Профиль-кандидат: $CAMERA
 Источник Thingino: $THINGINO_COMMIT
-Файл: Thingino/thingino-t23-sd.bin
+Файл: $IMAGE_PATH
 Размер: $IMAGE_SIZE bytes
 SHA256: $IMAGE_SHA
 Исторический локальный reference: $HISTORICAL_REFERENCE
@@ -369,7 +383,7 @@ Root: /dev/mmcblk0p2 ext4
 EN:
 Candidate profile: $CAMERA
 Thingino source: $THINGINO_COMMIT
-File: Thingino/thingino-t23-sd.bin
+File: $IMAGE_PATH
 Size: $IMAGE_SIZE bytes
 SHA256: $IMAGE_SHA
 Historical local reference: $HISTORICAL_REFERENCE
@@ -386,7 +400,7 @@ EOF
 echo
 echo "THINGINO WIFICAM SD IMAGE: VERIFIED"
 echo "SPI artifact  : $SPI_IMAGE"
-echo "Canonical     : Thingino/thingino-t23-sd.bin"
+echo "Canonical     : $IMAGE_PATH"
 echo "Size          : $IMAGE_SIZE bytes"
 echo "SHA256        : $IMAGE_SHA"
 echo "Historical    : $HISTORICAL_REFERENCE"
@@ -396,6 +410,7 @@ echo "Web URL       : http://CAMERA_IP:8090/"
 echo
 
 if [ "$PUBLISH" = "1" ]; then
+    [ "$IMAGE_DIR" = "$REPO_DIR/Thingino" ] || die "private Wi-Fi image cannot be published"
     BRANCH="$(git -C "$REPO_DIR" branch --show-current)"
     [ "$BRANCH" = "mymarrchWFcam" ] || die "refusing publish from branch: $BRANCH"
 
@@ -414,5 +429,5 @@ if [ "$PUBLISH" = "1" ]; then
     echo "Git publish: OK ($BRANCH)"
 else
     echo "Not pushed. To build + commit + push in one run:"
-    echo "  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh"
+    echo "  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh  # only without local/wifi.env"
 fi
