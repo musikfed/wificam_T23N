@@ -12,6 +12,11 @@ const timers = new Map();
 const intervals = [];
 const documentListeners = {};
 const windowListeners = {};
+const stored = new Map();
+const localStorage = {
+  getItem: key => stored.get(key) ?? null,
+  setItem: (key,value) => stored.set(key,String(value)),
+};
 let nextTimer = 1;
 
 function element(id) {
@@ -61,7 +66,7 @@ const doc = {
 const win = {addEventListener:(type,cb)=>{windowListeners[type]=cb;}};
 const sandbox = {
   document:doc, window:win,
-  console, URLSearchParams, Date,
+  console, URLSearchParams, Date, localStorage,
   setTimeout:(fn)=>{const id=nextTimer++;timers.set(id,fn);return id;},
   clearTimeout:id=>timers.delete(id),
   setInterval:fn=>{intervals.push(fn);return intervals.length;},
@@ -83,6 +88,16 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(requests.filter(v=>v.includes('op=services')).length,0,
     'service scan must be deferred');
 
+  // View-only mirror/flip: transforms the browser image, not camera RTSP.
+  sandbox.setPreviewOrientation('mirror',true);
+  sandbox.setPreviewOrientation('flip',true);
+  assert.match(get('liveFrame').style.transform,/scaleX\(-1\) scaleY\(-1\)/);
+  assert.equal(stored.get('wificam.preview.mirror'),'1');
+  assert.equal(stored.get('wificam.preview.flip'),'1');
+  sandbox.digitalZoom(1);
+  assert.match(get('liveFrame').style.transform,/scale\(1\.25\)/);
+  // Preview orientation must not initiate a new network request.
+  assert.equal(requests.filter(v=>v.startsWith('image:')).length,0);
   buttons.find(b=>b.dataset.page==='live').onclick();
   await flush();
   assert.equal(get('liveFrame').src,undefined,
