@@ -67,6 +67,11 @@
        <label style="display:inline-block;margin:8px"><input type="checkbox" id="tiltInvert" onchange="ptzInvert('tilt',this.checked)"> <span data-i18n="reverseTilt">Реверс верх / низ</span></label>
        <div class="actions"><button onclick="digitalZoom(-1)">− Zoom</button><button onclick="digitalZoom(1)">+ Zoom</button>
        <button onclick="digitalZoom(0)">1×</button><button id="focusBtn" onclick="apiAction('ptz_autofocus')" disabled data-i18n="autoFocus">Автофокус (если поддерживается)</button></div>
+       <div class="actions">
+       <label><input type="checkbox" id="previewMirror" onchange="setPreviewOrientation('mirror',this.checked)"> Зеркало по горизонтали / Mirror</label>
+       <label><input type="checkbox" id="previewFlip" onchange="setPreviewOrientation('flip',this.checked)"> Переворот по вертикали / Flip</label>
+       </div>
+       <small class="muted">Зеркало и переворот меняют только этот вебпросмотр, не RTSP Hombo3 и не команды моторчиков.</small>
        <p class="muted" id="zoomState">1× — digital preview zoom; optical zoom/autofocus require supported hardware.</p>
       </div>
       </div></section>
