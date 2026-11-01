@@ -542,3 +542,12 @@ ssh root@CAMERA_IP 'sh /tmp/camera_fix_wificam_0_1_test.sh'
 ```
 
 Скрипт не останавливает и не меняет Dropbear/SSH.
+
+## Hombo3 / визуальный клиент
+
+Локальная интеграция SD-камеры с роботом Hombo3: CGI/API, JPEG/RTSP,
+микрофон, динамик через защищённый SSH и условия подключения GPT/LLM:
+[docs/HOMBO3_INTEGRATION_RU.md](docs/HOMBO3_INTEGRATION_RU.md).
+
+Важно: `0.1_test` — сохранённый аппаратный baseline, но новый BusyBox CGI
+фикс ещё не записан на SD и не испытан на железе.
