@@ -139,3 +139,11 @@ sh /tmp/camera_preview_fps.sh apply 12
 После изменения FPS проверить CPU, нагрузку, температуру, кадры,
 аудио и motor PTZ. Если растёт задержка или теряются кадры —
 откатить FPS.
+
+## Где работают проекты (важно для всех инструкций)
+
+WIFICAM собирается на Acer в **WSL Ubuntu 24.04 на Windows диске D:**,
+а Hombo3/CameraHub запускаются **не в WSL, а в Windows 11 Pro на Acer**.
+`.109` — DEXP с AmneziaWG и Docker Compose, `.100` — GPU CORE для LLM.
+Остальная архитектура, CPU, RAM, Python/uv и правила безопасности:
+[PEGINELAB_LAB_ARCHITECTURE_RU.md](PEGINELAB_LAB_ARCHITECTURE_RU.md).
