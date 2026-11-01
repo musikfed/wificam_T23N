@@ -2,11 +2,13 @@ const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 let lang='ru';
 let csrf='';
+let cameraPreviewMode='idle';
+let previewZoom=1;
 const serviceInfo={};
 
 const tr={
- ru:{dashboard:'Главная',live:'Видео',recording:'Запись',image:'Изображение',network:'Сеть / Wi‑Fi',storage:'SD-карта',system:'Система',firmware:'Обновление',logs:'Логи',model:'Модель',architecture:'Архитектура',imageHint:'Web UI использует camera service, который ОС подняла при загрузке.',cameraOsHint:'Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.',wifiSafe:'Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.',scan:'Сканировать сети',password:'Пароль',testSwitch:'Проверить и переключить',reboot:'Перезагрузить',fwHint:'Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.',webPassword:'Пароль администратора Web UI',newPassword:'Новый пароль',repeatPassword:'Повторить пароль',changePassword:'Сменить пароль',authHint:'После смены пароля HTTP-аутентификация перезапустится. Используйте 10–64 печатных ASCII-символа без пробелов; кириллица не поддерживается.',gateway:'Шлюз',optionalServices:'Дополнительные сервисы',servicesHint:'Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.',storageLayout:'MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.',enable:'Включить',disable:'Выключить',running:'работает',stopped:'остановлен',unavailable:'не установлен',protected:'защищён'},
- en:{dashboard:'Dashboard',live:'Live view',recording:'Recording',image:'Image',network:'Network / Wi‑Fi',storage:'Storage / SD',system:'System',firmware:'Firmware update',logs:'Logs',model:'Model',architecture:'Architecture',imageHint:'The Web UI uses the camera service initialized by the OS at boot.',cameraOsHint:'The OS initializes the sensor and camera during boot; the Web UI operates on top of the system camera service.',wifiSafe:'The new network is tested first. On failure the backend restores the previous known-good profile.',scan:'Scan networks',password:'Password',testSwitch:'Test & switch',reboot:'Reboot',fwHint:'Firmware update will be enabled only after U‑Boot and recovery boot paths are validated.',webPassword:'Web UI administrator password',newPassword:'New password',repeatPassword:'Repeat password',changePassword:'Change password',authHint:'HTTP authentication will restart after changing the password. Use 10–64 printable ASCII characters without spaces.',gateway:'Gateway',optionalServices:'Optional services',servicesHint:'A disabled service is not started and therefore has no persistent userspace CPU/RAM process.',storageLayout:'MEDIA = 20 GiB for photos/video; all remaining card space is assigned to ROOTFS.',enable:'Enable',disable:'Disable',running:'running',stopped:'stopped',unavailable:'not installed',protected:'protected'}
+ ru:{dashboard:'Главная',live:'Видео',recording:'Запись',image:'Изображение',network:'Сеть / Wi‑Fi',storage:'SD-карта',system:'Система',firmware:'Обновление',logs:'Логи',model:'Модель',architecture:'Архитектура',imageHint:'Web UI использует camera service, который ОС подняла при загрузке.',cameraOsHint:'Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.',wifiSafe:'Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.',scan:'Сканировать сети',password:'Пароль',testSwitch:'Проверить и переключить',reboot:'Перезагрузить',fwHint:'Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.',webPassword:'Пароль администратора Web UI',newPassword:'Новый пароль',repeatPassword:'Повторить пароль',changePassword:'Сменить пароль',authHint:'После смены пароля HTTP-аутентификация перезапустится. Используйте 10–64 печатных ASCII-символа без пробелов; кириллица не поддерживается.',gateway:'Шлюз',optionalServices:'Дополнительные сервисы',servicesHint:'Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.',storageLayout:'MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.',enable:'Включить',disable:'Выключить',running:'работает',stopped:'остановлен',unavailable:'не установлен',protected:'защищён',ptzTitle:'Поворот камеры / PTZ',reversePan:'Реверс лево / право',reverseTilt:'Реверс верх / низ',autoFocus:'Автофокус (при наличии)'},
+ en:{dashboard:'Dashboard',live:'Live view',recording:'Recording',image:'Image',network:'Network / Wi‑Fi',storage:'Storage / SD',system:'System',firmware:'Firmware update',logs:'Logs',model:'Model',architecture:'Architecture',imageHint:'The Web UI uses the camera service initialized by the OS at boot.',cameraOsHint:'The OS initializes the sensor and camera during boot; the Web UI operates on top of the system camera service.',wifiSafe:'The new network is tested first. On failure the backend restores the previous known-good profile.',scan:'Scan networks',password:'Password',testSwitch:'Test & switch',reboot:'Reboot',fwHint:'Firmware update will be enabled only after U‑Boot and recovery boot paths are validated.',webPassword:'Web UI administrator password',newPassword:'New password',repeatPassword:'Repeat password',changePassword:'Change password',authHint:'HTTP authentication will restart after changing the password. Use 10–64 printable ASCII characters without spaces.',gateway:'Gateway',optionalServices:'Optional services',servicesHint:'A disabled service is not started and therefore has no persistent userspace CPU/RAM process.',storageLayout:'MEDIA = 20 GiB for photos/video; all remaining card space is assigned to ROOTFS.',enable:'Enable',disable:'Disable',running:'running',stopped:'stopped',unavailable:'not installed',protected:'protected',ptzTitle:'Camera movement / PTZ',reversePan:'Reverse left / right',reverseTilt:'Reverse up / down',autoFocus:'Autofocus (if supported)'}
 };
 
 function translate(){
@@ -62,9 +64,52 @@ async function post(op,data={}){
   return call(op,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:formBody(data)});
 }
 
+function previewFallback(){
+  const img=$('#liveFrame');
+  if(!img)return;
+  cameraPreviewMode='snapshot';
+  $('#previewMode').textContent=lang==='ru'
+    ? 'MJPEG недоступен; резервные JPEG раз в 2 с (меньшая скорость)'
+    : 'Native MJPEG unavailable; fallback JPEG every 2 seconds';
+  img.onerror=()=>{$('#previewMode').textContent='Snapshot CGI unavailable: check RVD / CGI';};
+  img.src='/cgi-bin/snapshot.jpg?t='+Date.now();
+}
 function refreshPreview(){
   const img=$('#liveFrame');
-  if(img) img.src='/cgi-bin/snapshot.jpg?t='+Date.now();
+  if(!img)return;
+  cameraPreviewMode='mjpeg';
+  $('#previewMode').textContent=lang==='ru'
+    ? 'Нативный MJPEG Raptor, непрерывный поток без перезапуска кодировщика'
+    : 'Native Raptor MJPEG; warm encoder, lower-latency frames';
+  img.onerror=previewFallback;
+  img.src='/cgi-bin/live.mjpg?t='+Date.now();
+}
+function digitalZoom(delta){
+  previewZoom=delta===0?1:Math.min(3,Math.max(1,Math.round((previewZoom+delta*0.25)*100)/100));
+  const img=$('#liveFrame');
+  if(img)img.style.transform='scale('+previewZoom+')';
+  $('#zoomState').textContent=previewZoom.toFixed(2)+'× digital preview zoom (NOT optical)';
+}
+async function loadPtzStatus(){
+  try{
+    const r=await call('ptz_status');
+    const ready=Boolean(r.ptz);
+    $('#ptzCapability').textContent=ready?'Thingino motors ready':'PTZ motors unavailable on this hardware/boot';
+    $$('.ptz-control').forEach(b=>b.disabled=!ready);
+    $('#panInvert').checked=Boolean(r.pan_invert);
+    $('#tiltInvert').checked=Boolean(r.tilt_invert);
+    // Focus requires a real optical focus driver. Do not present a false feature.
+    $('#focusBtn').disabled=!r.autofocus;
+  }catch(e){$('#ptzCapability').textContent=e.message;$$('.ptz-control').forEach(b=>b.disabled=true);}
+}
+async function ptzMove(direction){
+  try{await post('ptz_move',{direction});}catch(e){toast(e.message);}
+}
+async function ptzInvert(axis,enabled){
+  try{
+    await post('ptz_invert',{axis,enabled:enabled?'1':'0'});
+    await loadPtzStatus();
+  }catch(e){toast(e.message);await loadPtzStatus();}
 }
 
 async function scan(){
@@ -139,6 +184,12 @@ $$('#nav button').forEach(b=>b.onclick=()=>{
   $$('#nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
   $$('.page').forEach(x=>x.classList.remove('active'));$('#'+b.dataset.page).classList.add('active');
   $('#pageTitle').textContent=tr[lang][b.dataset.page]||b.dataset.page;
+  if(b.dataset.page==='live'){loadPtzStatus();refreshPreview();}
+  else if(cameraPreviewMode!=='idle'){
+    // Disconnect persistent JPEG reader while video tab is hidden.
+    $('#liveFrame').removeAttribute('src');
+    cameraPreviewMode='idle';
+  }
   if(b.dataset.page==='storage')loadStorage();
   if(b.dataset.page==='network')loadServices();
 });
@@ -152,4 +203,6 @@ translate();
 refreshStatus();
 loadServices();
 setInterval(refreshStatus,15000);
-setInterval(()=>{const p=$('#live');if(p&&p.classList.contains('active'))refreshPreview()},2000);
+setInterval(()=>{const p=$('#live');if(p&&p.classList.contains('active')&&cameraPreviewMode==='snapshot'){
+    const img=$('#liveFrame');if(img)img.src='/cgi-bin/snapshot.jpg?t='+Date.now();
+}},2000);
