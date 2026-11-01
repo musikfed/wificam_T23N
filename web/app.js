@@ -3,6 +3,7 @@ const $$=s=>[...document.querySelectorAll(s)];
 let lang='ru';
 let csrf='';
 let cameraPreviewMode='idle';
+let previewPollTimer=null;
 let previewZoom=1;
 const serviceInfo={};
 
@@ -64,26 +65,70 @@ async function post(op,data={}){
   return call(op,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:formBody(data)});
 }
 
-function previewFallback(){
+// The browser does NOT subscribe to camera frames by default. Hombo3 RTSP
+// remains independent, including when this PegineLab browser disconnects.
+function previewAllowed(){
+  const live=$('#live');
+  return !document.hidden && Boolean(live && live.classList.contains('active'));
+}
+function previewButtons(){
+  const start=$('#previewStart'),stop=$('#previewStop');
+  if(start)start.disabled=cameraPreviewMode!=='idle';
+  if(stop)stop.disabled=cameraPreviewMode==='idle';
+}
+function stopPreview(reason){
+  // Removing src aborts the browser's HTTP MJPEG request, so its CGI/curl
+  // reader can exit. Never stop Raptor RVD/RSD/RAD or Hombo3's RTSP stream.
+  if(previewPollTimer!==null){clearTimeout(previewPollTimer);previewPollTimer=null;}
+  cameraPreviewMode='idle';
   const img=$('#liveFrame');
-  if(!img)return;
+  if(img){
+    img.onload=null;
+    img.onerror=null;
+    img.removeAttribute('src');
+  }
+  const mode=$('#previewMode');
+  if(mode)mode.textContent=reason||(lang==='ru'
+    ? 'Видео выключено: нет видеотрафика вебморды'
+    : 'Preview is off: web UI sends no video traffic');
+  previewButtons();
+}
+function previewFallback(){
+  if(cameraPreviewMode!=='mjpeg'||!previewAllowed())return;
+  // RHD MJPEG unavailable: one snapshot at a time, only when a frame has
+  // finished loading. No overlapping AJAX requests or unbounded queue.
+  stopPreview();
   cameraPreviewMode='snapshot';
+  const img=$('#liveFrame');
   $('#previewMode').textContent=lang==='ru'
-    ? 'MJPEG недоступен; резервные JPEG раз в 2 с (меньшая скорость)'
-    : 'Native MJPEG unavailable; fallback JPEG every 2 seconds';
-  img.onerror=()=>{$('#previewMode').textContent='Snapshot CGI unavailable: check RVD / CGI';};
+    ? 'Резерв: одиночный JPEG не чаще раза в 2 секунды'
+    : 'Fallback: one JPEG at a time, at most every 2 seconds';
+  img.onerror=()=>{if(cameraPreviewMode==='snapshot')stopPreview('JPEG/CGI unavailable; check RVD and BusyBox CGI');};
+  img.onload=()=>{
+    if(cameraPreviewMode!=='snapshot'||!previewAllowed())return;
+    previewPollTimer=setTimeout(()=>{
+      previewPollTimer=null;
+      if(cameraPreviewMode==='snapshot'&&previewAllowed()){
+        img.src='/cgi-bin/snapshot.jpg?t='+Date.now();
+      }
+    },2000);
+  };
+  previewButtons();
   img.src='/cgi-bin/snapshot.jpg?t='+Date.now();
 }
-function refreshPreview(){
-  const img=$('#liveFrame');
-  if(!img)return;
+function startPreview(){
+  if(!previewAllowed())return;
+  stopPreview();
   cameraPreviewMode='mjpeg';
+  const img=$('#liveFrame');
   $('#previewMode').textContent=lang==='ru'
-    ? 'Нативный MJPEG Raptor, непрерывный поток без перезапуска кодировщика'
-    : 'Native Raptor MJPEG; warm encoder, lower-latency frames';
-  img.onerror=previewFallback;
+    ? 'Включён MJPEG: второй поток только для этой вкладки'
+    : 'MJPEG enabled: second stream for this tab only';
+  img.onerror=()=>{if(cameraPreviewMode==='mjpeg'&&previewAllowed())previewFallback();};
+  previewButtons();
   img.src='/cgi-bin/live.mjpg?t='+Date.now();
 }
+function refreshPreview(){startPreview();}
 function digitalZoom(delta){
   previewZoom=delta===0?1:Math.min(3,Math.max(1,Math.round((previewZoom+delta*0.25)*100)/100));
   const img=$('#liveFrame');
@@ -181,17 +226,19 @@ async function changeWebPassword(ev){
 }
 
 $$('#nav button').forEach(b=>b.onclick=()=>{
+  // Stop before leaving the live page; this closes the MJPEG HTTP request.
+  if(b.dataset.page!=='live')stopPreview();
   $$('#nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
   $$('.page').forEach(x=>x.classList.remove('active'));$('#'+b.dataset.page).classList.add('active');
   $('#pageTitle').textContent=tr[lang][b.dataset.page]||b.dataset.page;
-  if(b.dataset.page==='live'){loadPtzStatus();refreshPreview();}
-  else if(cameraPreviewMode!=='idle'){
-    // Disconnect persistent JPEG reader while video tab is hidden.
-    $('#liveFrame').removeAttribute('src');
-    cameraPreviewMode='idle';
+  if(b.dataset.page==='live'){
+    // PTZ status is lightweight. VIDEO IS NOT STARTED until explicitly requested.
+    loadPtzStatus();
+    previewButtons();
   }
   if(b.dataset.page==='storage')loadStorage();
-  if(b.dataset.page==='network')loadServices();
+  if(b.dataset.page==='network'){refreshStatus();loadServices();}
+  if(b.dataset.page==='dashboard'||b.dataset.page==='system')refreshStatus();
 });
 $('#langBtn').onclick=()=>{lang=lang==='ru'?'en':'ru';translate()};
 $('#scanBtn').onclick=scan;
@@ -199,10 +246,21 @@ $('#wifiForm').addEventListener('submit',applyWifi);
 $('#webPasswordForm').addEventListener('submit',changeWebPassword);
 $('#rebootBtn').onclick=()=>{if(confirm(lang==='ru'?'Перезагрузить камеру?':'Reboot camera?'))apiAction('reboot')};
 
+// No video or network/service scans at boot. The status poll is cheap and
+// only runs on status-related pages while the browser is visible.
 translate();
+previewButtons();
 refreshStatus();
-loadServices();
-setInterval(refreshStatus,15000);
-setInterval(()=>{const p=$('#live');if(p&&p.classList.contains('active')&&cameraPreviewMode==='snapshot'){
-    const img=$('#liveFrame');if(img)img.src='/cgi-bin/snapshot.jpg?t='+Date.now();
-}},2000);
+function visibleStatusPage(){
+  const active=$$('.page').find(p=>p.classList.contains('active'));
+  return active&&['dashboard','system','network'].includes(active.id);
+}
+setInterval(()=>{if(!document.hidden&&visibleStatusPage())refreshStatus();},60000);
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){stopPreview();}
+  else if(visibleStatusPage())refreshStatus(); // never auto-resume video
+});
+window.addEventListener('pagehide',()=>stopPreview());
+// Prevent stale video after BFCache restores a previously viewed tab.
+window.addEventListener('pageshow',()=>{if(visibleStatusPage()&&!document.hidden)refreshStatus();});
+
