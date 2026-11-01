@@ -138,6 +138,30 @@ start() {
         rm -f "$PIDFILE"
         return 1
     fi
+
+    # Hardware regression test: 0.1_test served "#!/bin/sh" verbatim from
+    # /cgi-bin/api because the cached BusyBox binary lacked functioning CGI.
+    # Check authenticated JSON on the known test account. Never serve raw CGI
+    # source on the network: stop our listener if this check fails.
+    if [ "$AUTO_PROVISION_TEST_WEB_AUTH" = "1" ] &&
+       [ -n "$DEFAULT_WEB_PASSWORD" ] &&
+       grep -Fqx "/:$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" "$AUTH_CONF" 2>/dev/null; then
+        if ! command -v curl >/dev/null 2>&1; then
+            echo "WIFICAM CGI smoke check requires curl; refusing untested httpd" | tee -a "$LOG" >&2
+            stop
+            return 1
+        fi
+        response="$(curl --silent --max-time 4 --user "$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" \
+            "http://127.0.0.1:$WEB_PORT/cgi-bin/api?op=status" 2>/dev/null || true)"
+        case "$response" in
+            '{"ok":true,'*) echo "WIFICAM CGI: status JSON verified on port $WEB_PORT" ;;
+            *)
+                echo "WIFICAM CGI FAILED: /cgi-bin/api did not execute as JSON; refusing to expose CGI source" | tee -a "$LOG" >&2
+                stop
+                return 1
+                ;;
+        esac
+    fi
 }
 
 stop() {
