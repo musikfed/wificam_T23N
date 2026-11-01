@@ -38,6 +38,14 @@ if command -v curl >/dev/null 2>&1 && [ -n "$WEB_PASSWORD" ]; then
 else
     echo "API probe skipped: set WEB_PASSWORD=... and ensure curl is installed"
 fi
+echo "=== Performance (read-only; do not unload motor/ISP drivers) ==="
+printf 'System load: '; cat /proc/loadavg 2>/dev/null || true
+printf 'Free memory: '; free 2>/dev/null | head -n 3 || true
+printf 'Raptor JPEG fps: '; raptorctl config get jpeg fps 2>/dev/null || echo "Raptor not available"
+printf 'Stream0 FPS: '; raptorctl config get stream0 fps 2>/dev/null || echo "n/a"
+printf 'Sensor low latency: '; raptorctl config get sensor low_latency 2>/dev/null || echo "n/a"
+printf 'Motor daemon: '; pidof motors-daemon 2>/dev/null || echo "not running"
+printf 'RHD / RSD / RVD / RAD: '; pidof rhd rsd rvd rad 2>/dev/null || true
 echo "=== Recent httpd log ==="
 tail -n 15 "$LOG" 2>/dev/null || true
 echo "Done. No services were restarted or disabled."
