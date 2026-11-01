@@ -17,10 +17,17 @@ FAST="${THINGINO_FAST:-0}"
 # Keep it in gitignored out/private-sd, never overwrite the versioned
 # public Thingino/thingino-t23-sd.bin with private LAN credentials.
 LOCAL_WIFI="$REPO_DIR/local/wifi.env"
-IMAGE_DIR="$REPO_DIR/Thingino"
+PRIVATE_WIFI=0
+# Never overwrite the hardware-booted 0.1_test reference during an ordinary
+# YadroKreator build (PUBLISH=0). Only explicit publishing touches Thingino/.
 if [ -e "$LOCAL_WIFI" ] || [ -L "$LOCAL_WIFI" ]; then
     [ "$PUBLISH" != 1 ] || { echo "ERROR: refusing PUBLISH=1 with embedded Wi-Fi credentials" >&2; exit 1; }
+    PRIVATE_WIFI=1
     IMAGE_DIR="$REPO_DIR/out/private-sd"
+elif [ "$PUBLISH" = "1" ]; then
+    IMAGE_DIR="$REPO_DIR/Thingino"
+else
+    IMAGE_DIR="$REPO_DIR/out/candidate-sd"
 fi
 IMAGE_PATH="$IMAGE_DIR/thingino-t23-sd.bin"
 
@@ -89,7 +96,7 @@ echo "Thingino checkout : $THINGINO_DIR"
 echo "Pinned Thingino   : $THINGINO_REF"
 echo "Camera profile    : $CAMERA"
 echo "Target artifact   : $IMAGE_PATH"
-if [ "$IMAGE_DIR" != "$REPO_DIR/Thingino" ]; then
+if [ "$PRIVATE_WIFI" = "1" ]; then
     echo "SECURITY: private Wi-Fi PSK image under gitignored out/; PUBLISH=1 blocked."
 fi
 echo
@@ -277,7 +284,7 @@ fi
 # If private Wi-Fi provisioning was requested, verify that both the
 # Buildroot target and the ACTUAL ext4 image contain the generated config.
 # Never print it: the derived WPA2 PSK is password-equivalent.
-if [ "$IMAGE_DIR" != "$REPO_DIR/Thingino" ]; then
+if [ "$PRIVATE_WIFI" = "1" ]; then
     [ -f "$TARGET/etc/wpa_supplicant.conf" ] || die "private Wi-Fi missing from target"
     grep -q '^# PegineLab: generated locally' "$TARGET/etc/wpa_supplicant.conf" || \
         die "Buildroot overwrote private Wi-Fi target configuration"
@@ -413,7 +420,7 @@ EOF
 echo
 echo "THINGINO WIFICAM SD IMAGE: VERIFIED"
 echo "SPI artifact  : $SPI_IMAGE"
-echo "Canonical     : $IMAGE_PATH"
+echo "Output image  : $IMAGE_PATH"
 echo "Size          : $IMAGE_SIZE bytes"
 echo "SHA256        : $IMAGE_SHA"
 echo "Historical    : $HISTORICAL_REFERENCE"
@@ -425,7 +432,7 @@ echo
 if [ "$PUBLISH" = "1" ]; then
     [ "$IMAGE_DIR" = "$REPO_DIR/Thingino" ] || die "private Wi-Fi image cannot be published"
     BRANCH="$(git -C "$REPO_DIR" branch --show-current)"
-    [ "$BRANCH" = "mymarrchWFcam" ] || die "refusing publish from branch: $BRANCH"
+    [ "$BRANCH" = "main" ] || die "refusing publish from branch: $BRANCH"
 
     git -C "$REPO_DIR" add -f \
         Thingino/thingino-t23-sd.bin \
@@ -441,6 +448,6 @@ if [ "$PUBLISH" = "1" ]; then
     git -C "$REPO_DIR" push origin "$BRANCH"
     echo "Git publish: OK ($BRANCH)"
 else
-    echo "Not pushed. To build + commit + push in one run:"
+    echo "Candidate kept locally; verified reference in Thingino/ is unchanged."\necho "To build + commit + push an explicitly accepted image:"
     echo "  PUBLISH=1 sh scripts/build_thingino_wificam_image.sh  # only without local/wifi.env"
 fi

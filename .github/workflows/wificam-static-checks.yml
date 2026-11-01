@@ -1,7 +1,7 @@
 name: WIFICAM static checks
 on:
   push:
-    branches: [mymarrchWFcam]
+    branches: [main]
   pull_request:
 jobs:
   sanity:

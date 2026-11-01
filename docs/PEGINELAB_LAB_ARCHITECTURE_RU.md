@@ -116,8 +116,8 @@ WSL distribution files located on D:
 
 ```bash
 cd ~/myipcam/wificam_T23N
-git switch mymarrchWFcam
-git pull --ff-only origin mymarrchWFcam
+git switch main
+git pull --ff-only origin main
 # Thingino checkout: ~/myipcam/thingino-firmware
 # CAMERA=galayou_g2_t23n_sc2336_atbm6012bx
 THINGINO_FAST=1 PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
@@ -178,10 +178,15 @@ T23N mic -> RTSP audio track -> Acer (STT после отдельной инте
 
 | Компонент | Репозиторий / часть |
 |---|---|
-| SD image / BusyBox CGI / Raptor / motor | [wificam_T23N](https://github.com/musikfed/wificam_T23N), ветка `mymarrchWFcam`; `scripts/build_thingino_wificam_image.sh`, `rootfs/`, `web/` |
+| SD image / BusyBox CGI / Raptor / motor | [wificam_T23N](https://github.com/musikfed/wificam_T23N), ветка `main`; `scripts/build_thingino_wificam_image.sh`, `rootfs/`, `web/` |
 | Связь камеры с Hombo3 | `wificam_T23N/docs/HOMBO3_INTEGRATION_RU.md` и `Hombo3_3.0.0/docs/WIFICAM_T23N_RU.md` |
 | Hombo3 orchestrator | [Hombo3_3.0.0](https://github.com/musikfed/Hombo3_3.0.0), `main`; `backend/app/main.py`, `backend/app/camera.py`, `frontend/` |
 | Настройки камеры для Hombo3 | `Hombo3_3.0.0/.env.wificam.example` (только образец, реальный `.env` не коммитить) |
 | Аппаратный робот | `Hombo3_3.0.0/docs/HARDWARE_BASELINE_RU.md` и `HOMBO3_PINOUT_QUICK_RU.md` |
 
 **Тестовый чеклист следующего этапа:** локальный доступ Windows→T23N/CORE; RTSP frame latency/FPS; PTZ reverse с реальным мотором; JPEG/CGI Basic Auth; микрофон и динамик через проверенные интерфейсы; таймаут Ollama через VPN/локальную сеть; 2FA на внешнем edge; пробуждение .100/.103 без потери состояния; SSH recovery после reboot.
+
+
+## Уточнение 2026-11-01: станок сборки Huananzhi
+
+Основной веб-станок сборки ядер и прошивок теперь выделен в отдельный репозиторий `musikfed/YadroKreator` на Ubuntu 24.04 Huananzhi (`192.168.0.100:62404` через доверенную LAN/VPN). Репозиторий камеры `musikfed/wificam_T23N` — только исходники, SD-загрузчик, rootfs и локальный интерфейс камеры. Старые инструкции сборки из Acer WSL сохраняются как альтернативная рабочая среда и не означают, что сервер уже проверен вживую. Для YadroKreator используется `PUBLISH=0`; непроверенный образ сохраняется в `out/candidate-sd/` либо `out/private-sd/` и не подменяет hardware-booted эталон `0.1_test`.

@@ -22,7 +22,7 @@
 
 ## Repositories
 
-- Firmware: https://github.com/musikfed/wificam_T23N (`mymarrchWFcam`).
+- Firmware: https://github.com/musikfed/wificam_T23N (`main`).
 - Robot/controller: https://github.com/musikfed/Hombo3_3.0.0 (`main`).
 ## This repository specifically
 
@@ -30,3 +30,9 @@
 - SD writer takes a **whole disk** target only after explicit verification and writes the assembled image from LBA0. USB reader passthrough uses `usbipd` in Windows PowerShell, not in Ubuntu.
 - Prefer userspace service fixes to unnecessary kernel rebuilds. Rebuild BusyBox only when CGI features/binary require it. Preserve critical recovery services.
 - Paired RU/EN Thingino and first boot documents should stay consistent. Never silently rewrite `0.1_test`.
+
+## Mainline build ownership (2026-11-01)
+
+- WIFICAM camera firmware and camera UI live in this repo on `main`; the Huananzhi Ubuntu 24.04 build *dashboard* and job scheduler belong only to `musikfed/YadroKreator` (`192.168.0.100:62404`).
+- `release/0.1_test` is the hardware-booted SD reference, not evidence that its camera Web UI/API is fixed. New builds are unverified until SD boot, SSH, Web UI 8090, CGI, preview and PTZ checks on hardware.
+- Factory builds set `PUBLISH=0`; never overwrite the versioned `Thingino/thingino-t23-sd.bin` or publish private Wi-Fi credentials. Outputs: `out/candidate-sd/` or `out/private-sd/`.

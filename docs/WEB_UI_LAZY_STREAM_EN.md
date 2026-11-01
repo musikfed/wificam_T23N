@@ -1,6 +1,6 @@
 # PegineLab T23N — lazy Web UI without competing with Hombo3
 
-**Status:** implemented in development branch `mymarrchWFcam`, not in the
+**Status:** implemented in development branch `main`, not in the
 published `0.1_test` SD binary. Build and hardware validation are still required.
 
 ## Design

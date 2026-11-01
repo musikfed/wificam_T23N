@@ -86,8 +86,8 @@ Previously used Linux working paths (WSL disk stored on D: does **not** mean sou
 
 ```sh
 cd ~/myipcam/wificam_T23N
-git switch mymarrchWFcam
-git pull --ff-only origin mymarrchWFcam
+git switch main
+git pull --ff-only origin main
 # Pinned Thingino clone: ~/myipcam/thingino-firmware
 THINGINO_FAST=1 PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
 ```
@@ -125,6 +125,11 @@ Priorities: local-first ownership and offline camera autonomy; SSH recovery alwa
 
 ## Related repositories and verification
 
-- WIFICAM: [musikfed/wificam_T23N](https://github.com/musikfed/wificam_T23N) `mymarrchWFcam`; `scripts/build_thingino_wificam_image.sh`, `web/`, `rootfs/`, `docs/HOMBO3_INTEGRATION_RU.md`.
+- WIFICAM: [musikfed/wificam_T23N](https://github.com/musikfed/wificam_T23N) `main`; `scripts/build_thingino_wificam_image.sh`, `web/`, `rootfs/`, `docs/HOMBO3_INTEGRATION_RU.md`.
 - Hombo3: [musikfed/Hombo3_3.0.0](https://github.com/musikfed/Hombo3_3.0.0) `main`; `backend/app/main.py`, `backend/app/camera.py`, `frontend/`, `.env.wificam.example`, `docs/WIFICAM_T23N_RU.md`.
 - Hardware acceptance still required: actual camera PTZ/mic/speaker/RTSP latency and FPS, SSH persistence after reboot, CORE LLM connectivity, VPN 2FA ingress and Wake-on-LAN operation. CI syntax/mock tests are **not** physical verification.
+
+
+## 2026-11-01 update: Huananzhi build factory
+
+The primary kernel and firmware build dashboard now lives in the separate `musikfed/YadroKreator` repository on Huananzhi Ubuntu 24.04 at `192.168.0.100:62404` (trusted LAN/VPN only). `musikfed/wificam_T23N` owns only camera firmware, SD boot, rootfs and the camera-side Web UI. Existing Acer WSL build instructions remain an alternative, not proof that the Huananzhi service is already running. Factory jobs set `PUBLISH=0` and write unverified candidates to `out/candidate-sd/` or `out/private-sd/`, never over the 0.1_test hardware-booted image.

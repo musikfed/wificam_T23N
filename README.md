@@ -1,6 +1,24 @@
 # wificam_T23N — autonomous SD firmware
 
 
+> **Состояние / Status.** `release/0.1_test` — аппаратно подтверждённый
+> **SD boot baseline**, а не исправная финальная веб-прошивка. Точный бинарник
+> имеет SHA256 `f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be`.
+> В исходниках `main` находятся более поздние исправления Web UI (8090,
+> BusyBox CGI/CSRF, Raptor), PTZ, экономный lazy MJPEG, Wi-Fi и recovery.
+> Новый бинарник с этими изменениями должен пройти сборку и проверку на
+> физической камере. **CI не является доказательством работы железа.**
+>
+> **YadroKreator (отдельный репозиторий):**
+> `http://192.168.0.100:62404/` на Huananzhi Ubuntu 24.04.
+> Для обычной сборки используется `PUBLISH=0`: новые непроверенные образы
+> пишутся в `out/candidate-sd/` или, при локальном `local/wifi.env`,
+> в `out/private-sd/`. Они не заменяют проверенный
+> `Thingino/thingino-t23-sd.bin` и не отправляются в GitHub.
+> Веб-интерфейс **самой камеры** остаётся в `web/` и открывается на `:8090`.
+> Порт 62404 не предназначен для доступа из Интернета.
+>
+
 > **Важно для 0.1_test:** SHA256 `f9f50a8595d4fe629ed787483188319000d2780bd3c6dee56fef4de5e754f6be`
 > аппаратно подтвердил SD boot, но этот конкретный bin был собран до последних
 > runtime-исправлений WIFICAM (8090, private httpd config, first-boot claim).
@@ -13,7 +31,7 @@
 
 ### Вариант A — скачать готовый SD image
 
-Аппаратно проверенный image находится в ветке `mymarrchWFcam`:
+Аппаратно проверенный image находится в ветке `main`:
 
 ```text
 Thingino/thingino-t23-sd.bin
@@ -49,9 +67,9 @@ Image записывается целиком с LBA0. Не использова
 ```sh
 git clone https://github.com/musikfed/wificam_T23N.git
 cd wificam_T23N
-git switch mymarrchWFcam
+git switch main
 
-THINGINO_FAST=1 PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+THINGINO_FAST=0 PUBLISH=0 sh scripts/build_thingino_wificam_image.sh
 ```
 
 Канонический результат:
@@ -87,7 +105,7 @@ TCP 8090 с тестовыми реквизитами. На текущем ап�
 ![PegineLab](web/assets/peginelab-logo.svg)
 
 Экспериментальная прошивка для Wi‑Fi камеры **Ingenic T23/T23N**, ветка
-`mymarrchWFcam`.
+`main`.
 
 ## Аппаратный режим этой ветки
 
@@ -149,7 +167,7 @@ Thingino/IMAGE_INFO.txt
 ```sh
 cd ~/myipcam/wificam_T23N
 git pull
-PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+PUBLISH=0 sh scripts/build_thingino_wificam_image.sh
 ```
 
 Отдельный ручной clone Thingino не требуется: если checkout отсутствует,
@@ -247,7 +265,7 @@ sudo apt install -y git make gcc python3 curl squashfs-tools dosfstools fdisk e2
 
 ```sh
 cd ~/myipcam/wificam_T23N
-git switch mymarrchWFcam
+git switch main
 git pull
 sh scripts/build_all.sh
 ```

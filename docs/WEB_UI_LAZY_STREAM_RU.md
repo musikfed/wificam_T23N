@@ -1,6 +1,6 @@
 # PegineLab WIFICAM T23N — ленивый Web UI без помех Hombo3
 
-**Статус:** исправлено в исходниках `mymarrchWFcam`. Старая карта с
+**Статус:** исправлено в исходниках `main`. Старая карта с
 `0.1_test` **не содержит** этих правок; новое поведение появится
 только после сборки нового SD-образа и аппаратной проверки.
 
@@ -81,8 +81,8 @@ SSH/Dropbear, Wi-Fi, ядро/ISP, RTSP-сессия Hombo3. Кеш/пулы
 
 ```sh
 cd ~/myipcam/wificam_T23N
-git switch mymarrchWFcam
-git pull --ff-only origin mymarrchWFcam
+git switch main
+git pull --ff-only origin main
 # Пока SD не пересобран, новый UI на камере не появится.
 # Файлы на GitHub сами по себе НЕ обновляют образ.
 ```

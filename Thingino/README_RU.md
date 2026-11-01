@@ -101,7 +101,7 @@ WIFICAM включает:
 ```sh
 cd ~/myipcam/wificam_T23N
 git pull
-PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+PUBLISH=0 sh scripts/build_thingino_wificam_image.sh
 ```
 
 **Отдельно клонировать Thingino вручную больше не требуется.** Если каталога
@@ -349,3 +349,8 @@ FAT16 BOOT на LBA2048 и ext4 ROOTFS на LBA34816 — не менять.
 а `PUBLISH=1` будет заблокирован. Пароль Wi-Fi **не хранить в Git**.
 Если пароль неверен, Thingino может не переключиться в AP.
 [Полная инструкция](../docs/ACER_WSL_SD_WIFI_RU.md).
+
+
+### YadroKreator factory build / Сборка на сервере
+
+The Huananzhi Ubuntu 24.04 dashboard at `http://192.168.0.100:62404/` runs this build with `PUBLISH=0`. New candidates are saved to `out/candidate-sd/` (or `out/private-sd/` when local `local/wifi.env` is configured); the tracked `Thingino/thingino-t23-sd.bin` is the unchanged hardware-booted 0.1_test baseline. Camera UI fixes require a newly built binary and testing on hardware. Never make the build UI port publicly accessible.

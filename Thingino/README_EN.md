@@ -102,7 +102,7 @@ After updating the main project checkout:
 ```sh
 cd ~/myipcam/wificam_T23N
 git pull
-PUBLISH=1 sh scripts/build_thingino_wificam_image.sh
+PUBLISH=0 sh scripts/build_thingino_wificam_image.sh
 ```
 
 There is **no separate manual Thingino clone prerequisite anymore**. The build
@@ -347,3 +347,8 @@ written under ignored `out/private-sd/`. `PUBLISH=1` is forbidden
 in private Wi-Fi mode. Incorrect credentials may prevent station
 association without any automatic AP fallback.
 [Full guide](../docs/ACER_WSL_SD_WIFI_EN.md).
+
+
+### YadroKreator factory build / Сборка на сервере
+
+The Huananzhi Ubuntu 24.04 dashboard at `http://192.168.0.100:62404/` runs this build with `PUBLISH=0`. New candidates are saved to `out/candidate-sd/` (or `out/private-sd/` when local `local/wifi.env` is configured); the tracked `Thingino/thingino-t23-sd.bin` is the unchanged hardware-booted 0.1_test baseline. Camera UI fixes require a newly built binary and testing on hardware. Never make the build UI port publicly accessible.
