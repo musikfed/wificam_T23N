@@ -18,9 +18,13 @@ chmod +x "$TMP/bin/wificam-ptz-ctl"
 export PATH="$TMP/bin:$PATH"
 API="$ROOT/web/cgi-bin/api"
 QUERY_STRING='op=ptz_status' REQUEST_METHOD=GET sh "$API" > "$TMP/status"
-echo "DEBUG CGI status output:"; cat "$TMP/status"
+
 grep -q '^Content-Type: application/json' "$TMP/status"
 grep -q '"ptz":true' "$TMP/status"
+# Single GET query parameter must be parsed, not fall through to unknown op.
+QUERY_STRING='op=status' REQUEST_METHOD=GET sh "$API" > "$TMP/main-status"
+grep -q '"ok":true' "$TMP/main-status"
+! grep -q '"error":"unknown operation"' "$TMP/main-status"
 printf '%s\n' 'direction=left' |
   QUERY_STRING='op=ptz_move' REQUEST_METHOD=POST sh "$API" > "$TMP/no-auth"
 grep -q 'web authentication required' "$TMP/no-auth"
