@@ -222,6 +222,43 @@ web_password() {
     (sleep 1; /etc/init.d/S90wificam restart) >/dev/null 2>&1 &
 }
 
+ptz_status() {
+    command -v wificam-ptz-ctl >/dev/null 2>&1 || fail "PTZ controller not installed"
+    wificam-ptz-ctl status || fail "PTZ status unavailable"
+}
+
+ptz_action() {
+    require_post
+    require_auth
+    require_csrf
+    command -v wificam-ptz-ctl >/dev/null 2>&1 || fail "PTZ controller not installed"
+    direction="$(param direction)"
+    case "$direction" in left|right|up|down) ;; *) fail "invalid PTZ direction" ;; esac
+    output="$(wificam-ptz-ctl move "$direction" 2>&1)" || fail "$output"
+    ok ',"message":"PTZ step sent"'
+}
+
+ptz_invert() {
+    require_post
+    require_auth
+    require_csrf
+    command -v wificam-ptz-ctl >/dev/null 2>&1 || fail "PTZ controller not installed"
+    axis="$(param axis)"
+    value="$(param enabled)"
+    case "$axis" in pan|tilt) ;; *) fail "invalid PTZ axis" ;; esac
+    case "$value" in 0|1) ;; *) fail "invalid PTZ invert value" ;; esac
+    output="$(wificam-ptz-ctl invert "$axis" "$value" 2>&1)" || fail "$output"
+    header
+    printf '%s\n' "$output"
+}
+
+ptz_autofocus() {
+    require_post
+    require_auth
+    require_csrf
+    fail "Autofocus not exposed by this camera profile; manual DW9714 focus is not autofocus"
+}
+
 op="$(param op)"
 
 case "$op" in
@@ -231,6 +268,10 @@ case "$op" in
   storage) storage ;;
   services) services ;;
   service_toggle) service_toggle ;;
+  ptz_status) ptz_status ;;
+  ptz_move) ptz_action ;;
+  ptz_invert) ptz_invert ;;
+  ptz_autofocus) ptz_autofocus ;;
   camera_start) camera_action start ;;
   camera_stop) camera_action stop ;;
   record_start) camera_action record-start ;;
