@@ -262,5 +262,5 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',()=>stopPreview());
 // Prevent stale video after BFCache restores a previously viewed tab.
-window.addEventListener('pageshow',()=>{if(visibleStatusPage()&&!document.hidden)refreshStatus();});
+window.addEventListener('pageshow',event=>{if(event.persisted&&visibleStatusPage()&&!document.hidden)refreshStatus();});
 
