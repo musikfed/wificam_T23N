@@ -18,6 +18,12 @@ mkdir -p "$OUT/usr/share/wificam-web"
 cp -R "$REPO_DIR/rootfs/." "$OUT/"
 cp -R "$REPO_DIR/web/." "$OUT/usr/share/wificam-web/"
 
+# Never source or echo private Wi-Fi credentials. This stage uses stdlib Python
+# to create /etc/wpa_supplicant.conf (SSID hex + derived WPA2 PSK). It must run
+# AFTER copying the repo overlay and BEFORE Buildroot creates rootfs.ext2.
+python3 "$REPO_DIR/scripts/prepare_wifi_overlay.py" \
+    "$REPO_DIR/local/wifi.env" "$OUT"
+
 # Decode the compact PegineLab logo source into a PNG for framebuffer tools.
 if [ -f "$REPO_DIR/branding/peginelab-logo.png.b64" ]; then
     mkdir -p "$OUT/usr/share/wificam-web/assets"
