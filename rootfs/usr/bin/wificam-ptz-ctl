@@ -2,7 +2,7 @@
 # Safe, bounded local PTZ commands for Galayou/Thingino motors.
 # Direction changes do not reload drivers or reboot the camera.
 set -eu
-STATE_DIR=/opt/wificam
+STATE_DIR="${STATE_DIR:-/opt/wificam}"
 [ -f /etc/wificam/wificam.conf ] && . /etc/wificam/wificam.conf
 STATE_DIR="${STATE_DIR:-/opt/wificam}"
 CONF="$STATE_DIR/ptz-controls.conf"
