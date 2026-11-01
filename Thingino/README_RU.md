@@ -337,3 +337,15 @@ Web UI не может случайно выключить SSH. Build pipeline �
 внешний AmneziaWG/2FA вход — DEXP `.109`.
 Полная архитектура и характеристики:
 [PEGINELAB_LAB_ARCHITECTURE_RU.md](../docs/PEGINELAB_LAB_ARCHITECTURE_RU.md).
+
+## Персональная сборка и автоматический Wi-Fi (Acer WSL)
+
+**SPI/NOR физически отсутствует.** MMC SPL на LBA34, U-Boot на LBA86,
+FAT16 BOOT на LBA2048 и ext4 ROOTFS на LBA34816 — не менять.
+Локальный файл `local/wifi.env` (скопировать из
+`local/wifi.env.example`, `chmod 600`) генерирует готовый
+`/etc/wpa_supplicant.conf` с WPA2 PSK в rootfs. Не публиковать
+секретный образ: он появится в `out/private-sd/`,
+а `PUBLISH=1` будет заблокирован. Пароль Wi-Fi **не хранить в Git**.
+Если пароль неверен, Thingino может не переключиться в AP.
+[Полная инструкция](../docs/ACER_WSL_SD_WIFI_RU.md).
