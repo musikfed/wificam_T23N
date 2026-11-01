@@ -218,7 +218,7 @@ for opt in $BUSYBOX_REQUIRED_OPTS; do
         die "BusyBox HTTP feature missing after reconfigure: $opt"
     fi
 done
-if grep -q '^CONFIG_FEATURE_FORCE_APPLETS=y
+if grep -q '^CONFIG_FEATURE_FORCE_APPLETS=y that the cached MIPS binary includes
 # CGI. We saw this on the hardware-booted 0.1_test: /cgi-bin/api was served
 # literally as "#!/bin/sh", despite the .config checks passing. Force an
 # incremental BusyBox rebuild before packaging p2; no kernel rebuild needed.
