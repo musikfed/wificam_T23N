@@ -13,6 +13,8 @@ jobs:
           set -eu
           sh -n scripts/build_thingino_wificam_image.sh
           sh -n scripts/package_rootfs_overlay.sh
+          sh -n scripts/wsl_camera_inventory.sh
+          sh -n scripts/wsl_restore_camera.sh
           sh -n scripts/camera_diagnostics.sh
           sh -n scripts/camera_preview_fps.sh
           sh -n rootfs/usr/bin/wificam-ptz-ctl
@@ -22,6 +24,10 @@ jobs:
           sh -n web/cgi-bin/api
           sh -n web/cgi-bin/snapshot.jpg
           sh -n web/setup/cgi-bin/claim
+      - name: Check local Wi-Fi config generator and no-secret output
+        run: |
+          python3 -m py_compile scripts/prepare_wifi_overlay.py
+          python3 -m unittest discover -s tests -p test_prepare_wifi_overlay.py -v
       - name: Simulated physical PTZ commands and reverse axes
         run: sh scripts/test_ptz_sim.sh
       - name: PTZ CGI JSON and auth tests
