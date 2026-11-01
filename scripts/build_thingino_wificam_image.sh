@@ -274,6 +274,19 @@ if [ ! -x "$TARGET/etc/init.d/S30dropbear" ] && [ ! -x "$TARGET/etc/init.d/S50dr
     die "Dropbear init script missing from target rootfs"
 fi
 
+# If private Wi-Fi provisioning was requested, verify that both the
+# Buildroot target and the ACTUAL ext4 image contain the generated config.
+# Never print it: the derived WPA2 PSK is password-equivalent.
+if [ "$IMAGE_DIR" != "$REPO_DIR/Thingino" ]; then
+    [ -f "$TARGET/etc/wpa_supplicant.conf" ] || die "private Wi-Fi missing from target"
+    grep -q '^# PegineLab: generated locally' "$TARGET/etc/wpa_supplicant.conf" || \
+        die "Buildroot overwrote private Wi-Fi target configuration"
+    debugfs -R 'cat /etc/wpa_supplicant.conf' "$ROOTFS_EXT" 2>/dev/null | \
+        grep -q '^# PegineLab: generated locally' || \
+        die "private Wi-Fi config did not reach rootfs.ext2"
+    echo "Wi-Fi private config: verified INSIDE rootfs.ext2 (contents hidden)"
+fi
+
 grep -q '^WEB_PORT=8090$' "$TARGET/etc/wificam/wificam.conf" || \
     die "WIFICAM WEB_PORT is not 8090"
 grep -q '^AUTO_PROVISION_TEST_WEB_AUTH=1$' "$TARGET/etc/wificam/wificam.conf" || \
