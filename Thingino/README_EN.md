@@ -316,3 +316,13 @@ SSH_PROTECT=1
 
 The Web UI cannot accidentally disable SSH. The build verifies Dropbear and
 its init script inside `rootfs.ext2`, preserving a local recovery path.
+
+### PTZ and low-latency preview (source after 0.1_test)
+
+The :8090 UI prioritizes one persistent native Raptor MJPEG reader,
+provides bounded direction nudges and independently persistent pan/tilt
+axis inversion. Unsupported autofocus/optical zoom is reported honestly;
+browser preview zoom is digital. Use the reversible
+`scripts/camera_preview_fps.sh` for optional 8–15 FPS JPEG tuning;
+do not disable camera, motor, MMC, Wi-Fi or SSH kernel drivers/services.
+The existing `0.1_test` binary does NOT contain these changes.
