@@ -29,6 +29,16 @@ class CgiSafetyContract(unittest.TestCase):
         self.assertIn("trap cleanup EXIT", smoke)
         self.assertNotIn("killall httpd", smoke)
 
+    def test_builder_sanitizes_ld_library_path_before_buildroot(self):
+        builder = (ROOT / "scripts/rebuild_busybox_cgi_candidate.sh").read_text()
+        # Regression: Huananzhi shell had an inherited cwd entry in this
+        # variable. Buildroot rejects it before compiling BusyBox.
+        self.assertIn("unset LD_LIBRARY_PATH", builder)
+        self.assertIn("LD_LIBRARY_PATH+x", builder)
+        self.assertLess(builder.index("unset LD_LIBRARY_PATH"),
+                        builder.index("make CAMERA="))
+        self.assertIn("br-busybox-reconfigure", builder)
+
     def test_incremental_builder_never_rebuilds_kernel_or_flashes(self):
         builder = (ROOT / "scripts/rebuild_busybox_cgi_candidate.sh").read_text()
         self.assertIn("br-busybox-rebuild", builder)
