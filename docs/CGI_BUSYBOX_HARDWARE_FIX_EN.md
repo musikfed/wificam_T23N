@@ -11,6 +11,28 @@ This change includes:
 - \`rootfs/etc/init.d/S90wificam\`: **preflight before binding LAN :8090**. Optional \`WIFICAM_HTTPD_BIN=/absolute/path/to/tested/busybox\` for an isolated binary; default system HTTP server remains unchanged.
 - CI shell checks + static assertions, separate from hardware acceptance.
 
+## Buildroot environment failure observed on Huananzhi
+
+The first incremental attempt failed during `br-busybox-reconfigure`,
+**before** any candidate BusyBox was compiled:
+
+```text
+You seem to have the current working directory in your
+LD_LIBRARY_PATH environment variable. This doesn't work.
+```
+
+Buildroot rejects inherited `LD_LIBRARY_PATH` containing `.`,
+the current directory, or an empty path component. The candidate builder
+now **unsets this variable inside its own process** before invoking
+Buildroot. It does not modify your login shell, system libraries,
+camera or kernel; no `sudo` needed.
+
+After `git fetch`, **re-export the script** into `$JOB/out/`.
+An old previously exported file will not update automatically.
+An emergency fallback with the old script is
+`env -u LD_LIBRARY_PATH sh "$JOB/out/rebuild_busybox_cgi_candidate.sh"`,
+but prefer the updated version below.
+
 ## Incremental build on Huananzhi
 
 Run as regular Ubuntu user, with no active factory jobs:

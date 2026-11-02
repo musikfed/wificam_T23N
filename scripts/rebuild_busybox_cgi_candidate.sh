@@ -7,6 +7,21 @@ set -eu
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
+# Buildroot refuses LD_LIBRARY_PATH when it contains the current working
+# directory (including empty ':' components, '.'). This actually happened
+# on Huananzhi on 2026-11-02 before BusyBox reconfigure could run:
+# "You seem to have the current working directory in your
+# LD_LIBRARY_PATH environment variable. This doesn't work."
+#
+# Do not require the operator to unset it manually every time. Buildroot
+# configures the target toolchain's library search paths itself. This affects
+# ONLY this script and its child processes; it doesn't change the login shell
+# or system environment and doesn't require sudo.
+if [ "${LD_LIBRARY_PATH+x}" = x ]; then
+    unset LD_LIBRARY_PATH
+    echo "INFO: removed inherited LD_LIBRARY_PATH for Buildroot (process-local)"
+fi
+
 REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 THINGINO_DIR="${THINGINO_DIR:-/1tbdisk/PegineLab/build/thingino-firmware}"
 CAMERA="${CAMERA:-galayou_g2_t23n_sc2336_atbm6012bx}"
