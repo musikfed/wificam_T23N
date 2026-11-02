@@ -94,6 +94,31 @@ H:/usr/share/wificam-web
 /:admin:Wificam12345
 ```
 
+## Подтверждённый первый вход на реальной T23N (02.11.2026)
+
+![Не требуется: ввод пароля скрыт в терминале](../web/assets/peginelab-logo.svg)
+
+По снимку SSH-запуска Thingino профиль `galayou_g2_t23n_sc2336_atbm6012bx` уже поднял
+Wi-Fi `192.168.1.55` и открыл Dropbear. Сразу после входа появилось:
+
+```text
+It's your first login.
+You are required to change your password!
+Password:
+```
+
+**Тут Thingino просит именно НОВЫЙ пароль root!** Старый заводской `root`
+вводится раньше, в строке `root@192.168.1.55's password:`, если пароль
+не менялся. Затем новое значение дважды: `Password:`, `Confirm:`.
+Скрипт Thingino [chpasswd](https://github.com/themactep/thingino-firmware/blob/24ec28c7457686ff733132e580267d6a95308c80/overlay/etc/profile.d/chpasswd)
+запрещает пустую строку и значение `root`. После `Password updated.`
+для SSH и Thingino Web нужен уже **новый root-пароль**; PegineLab
+`admin / Wificam12345` остаётся отдельной **тестовой** авторизацией.
+
+**[Пошаговый протокол этого запуска и команды проверки SD-root / WIFICAM](REAL_CAMERA_FIRST_BOOT_RU.md).**
+Пока подтверждены только Wi-Fi, баннер Thingino и SSH; работоспособность
+rootfs с `/dev/mmcblk0p2`, порта 8090, RTSP и PTZ проверяем отдельно.
+
 ## SSH из Windows PowerShell
 
 Thingino использует Dropbear SSH.
