@@ -14,7 +14,8 @@ PegineLab WIFICAM — обязательный web-стек canonical Thingino M
 
 ```text
 Thingino Web UI         : 80/443
-PegineLab WIFICAM httpd : 8080
+Thingino camera/API     : 8080
+PegineLab WIFICAM httpd : 8090
   └─ HTML/CSS/JS
       └─ CGI JSON API
           ├─ Wi-Fi/IP
@@ -100,4 +101,4 @@ Persistent WIFICAM state хранится под `/opt/wificam`. Для storage 
 
 Аппаратный acceptance criterion: после загрузки должна открываться не только
 штатная Thingino UI, но и **PegineLab WIFICAM на
-`http://CAMERA_IP:8080/`**.
+`http://CAMERA_IP:8090/`**.
