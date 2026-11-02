@@ -16,6 +16,31 @@
 3. \`rootfs/etc/init.d/S90wificam\` — **до** открытия публичного 8090 тестирует CGI через localhost; если CGI не работает, отказывает в запуске. Для проверенного отдельно бинарника допускает \`WIFICAM_HTTPD_BIN=/opt/wificam/.../busybox\` (абсолютный путь), не заменяя базовый BusyBox.
 4. Тесты CI проверяют сохранение защитного механизма и синтаксис, но **не заменяют аппаратный CGI-тест**.
 
+## Исправленная ошибка сборки от 02.11.2026
+
+При первой попытке на Huananzhi запуск дошёл до `br-busybox-reconfigure`
+и был остановлен самим Buildroot:
+
+```text
+You seem to have the current working directory in your
+LD_LIBRARY_PATH environment variable. This doesn't work.
+make: *** [br-busybox-reconfigure] Error 2
+```
+
+Причина: у терминала Ubuntu унаследована несовместимая с Buildroot
+`LD_LIBRARY_PATH` (например `.`, текущий каталог или пустой компонент
+из `:`). **Исправлено в `scripts/rebuild_busybox_cgi_candidate.sh`:**
+переменная сбрасывается только внутри процесса скрипта и его дочерних
+`make`. Не нужно менять глобальный профиль, системные библиотеки
+или выполнять `sudo`. Это **не** ошибка камеры, BusyBox CGI
+или ядра; до компиляции тогда не дошло.
+
+Если в `"$JOB/out/rebuild_busybox_cgi_candidate.sh"` лежит предыдущая
+версия скрипта, его **обязательно скачать заново** из GitHub перед повтором.
+Старый файл сам не обновится после `git fetch`. Если нужно одноразово
+обойти ошибку старым скриптом: `env -u LD_LIBRARY_PATH sh "$JOB/out/rebuild_busybox_cgi_candidate.sh"`,
+но предпочтительнее свежий исправленный скрипт ниже.
+
 ## Шаг A. Инкрементально собрать только BusyBox на Huananzhi
 
 Выполнять от обычного пользователя Ubuntu на сервере, **не sudo**, только когда YadroKreator не собирает ничего другого.
