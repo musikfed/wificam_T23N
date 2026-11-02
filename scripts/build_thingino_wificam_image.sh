@@ -241,7 +241,7 @@ fi
 # literally as "#!/bin/sh", despite the .config checks passing. Force an
 # incremental BusyBox rebuild before packaging p2; no kernel rebuild needed.
 echo
-echo "Rebuilding target BusyBox to ensure CGI is compiled into the actual binary..."
+echo "Rebuilding target BusyBox with CGI options; real execution still requires camera smoke testing..."
 (
     cd "$THINGINO_DIR"
     env IP= THINGINO_USER_DIR="$USER_ROOT" \
@@ -418,7 +418,9 @@ echo "Size          : $IMAGE_SIZE bytes"
 echo "SHA256        : $IMAGE_SHA"
 echo "Historical    : $HISTORICAL_REFERENCE"
 echo "Historical SHA: $HISTORICAL_SHA"
-echo "Web UI        : VERIFIED inside p2 rootfs.ext2"
+echo "Web UI        : FILES VERIFIED inside p2 rootfs.ext2 (CGI execution NOT YET proven)"
+echo "Hardware CGI  : PENDING — run scripts/camera_smoke_httpd_cgi.sh on camera"
+echo "Security      : S90wificam must refuse port 8090 if CGI source would be exposed"
 echo "Web URL       : http://CAMERA_IP:8090/"
 echo
 
