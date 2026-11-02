@@ -58,6 +58,30 @@ printf '%s' 'NEW_PASSWORD_AT_LEAST_10' | wificam-set-web-password admin
 
 Then open `http://CAMERA_IP:8090/` and log in as `admin`.
 
+## Observed first Thingino SSH login (2026-11-02)
+
+On the actual T23N camera the SSH banner appeared after the Wi-Fi
+connection at `192.168.1.55`. Thingino immediately printed:
+
+```text
+It's your first login.
+You are required to change your password!
+Password:
+```
+
+The SSH authentication prompt `root@192.168.1.55's password:` initially
+accepts the default `root` on an unchanged test image. **The subsequent
+`Password:` prompt is for a NEW root password**, not the old one!
+It then asks `Confirm:`; both entries must match, and Thingino's
+[chpasswd profile](https://github.com/themactep/thingino-firmware/blob/24ec28c7457686ff733132e580267d6a95308c80/overlay/etc/profile.d/chpasswd)
+rejects `root` or an empty string. Subsequent SSH and Thingino Web logins
+must use the new password. PegineLab's separate `admin / Wificam12345`
+account is still test-only.
+
+See the [real-camera first-boot walkthrough](REAL_CAMERA_FIRST_BOOT_EN.md)
+for read-only MMC-root and independent PegineLab :8090 diagnostics.
+Wi-Fi + SSH do not yet prove video, PTZ or SD-root boot.
+
 ## SSH from Windows PowerShell
 
 ```powershell
