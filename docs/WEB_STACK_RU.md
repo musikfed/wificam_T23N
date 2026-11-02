@@ -1,5 +1,15 @@
 # Web UI и API — русский
 
+> **Полевой дефект 2026-11-02:** BusyBox `httpd` на T23N возвращал
+> `HTTP 200` и буквальный исходник CGI `#!/bin/sh`; прямой
+> запуск `cgi-bin/api` исправен. Новый `S90wificam` проводит
+> предварительный локальный CGI-тест **до** открытия 8090.
+> Исправление и аппаратная проверка отдельного бинарника описаны в
+> [CGI_BUSYBOX_HARDWARE_FIX_RU.md](CGI_BUSYBOX_HARDWARE_FIX_RU.md).
+> `CONFIG_FEATURE_HTTPD_CGI=y` в .config недостаточно для статуса
+> аппаратно проверенной прошивки.
+
+
 PegineLab WIFICAM — обязательный web-стек canonical Thingino MMC/SD image для T23/T23N:
 
 ```text
