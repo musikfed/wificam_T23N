@@ -3,6 +3,19 @@
 Detailed first boot, authentication, Windows/Linux SSH and troubleshooting: `../docs/FIRST_BOOT_SSH_EN.md`.
 Boot/runtime optimization and required Raptor services: `../docs/BOOT_OPTIMIZATION_EN.md`.
 
+## Real camera field test 2026-11-02
+
+Thingino is reachable by Wi-Fi at `192.168.1.55` and via SSH. The
+upstream first-login `Password:` displayed after
+`You are required to change your password!` is **a NEW root password**,
+followed by `Confirm:` — not the initial SSH `root` password.
+Thingino rejects `root` as a new password. The next SSH/Thingino Web
+login uses the new root password; independent PegineLab Web
+`http://192.168.1.55:8090/` uses test-only `admin / Wificam12345`.
+
+See [the verified prompt and read-only checks](../docs/REAL_CAMERA_FIRST_BOOT_EN.md).
+Current screenshot confirms Wi-Fi/SSH only, not MMC root, video or PTZ.
+
 ## 0.1_test status
 
 **HARDWARE VERIFIED on 2026-10-21.** The canonical
