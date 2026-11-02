@@ -16,22 +16,73 @@ AUTO_PROVISION_TEST_WEB_AUTH="${AUTO_PROVISION_TEST_WEB_AUTH:-0}"
 DEFAULT_WEB_USER="${DEFAULT_WEB_USER:-admin}"
 DEFAULT_WEB_PASSWORD="${DEFAULT_WEB_PASSWORD:-}"
 WEB_PORT="${WEB_PORT:-8090}"
+# Optional isolated CGI-capable BusyBox, tested before any LAN bind.
+# Leave empty for normal image BusyBox. Never replace system /bin/busybox
+# merely to fix the dashboard; SSH/boot use it.
+WIFICAM_HTTPD_BIN="${WIFICAM_HTTPD_BIN:-}"
 MEDIA_MOUNT="${MEDIA_MOUNT:-/mnt/media}"
 MEDIA_FALLBACKS="${MEDIA_FALLBACKS:-/mnt/mmcblk0p1 /mnt/sdcard /mnt/sda0}"
 
 httpd_available() {
+    if [ -n "$WIFICAM_HTTPD_BIN" ]; then
+        case "$WIFICAM_HTTPD_BIN" in
+            /*) [ -x "$WIFICAM_HTTPD_BIN" ] || return 1 ;;
+            *) echo "WIFICAM_HTTPD_BIN must be an absolute executable path" >&2; return 1 ;;
+        esac
+        "$WIFICAM_HTTPD_BIN" httpd -h 2>&1 | grep -qi httpd && return 0
+        return 1
+    fi
     command -v httpd >/dev/null 2>&1 && return 0
     busybox httpd -h 2>&1 | grep -qi httpd && return 0
     return 1
 }
 
-start_httpd() {
-    if command -v httpd >/dev/null 2>&1; then
-        httpd "$@" >>"$LOG" 2>&1 &
+run_httpd() {
+    if [ -n "$WIFICAM_HTTPD_BIN" ]; then
+        "$WIFICAM_HTTPD_BIN" httpd "$@"
+    elif command -v httpd >/dev/null 2>&1; then
+        httpd "$@"
     else
-        busybox httpd "$@" >>"$LOG" 2>&1 &
+        busybox httpd "$@"
     fi
+}
+
+start_httpd() {
+    run_httpd "$@" >>"$LOG" 2>&1 &
     echo $! > "$PIDFILE"
+}
+
+probe_httpd_cgi() {
+    # FAIL CLOSED before binding the LAN port. A CGI-disabled BusyBox returns
+    # '#!/bin/sh' literally as HTTP 200, exposing CGI script source. Probe
+    # loopback only and reject any response other than actual JSON.
+    command -v curl >/dev/null 2>&1 || {
+        echo "WIFICAM CGI smoke check requires curl" >&2
+        return 1
+    }
+    probe_dir="$(mktemp -d /tmp/wificam-httpd-preflight.XXXXXX)" || return 1
+    mkdir -p "$probe_dir/www/cgi-bin"
+    cat > "$probe_dir/www/cgi-bin/probe" <<'EOF'
+#!/bin/sh
+printf 'Content-Type: application/json\r\n\r\n'
+printf '{"ok":true,"cgi":"executed"}\n'
+EOF
+    chmod 0700 "$probe_dir/www/cgi-bin/probe"
+    : > "$probe_dir/httpd.conf"
+    # If port 18090 is already in use, do not mistake another service's
+    # response for this probe: the child must stay running until inspected.
+    run_httpd -f -p 127.0.0.1:18090 -h "$probe_dir/www"         -c "$probe_dir/httpd.conf" >"$probe_dir/httpd.log" 2>&1 &
+    probe_pid=$!
+    sleep 1
+    probe_ok=0
+    if kill -0 "$probe_pid" 2>/dev/null; then
+        probe_body="$(curl --silent --max-time 4             http://127.0.0.1:18090/cgi-bin/probe 2>/dev/null || true)"
+        [ "$probe_body" = '{"ok":true,"cgi":"executed"}' ] && probe_ok=1
+    fi
+    kill "$probe_pid" 2>/dev/null || true
+    wait "$probe_pid" 2>/dev/null || true
+    rm -rf "$probe_dir"
+    [ "$probe_ok" = 1 ]
 }
 
 make_csrf() {
@@ -110,6 +161,14 @@ start() {
     if ! httpd_available; then
         echo "WIFICAM web UI not started: BusyBox httpd applet is unavailable" | tee -a "$LOG"
         echo "Thingino integration must build BR2_PACKAGE_BUSYBOX_HTTPD=y" | tee -a "$LOG"
+        return 1
+    fi
+
+    # Hardware bug 2026-11-02: target BusyBox exposed CGI sources
+    # despite CONFIG_FEATURE_HTTPD_CGI=y in build-time .config.
+    # Always prove actual execution *before* starting the LAN listener.
+    if ! probe_httpd_cgi; then
+        echo "WIFICAM CGI PRE-FLIGHT FAILED: this httpd serves scripts as files. Port $WEB_PORT stays closed." | tee -a "$LOG" >&2
         return 1
     fi
 

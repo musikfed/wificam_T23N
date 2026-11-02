@@ -17,6 +17,8 @@ jobs:
           sh -n scripts/wsl_restore_camera.sh
           sh -n scripts/camera_diagnostics.sh
           sh -n scripts/camera_preview_fps.sh
+          sh -n scripts/camera_smoke_httpd_cgi.sh
+          sh -n scripts/rebuild_busybox_cgi_candidate.sh
           sh -n rootfs/usr/bin/wificam-ptz-ctl
           sh -n web/cgi-bin/live.mjpg
           sh -n rootfs/etc/init.d/S90wificam
@@ -28,6 +30,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/prepare_wifi_overlay.py
           python3 -m unittest discover -s tests -p test_prepare_wifi_overlay.py -v
+          python3 -m unittest discover -s tests -p test_cgi_safety_contract.py -v
       - name: Simulated physical PTZ commands and reverse axes
         run: sh scripts/test_ptz_sim.sh
       - name: PTZ CGI JSON and auth tests
