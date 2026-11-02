@@ -1,4 +1,12 @@
-# Web UI and API — English
+# Web UI and API
+
+> **2026-11-02 field failure:** BusyBox httpd returned raw `#!/bin/sh`
+> CGI script sources with HTTP 200, despite functioning direct CGI JSON.
+> The updated init script now checks execution on localhost **before**
+> binding LAN port 8090. Follow
+> [hardware CGI recovery](CGI_BUSYBOX_HARDWARE_FIX_EN.md) and never
+> disable the guard or overwrite system BusyBox without testing.
+ — English
 
 PegineLab WIFICAM is a mandatory web stack in the canonical Thingino MMC/SD image for T23/T23N:
 
