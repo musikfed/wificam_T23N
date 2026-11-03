@@ -15,6 +15,13 @@ ALLOW_REBOOT="${ALLOW_REBOOT:-0}"
 AUTH_CONF="${AUTH_CONF:-/data/httpd.conf}"
 SSH_PROTECT="${SSH_PROTECT:-0}"
 
+# Optional external LLM companion: only an enable marker lives on T23N.
+# Audio/LLM API keys and inference must run outside this low-RAM camera.
+ASSISTANT_STATE_DIR="${SERVICE_STATE_DIR:-/opt/wificam/services}"
+ASSISTANT_ENABLED_FILE="$ASSISTANT_STATE_DIR/llm_companion.enabled"
+# Runtime heartbeat is volatile; a reboot must never show a stale connection.
+ASSISTANT_HEARTBEAT_FILE=/var/run/wificam-llm-companion.heartbeat
+
 REQUEST_DATA=""
 if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
     IFS= read -r REQUEST_DATA || true
@@ -263,6 +270,68 @@ ptz_autofocus() {
     fail "Autofocus not exposed by this camera profile; manual DW9714 focus is not autofocus"
 }
 
+
+# LLM mode is a declaration of consent for an external companion.
+# This CGI never opens an outbound AI connection or launches a model.
+assistant_status() {
+    require_auth
+    enabled=false
+    connected=false
+    state=disabled
+    if [ -f "$ASSISTANT_ENABLED_FILE" ]; then
+        enabled=true
+        state=waiting
+        now="$(date +%s 2>/dev/null || echo 0)"
+        last="$(cat "$ASSISTANT_HEARTBEAT_FILE" 2>/dev/null || echo 0)"
+        case "$now:$last" in
+          *[!0-9:]*|:*|*:) last=0 ;;
+        esac
+        # A heartbeat reports a gateway, not proof that physical audio works.
+        if [ "$last" -gt 0 ] 2>/dev/null && [ "$now" -ge "$last" ] 2>/dev/null &&
+           [ $((now - last)) -le 90 ]; then
+            connected=true
+            state=bridge_online
+        fi
+    fi
+    header
+    printf '{"ok":true,"enabled":%s,"connected":%s,"state":"%s","backend":"external"}\n' \
+        "$enabled" "$connected" "$state"
+}
+
+assistant_toggle() {
+    require_post
+    require_auth
+    require_csrf
+    choice="$(param enabled)"
+    case "$choice" in
+      1)
+        umask 077
+        mkdir -p "$ASSISTANT_STATE_DIR" || fail "cannot create assistant state directory"
+        : > "$ASSISTANT_ENABLED_FILE" || fail "cannot enable assistant mode"
+        rm -f "$ASSISTANT_HEARTBEAT_FILE"
+        ;;
+      0)
+        rm -f "$ASSISTANT_ENABLED_FILE" "$ASSISTANT_HEARTBEAT_FILE" ||
+            fail "cannot disable assistant mode"
+        ;;
+      *) fail "enabled must be 0 or 1" ;;
+    esac
+    assistant_status
+}
+
+assistant_heartbeat() {
+    require_post
+    require_auth
+    require_csrf
+    [ -f "$ASSISTANT_ENABLED_FILE" ] || fail "assistant mode is disabled"
+    umask 077
+    printf '%s\n' "$(date +%s)" > "$ASSISTANT_HEARTBEAT_FILE.tmp.$" ||
+        fail "cannot update companion heartbeat"
+    mv -f "$ASSISTANT_HEARTBEAT_FILE.tmp.$" "$ASSISTANT_HEARTBEAT_FILE" ||
+        fail "cannot save companion heartbeat"
+    assistant_status
+}
+
 op="$(param op)"
 
 case "$op" in
@@ -272,6 +341,9 @@ case "$op" in
   storage) storage ;;
   services) services ;;
   service_toggle) service_toggle ;;
+  assistant_status) assistant_status ;;
+  assistant_toggle) assistant_toggle ;;
+  assistant_heartbeat) assistant_heartbeat ;;
   ptz_status) ptz_status ;;
   ptz_move) ptz_action ;;
   ptz_invert) ptz_invert ;;
