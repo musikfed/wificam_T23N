@@ -14,14 +14,15 @@ try{
 const serviceInfo={};
 
 const tr={
- ru:{dashboard:'Главная',live:'Видео',recording:'Запись',image:'Изображение',network:'Сеть / Wi‑Fi',storage:'SD-карта',system:'Система',firmware:'Обновление',logs:'Логи',model:'Модель',architecture:'Архитектура',imageHint:'Web UI использует camera service, который ОС подняла при загрузке.',cameraOsHint:'Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.',wifiSafe:'Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.',scan:'Сканировать сети',password:'Пароль',testSwitch:'Проверить и переключить',reboot:'Перезагрузить',fwHint:'Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.',webPassword:'Пароль администратора Web UI',newPassword:'Новый пароль',repeatPassword:'Повторить пароль',changePassword:'Сменить пароль',authHint:'После смены пароля HTTP-аутентификация перезапустится. Используйте 10–64 печатных ASCII-символа без пробелов; кириллица не поддерживается.',gateway:'Шлюз',optionalServices:'Дополнительные сервисы',servicesHint:'Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.',storageLayout:'MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.',enable:'Включить',disable:'Выключить',running:'работает',stopped:'остановлен',unavailable:'не установлен',protected:'защищён',ptzTitle:'Поворот камеры / PTZ',reversePan:'Реверс лево / право',reverseTilt:'Реверс верх / низ',autoFocus:'Автофокус (при наличии)'},
- en:{dashboard:'Dashboard',live:'Live view',recording:'Recording',image:'Image',network:'Network / Wi‑Fi',storage:'Storage / SD',system:'System',firmware:'Firmware update',logs:'Logs',model:'Model',architecture:'Architecture',imageHint:'The Web UI uses the camera service initialized by the OS at boot.',cameraOsHint:'The OS initializes the sensor and camera during boot; the Web UI operates on top of the system camera service.',wifiSafe:'The new network is tested first. On failure the backend restores the previous known-good profile.',scan:'Scan networks',password:'Password',testSwitch:'Test & switch',reboot:'Reboot',fwHint:'Firmware update will be enabled only after U‑Boot and recovery boot paths are validated.',webPassword:'Web UI administrator password',newPassword:'New password',repeatPassword:'Repeat password',changePassword:'Change password',authHint:'HTTP authentication will restart after changing the password. Use 10–64 printable ASCII characters without spaces.',gateway:'Gateway',optionalServices:'Optional services',servicesHint:'A disabled service is not started and therefore has no persistent userspace CPU/RAM process.',storageLayout:'MEDIA = 20 GiB for photos/video; all remaining card space is assigned to ROOTFS.',enable:'Enable',disable:'Disable',running:'running',stopped:'stopped',unavailable:'not installed',protected:'protected',ptzTitle:'Camera movement / PTZ',reversePan:'Reverse left / right',reverseTilt:'Reverse up / down',autoFocus:'Autofocus (if supported)'}
+ ru:{assistant:'ИИ / Голос',assistantTitle:'LLM / GPT напарник',assistantEnable:'Включить режим LLM / GPT',assistantHint:'Речь и GPT обрабатывает внешняя программа. На камере сохраняется только переключатель; звук автоматически не передаётся.',assistantArchitecture:'Камера + внешний голосовой сервер',assistantArchitectureHint:'RTSP не зависит от режима ИИ. Для разговора через микрофон и динамик камеры нужен внешний мост и проверка двустороннего аудио.',assistantPageInfo:'Настройка разрешает внешней программе подключаться к голосовому режиму. ИИ не запускается на T23N, аудиопоток не передаётся до подключения моста.',assistantMode:'Режим',assistantBridge:'Внешний мост',assistantBridgeHint:'Подключено означает недавний сигнал от программы, но не проверку микрофона и динамика.',assistantSecrets:'Ключи GPT / LLM хранятся только на внешнем компьютере или сервере, не в прошивке.',assistantGuide:'Инструкция по подключению голосового моста',assistantOn:'включён',assistantOff:'выключен',assistantConnected:'сигнал получен',assistantWaiting:'не подключён',dashboard:'Главная',live:'Видео',recording:'Запись',image:'Изображение',network:'Сеть / Wi‑Fi',storage:'SD-карта',system:'Система',firmware:'Обновление',logs:'Логи',model:'Модель',architecture:'Архитектура',imageHint:'Web UI использует camera service, который ОС подняла при загрузке.',cameraOsHint:'Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.',wifiSafe:'Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.',scan:'Сканировать сети',password:'Пароль',testSwitch:'Проверить и переключить',reboot:'Перезагрузить',fwHint:'Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.',webPassword:'Пароль администратора Web UI',newPassword:'Новый пароль',repeatPassword:'Повторить пароль',changePassword:'Сменить пароль',authHint:'После смены пароля HTTP-аутентификация перезапустится. Используйте 10–64 печатных ASCII-символа без пробелов; кириллица не поддерживается.',gateway:'Шлюз',optionalServices:'Дополнительные сервисы',servicesHint:'Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.',storageLayout:'MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.',enable:'Включить',disable:'Выключить',running:'работает',stopped:'остановлен',unavailable:'не установлен',protected:'защищён',ptzTitle:'Поворот камеры / PTZ',reversePan:'Реверс лево / право',reverseTilt:'Реверс верх / низ',autoFocus:'Автофокус (при наличии)'},
+ en:{assistant:'AI / Voice',assistantTitle:'LLM / GPT companion',assistantEnable:'Enable LLM / GPT mode',assistantHint:'Speech and GPT are handled by an external application. The camera saves only a switch; no audio is transmitted automatically.',assistantArchitecture:'Camera + external voice server',assistantArchitectureHint:'RTSP is independent of AI mode. Using the camera microphone and speaker requires an external bridge and bidirectional-audio validation.',assistantPageInfo:'This setting permits an external companion to use the camera. No AI runs on the T23N; no audio is sent until an external bridge is configured.',assistantMode:'Mode',assistantBridge:'External bridge',assistantBridgeHint:'Connected means a recent bridge heartbeat, not proof of functioning microphone or speaker.',assistantSecrets:'Keep GPT / LLM API keys on an external computer or server, never in camera firmware.',assistantGuide:'External voice bridge setup guide',assistantOn:'enabled',assistantOff:'disabled',assistantConnected:'heartbeat received',assistantWaiting:'not connected',dashboard:'Dashboard',live:'Live view',recording:'Recording',image:'Image',network:'Network / Wi‑Fi',storage:'Storage / SD',system:'System',firmware:'Firmware update',logs:'Logs',model:'Model',architecture:'Architecture',imageHint:'The Web UI uses the camera service initialized by the OS at boot.',cameraOsHint:'The OS initializes the sensor and camera during boot; the Web UI operates on top of the system camera service.',wifiSafe:'The new network is tested first. On failure the backend restores the previous known-good profile.',scan:'Scan networks',password:'Password',testSwitch:'Test & switch',reboot:'Reboot',fwHint:'Firmware update will be enabled only after U‑Boot and recovery boot paths are validated.',webPassword:'Web UI administrator password',newPassword:'New password',repeatPassword:'Repeat password',changePassword:'Change password',authHint:'HTTP authentication will restart after changing the password. Use 10–64 printable ASCII characters without spaces.',gateway:'Gateway',optionalServices:'Optional services',servicesHint:'A disabled service is not started and therefore has no persistent userspace CPU/RAM process.',storageLayout:'MEDIA = 20 GiB for photos/video; all remaining card space is assigned to ROOTFS.',enable:'Enable',disable:'Disable',running:'running',stopped:'stopped',unavailable:'not installed',protected:'protected',ptzTitle:'Camera movement / PTZ',reversePan:'Reverse left / right',reverseTilt:'Reverse up / down',autoFocus:'Autofocus (if supported)'}
 };
 
 function translate(){
   $$('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;if(tr[lang][k])el.textContent=tr[lang][k]});
   document.documentElement.lang=lang;
   renderServices();
+  renderAssistant();
 }
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);log(msg)}
 function log(msg){const b=$('#logBox');if(b)b.textContent=new Date().toLocaleTimeString()+'  '+msg+'\n'+b.textContent}
@@ -229,6 +230,52 @@ async function toggleService(name){
   }catch(e){toast(e.message)}
 }
 
+
+const assistantInfo={enabled:false,connected:false};
+async function loadAssistant(){
+  const toggle=$('#assistantEnabled');
+  if(!toggle)return;
+  try{
+    const data=await call('assistant_status');
+    assistantInfo.enabled=Boolean(data.enabled);
+    assistantInfo.connected=Boolean(data.connected);
+    toggle.checked=assistantInfo.enabled;
+    toggle.disabled=false;
+    renderAssistant();
+  }catch(e){
+    toggle.disabled=true;
+    $('#assistantState').textContent=lang==='ru'?'API недоступно':'API unavailable';
+    log(e.message);
+  }
+}
+function renderAssistant(){
+  const t=tr[lang];
+  const state=assistantInfo.enabled
+    ?(assistantInfo.connected?t.assistantConnected:t.assistantWaiting)
+    :t.assistantOff;
+  $('#assistantState').textContent=state;
+  $('#assistantModeValue').textContent=assistantInfo.enabled?t.assistantOn:t.assistantOff;
+  $('#assistantBridgeValue').textContent=assistantInfo.connected?t.assistantConnected:t.assistantWaiting;
+}
+async function toggleAssistant(){
+  const el=$('#assistantEnabled');
+  const desired=el.checked;
+  el.disabled=true;
+  try{
+    if(!csrf)await refreshStatus();
+    if(!csrf)throw new Error(lang==='ru'?'Нет CSRF токена':'CSRF token unavailable');
+    const data=await post('assistant_toggle',{enabled:desired?'1':'0'});
+    assistantInfo.enabled=Boolean(data.enabled);
+    assistantInfo.connected=Boolean(data.connected);
+    el.checked=assistantInfo.enabled;
+    renderAssistant();
+    toast(lang==='ru'?(desired?'Режим LLM разрешён; подключите внешний мост':'Режим LLM выключен'):(desired?'LLM mode enabled; connect external bridge':'LLM mode disabled'));
+  }catch(e){
+    el.checked=assistantInfo.enabled;
+    toast(e.message);
+  }finally{el.disabled=false;}
+}
+
 async function changeWebPassword(ev){
   ev.preventDefault();
   const a=$('#newWebPassword').value,b=$('#repeatWebPassword').value;
@@ -255,11 +302,13 @@ $$('#nav button').forEach(b=>b.onclick=()=>{
     previewButtons();
   }
   if(b.dataset.page==='storage')loadStorage();
+  if(b.dataset.page==='assistant')loadAssistant();
   if(b.dataset.page==='network'){refreshStatus();loadServices();}
   if(b.dataset.page==='dashboard'||b.dataset.page==='system')refreshStatus();
 });
 $('#langBtn').onclick=()=>{lang=lang==='ru'?'en':'ru';translate()};
 $('#scanBtn').onclick=scan;
+$('#assistantEnabled').addEventListener('change',toggleAssistant);
 $('#wifiForm').addEventListener('submit',applyWifi);
 $('#webPasswordForm').addEventListener('submit',changeWebPassword);
 $('#rebootBtn').onclick=()=>{if(confirm(lang==='ru'?'Перезагрузить камеру?':'Reboot camera?'))apiAction('reboot')};
@@ -272,9 +321,10 @@ $('#previewMirror').checked=previewMirror;
 $('#previewFlip').checked=previewFlip;
 applyPreviewOrientation();
 refreshStatus();
+loadAssistant();
 function visibleStatusPage(){
   const active=$$('.page').find(p=>p.classList.contains('active'));
-  return active&&['dashboard','system','network'].includes(active.id);
+  return active&&['dashboard','system','network','assistant'].includes(active.id);
 }
 setInterval(()=>{if(!document.hidden&&visibleStatusPage())refreshStatus();},60000);
 document.addEventListener('visibilitychange',()=>{
