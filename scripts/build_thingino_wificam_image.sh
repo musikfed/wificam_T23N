@@ -17,10 +17,13 @@ FAST="${THINGINO_FAST:-0}"
 # Keep it in gitignored out/private-sd, never overwrite the versioned
 # public Thingino/thingino-t23-sd.bin with private LAN credentials.
 LOCAL_WIFI="$REPO_DIR/local/wifi.env"
-IMAGE_DIR="$REPO_DIR/Thingino"
+# Never rewrite the hardware-booted 0.1_test baseline in an ordinary factory job.
+IMAGE_DIR="$REPO_DIR/out/candidate-sd"
 if [ -e "$LOCAL_WIFI" ] || [ -L "$LOCAL_WIFI" ]; then
     [ "$PUBLISH" != 1 ] || { echo "ERROR: refusing PUBLISH=1 with embedded Wi-Fi credentials" >&2; exit 1; }
     IMAGE_DIR="$REPO_DIR/out/private-sd"
+elif [ "$PUBLISH" = "1" ]; then
+    IMAGE_DIR="$REPO_DIR/Thingino"
 fi
 IMAGE_PATH="$IMAGE_DIR/thingino-t23-sd.bin"
 
@@ -89,7 +92,7 @@ echo "Thingino checkout : $THINGINO_DIR"
 echo "Pinned Thingino   : $THINGINO_REF"
 echo "Camera profile    : $CAMERA"
 echo "Target artifact   : $IMAGE_PATH"
-if [ "$IMAGE_DIR" != "$REPO_DIR/Thingino" ]; then
+if [ "$IMAGE_DIR" = "$REPO_DIR/out/private-sd" ]; then
     echo "SECURITY: private Wi-Fi PSK image under gitignored out/; PUBLISH=1 blocked."
 fi
 echo
@@ -146,6 +149,28 @@ BR2_TARGET_ROOTFS_EXT2_SIZE="64M"
 BR2_PACKAGE_THINGINO_WEBSERVER_BUSYBOX=y
 BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES="$BUSYBOX_WIFICAM_FRAGMENT"
 
+# Lean T23N Raptor: keep sensor/RTSP/snapshots/audio/OSD/night/recording/motion.
+# Exclude transport daemons unnecessary for local Wi-Fi WIFICAM and RTSP.
+# This does NOT disable the Ingenic ISP, USB DWC2 Wi-Fi, PTZ or SD/MMC.
+BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
+# BR2_PACKAGE_THINGINO_RAPTOR_FULL is not set
+BR2_PACKAGE_THINGINO_RAPTOR_RVD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RSD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RAD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
+BR2_PACKAGE_THINGINO_RAPTOR_ROD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
+BR2_PACKAGE_THINGINO_RAPTOR_RMR=y
+BR2_PACKAGE_THINGINO_RAPTOR_RMD=y
+# BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_WEBTORRENT is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_RSP is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_RSR is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_RWC is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_RFS is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_RSD555 is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_DEBUG is not set
+
 # Mandatory PegineLab/WIFICAM files are embedded directly into p2/rootfs.ext2.
 BR2_ROOTFS_OVERLAY="\$(BR2_EXTERNAL_THINGINO_PATH)/overlay $ROOTFS_OVERLAY"
 EOF
@@ -180,6 +205,36 @@ KERNEL_IMAGE="$OUTDIR/images/uImage"
 FINAL_CONFIG="$OUTDIR/.config"
 
 [ -f "$FINAL_CONFIG" ] || die "final Thingino .config missing: $FINAL_CONFIG"
+
+# Hardware-specific, pinned upstream Galayou G2: T23N + SC2336 + USB
+# ATBM6012BX (requires DWC2) + MMC0 SD-root + GPIO motors + audio.
+# Fail rather than silently ship a fast but unusable image.
+[ "$CAMERA" = "galayou_g2_t23n_sc2336_atbm6012bx" ] || die "wrong camera: $CAMERA"
+for required in \
+    'BR2_INGENIC_SOC_MODEL="t23n"' \
+    'BR2_SENSOR_1_NAME="sc2336"' \
+    'BR2_PACKAGE_WIFI=y' \
+    'BR2_PACKAGE_WIFI_ATBM6012BX=y' \
+    'BR2_PACKAGE_THINGINO_KOPT_DWC2=y' \
+    'BR2_PACKAGE_THINGINO_KOPT_DWC2_WIFI_ONLY=y' \
+    'BR2_PACKAGE_THINGINO_KOPT_MMC0=y' \
+    'BR2_PACKAGE_THINGINO_KOPT_MMC0_1BIT=y' \
+    'BR2_THINGINO_SDCARD=y' \
+    'BR2_THINGINO_MOTORS=y' \
+    'BR2_THINGINO_AUDIO=y' \
+    'BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y'
+do
+    grep -Fqx "$required" "$FINAL_CONFIG" || die "T23N hardware feature missing: $required"
+done
+for component in RVD RSD RAD RHD ROD RIC RMR RMD; do
+    grep -Fqx "BR2_PACKAGE_THINGINO_RAPTOR_$component=y" "$FINAL_CONFIG" ||
+        die "required lightweight Raptor daemon missing: $component"
+done
+for component in FULL WEBRTC WEBTORRENT RSP RSR RWC RFS RSD555 DEBUG; do
+    if grep -Fqx "BR2_PACKAGE_THINGINO_RAPTOR_$component=y" "$FINAL_CONFIG"; then
+        die "unneeded Raptor feature enabled in T23N lean profile: $component"
+    fi
+done
 grep -q '^BR2_TARGET_ROOTFS_EXT2=y$' "$FINAL_CONFIG" || \
     die "BR2_TARGET_ROOTFS_EXT2 is not enabled in final Thingino config"
 grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y$' "$FINAL_CONFIG" || \
