@@ -167,6 +167,8 @@ BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
 BR2_PACKAGE_THINGINO_RAPTOR_RVD=y
 BR2_PACKAGE_THINGINO_RAPTOR_RSD=y
 BR2_PACKAGE_THINGINO_RAPTOR_RAD=y
+# Required for actual built-in speaker playback: provides rac + play wrapper.
+BR2_PACKAGE_THINGINO_RAPTOR_RAC=y
 BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
 BR2_PACKAGE_THINGINO_RAPTOR_ROD=y
 BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
@@ -232,6 +234,7 @@ for required in \
     'BR2_THINGINO_SDCARD=y' \
     'BR2_THINGINO_MOTORS=y' \
     'BR2_THINGINO_AUDIO=y' \
+    'BR2_PACKAGE_THINGINO_RAPTOR_RAC=y' \
     'BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y'
 do
     grep -Fqx "$required" "$FINAL_CONFIG" || die "T23N hardware feature missing: $required"
@@ -342,6 +345,17 @@ rm -f "$ROOTFS_EXT"
 [ -x "$TARGET/usr/bin/wificam-ptz-ctl" ] || die "Thingino PTZ controller missing/not executable"
 [ -f "$TARGET/usr/share/wificam-web/setup/index.html" ] || die "WIFICAM first-boot setup page missing"
 [ -x "$TARGET/usr/share/wificam-web/setup/cgi-bin/claim" ] || die "WIFICAM first-boot claim CGI missing/not executable"
+# A voice companion must use this camera's OWN microphone and speaker.
+# Shipping RAD without rac/play made the checkbox look functional but the
+# speaker cannot output Hombo3 TTS. Ensure each tool reaches final rootfs.
+for audio_tool in \
+    /usr/bin/rac \
+    /usr/sbin/play \
+    /usr/sbin/microphone \
+    /usr/sbin/speaker
+do
+    [ -x "$TARGET$audio_tool" ] || die "T23N camera audio tool missing: $audio_tool"
+done
 [ -x "$TARGET/usr/sbin/dropbear" ] || die "Dropbear binary missing from target rootfs"
 if [ ! -x "$TARGET/etc/init.d/S30dropbear" ] && [ ! -x "$TARGET/etc/init.d/S50dropbear" ]; then
     die "Dropbear init script missing from target rootfs"
@@ -403,6 +417,10 @@ debugfs -R 'stat /usr/share/wificam-web/setup/index.html' "$ROOTFS_EXT" 2>&1 | g
     die "WIFICAM first-boot setup page is absent from rootfs.ext2"
 debugfs -R 'stat /usr/share/wificam-web/setup/cgi-bin/claim' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "WIFICAM first-boot claim CGI is absent from rootfs.ext2"
+for audio_tool in /usr/bin/rac /usr/sbin/play /usr/sbin/microphone /usr/sbin/speaker; do
+    debugfs -R "stat $audio_tool" "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+        die "T23N microphone/speaker tool missing from SD rootfs: $audio_tool"
+done
 debugfs -R 'stat /usr/sbin/dropbear' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "Dropbear SSH binary is absent from rootfs.ext2"
 if ! debugfs -R 'stat /etc/init.d/S30dropbear' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:'; then
