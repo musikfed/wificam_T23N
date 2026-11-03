@@ -21,6 +21,7 @@
       <button data-page="image">◫ <span data-i18n="image">Изображение</span></button>
       <button data-page="network">≋ <span data-i18n="network">Сеть / Wi‑Fi</span></button>
       <button data-page="storage">▤ <span data-i18n="storage">SD-карта</span></button>
+      <button data-page="assistant">✦ <span data-i18n="assistant">ИИ / Голос</span></button>
       <button data-page="system">⚙ <span data-i18n="system">Система</span></button>
       <button data-page="firmware">⇧ <span data-i18n="firmware">Обновление</span></button>
       <button data-page="logs">⌁ <span data-i18n="logs">Логи</span></button>
@@ -41,6 +42,21 @@
         <article><small>Kernel</small><strong id="kernel">—</strong><span>Linux</span></article>
         <article><small>Wi‑Fi</small><strong id="ssid">—</strong><span id="ip">—</span></article>
         <article><small>MEDIA</small><strong id="diskUse">—</strong><span id="diskFree">—</span></article>
+      </div>
+      <div class="grid companion-grid">
+        <article class="panel companion-card">
+          <div class="companion-heading"><div><small>PEGINE AI · OPTIONAL</small><h2 data-i18n="assistantTitle">LLM / GPT напарник</h2></div><span class="companion-icon" aria-hidden="true">✦</span></div>
+          <label class="companion-toggle" for="assistantEnabled">
+            <input type="checkbox" id="assistantEnabled" disabled>
+            <span data-i18n="assistantEnable">Включить режим LLM / GPT</span>
+          </label>
+          <p class="muted" data-i18n="assistantHint">Обработку речи и GPT выполняет внешняя программа. На камере сохраняется только переключатель; звук не передаётся автоматически.</p>
+          <p class="service-state" id="assistantState" role="status" aria-live="polite">—</p>
+        </article>
+        <article class="panel companion-info">
+          <small>LOCAL-FIRST</small><h2 data-i18n="assistantArchitecture">Камера + внешний голосовой сервер</h2>
+          <p class="muted" data-i18n="assistantArchitectureHint">RTSP остаётся доступен независимо от режима ИИ. Для разговора через встроенный микрофон и динамик нужен внешний мост и проверка двустороннего аудио.</p>
+        </article>
       </div>
       <div class="panel">
         <h2 data-i18n="architecture">Архитектура</h2>
@@ -99,6 +115,18 @@
       </div>
     </section>
 
+    <section id="assistant" class="page">
+      <div class="panel"><h2 data-i18n="assistant">ИИ / Голос</h2>
+        <p data-i18n="assistantPageInfo">Эта настройка разрешает внешней программе использовать камеру как голосового напарника. ИИ не запускается на T23N и не получает доступ к потоку до настройки внешнего моста.</p>
+        <div class="kv companion-status-grid">
+          <div><small data-i18n="assistantMode">Режим</small><b id="assistantModeValue">—</b></div>
+          <div><small data-i18n="assistantBridge">Внешний мост</small><b id="assistantBridgeValue">—</b></div>
+        </div>
+        <p class="muted" data-i18n="assistantBridgeHint">Статус подключения означает недавний сигнал внешней программы, а не подтверждение работы микрофона или динамика.</p>
+        <p class="muted" data-i18n="assistantSecrets">Ключи GPT / LLM должны храниться только на внешнем компьютере или сервере. Не вводите их в камеру.</p>
+        <p><a href="https://github.com/musikfed/wificam_T23N/blob/mymarrchWFcam/docs/LLM_VOICE_COMPANION_RU.md" target="_blank" rel="noopener noreferrer" data-i18n="assistantGuide">Инструкция по подключению внешнего голосового моста</a></p>
+      </div>
+    </section>
     <section id="storage" class="page"><div class="panel"><h2 data-i18n="storage">SD-карта</h2><p data-i18n="storageLayout">MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.</p><div id="storageInfo">—</div><button onclick="loadStorage()">Refresh</button></div></section>
 
     <section id="system" class="page">
