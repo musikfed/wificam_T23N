@@ -40,6 +40,17 @@ class T23NLeanProfile(unittest.TestCase):
         self.assertIn('make CAMERA="$CAMERA" br-busybox-rebuild', BUILDER)
         self.assertIn('make CAMERA="$CAMERA" rootfs-ext2', BUILDER)
 
+    def test_native_microphone_and_speaker_mandatory(self):
+        for name in (
+            "BR2_PACKAGE_THINGINO_RAPTOR_RAC=y",
+            "/usr/bin/rac",
+            "/usr/sbin/play",
+            "/usr/sbin/microphone",
+            "/usr/sbin/speaker",
+            "T23N microphone/speaker tool missing from SD rootfs",
+        ):
+            self.assertIn(name, BUILDER)
+
     def test_docs_must_not_claim_hardware_speedup(self):
         doc = (ROOT / "docs/T23N_LEAN_PROFILE_RU.md").read_text()
         self.assertIn("не измерял", doc)
