@@ -32,6 +32,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_prepare_wifi_overlay.py -v
           python3 -m unittest discover -s tests -p test_cgi_safety_contract.py -v
           python3 -m unittest discover -s tests -p test_t23n_lean_profile.py -v
+          python3 -m unittest discover -s tests -p test_assistant_cgi.py -v
       - name: Simulated physical PTZ commands and reverse axes
         run: sh scripts/test_ptz_sim.sh
       - name: PTZ CGI JSON and auth tests
