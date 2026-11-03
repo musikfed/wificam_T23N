@@ -12,6 +12,9 @@ THINGINO_REF="${THINGINO_REF:-9925f46f73b9c39ec8d2a65134b18c94e6fdfb97}"
 THINGINO_URL="${THINGINO_URL:-https://github.com/themactep/thingino-firmware.git}"
 PUBLISH="${PUBLISH:-0}"
 FAST="${THINGINO_FAST:-0}"
+# Optional build-time WebRTC for future low-latency camera talkback.
+# Off in the smallest profile; never confuse it with the runtime LLM checkbox.
+WIFICAM_WEBRTC="${WIFICAM_WEBRTC:-0}"
 
 # A personalized image contains a Wi-Fi network key (WPA2 derived PSK).
 # Keep it in gitignored out/private-sd, never overwrite the versioned
@@ -28,6 +31,12 @@ fi
 IMAGE_PATH="$IMAGE_DIR/thingino-t23-sd.bin"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
+case "$WIFICAM_WEBRTC" in 0|1) ;; *) die "WIFICAM_WEBRTC must be 0 or 1" ;; esac
+WEBRTC_FRAGMENT='# BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC is not set'
+if [ "$WIFICAM_WEBRTC" = 1 ]; then
+    WEBRTC_FRAGMENT='BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC=y
+BR2_PACKAGE_THINGINO_RAPTOR_TLS=y'
+fi
 
 for cmd in git make sha256sum stat find grep debugfs; do
     command -v "$cmd" >/dev/null 2>&1 || die "$cmd not installed"
@@ -91,6 +100,7 @@ echo "Project checkout  : $REPO_DIR"
 echo "Thingino checkout : $THINGINO_DIR"
 echo "Pinned Thingino   : $THINGINO_REF"
 echo "Camera profile    : $CAMERA"
+echo "Optional WebRTC   : $WIFICAM_WEBRTC (build-time only)"
 echo "Target artifact   : $IMAGE_PATH"
 if [ "$IMAGE_DIR" = "$REPO_DIR/out/private-sd" ]; then
     echo "SECURITY: private Wi-Fi PSK image under gitignored out/; PUBLISH=1 blocked."
@@ -162,7 +172,7 @@ BR2_PACKAGE_THINGINO_RAPTOR_ROD=y
 BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
 BR2_PACKAGE_THINGINO_RAPTOR_RMR=y
 BR2_PACKAGE_THINGINO_RAPTOR_RMD=y
-# BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC is not set
+$WEBRTC_FRAGMENT
 # BR2_PACKAGE_THINGINO_RAPTOR_WEBTORRENT is not set
 # BR2_PACKAGE_THINGINO_RAPTOR_RSP is not set
 # BR2_PACKAGE_THINGINO_RAPTOR_RSR is not set
@@ -230,7 +240,15 @@ for component in RVD RSD RAD RHD ROD RIC RMR RMD; do
     grep -Fqx "BR2_PACKAGE_THINGINO_RAPTOR_$component=y" "$FINAL_CONFIG" ||
         die "required lightweight Raptor daemon missing: $component"
 done
-for component in FULL WEBRTC WEBTORRENT RSP RSR RWC RFS RSD555 DEBUG; do
+if [ "$WIFICAM_WEBRTC" = 1 ]; then
+    grep -Fqx 'BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC=y' "$FINAL_CONFIG" ||
+        die "WIFICAM_WEBRTC=1 requested but final WebRTC is disabled"
+else
+    if grep -Fqx 'BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC=y' "$FINAL_CONFIG"; then
+        die "WebRTC enabled unexpectedly in minimal T23N profile"
+    fi
+fi
+for component in FULL WEBTORRENT RSP RSR RWC RFS RSD555 DEBUG; do
     if grep -Fqx "BR2_PACKAGE_THINGINO_RAPTOR_$component=y" "$FINAL_CONFIG"; then
         die "unneeded Raptor feature enabled in T23N lean profile: $component"
     fi
