@@ -3,3 +3,17 @@
 
 .live-view{display:flex;flex-direction:column;gap:12px;align-items:center}
 .live-view img{display:block;max-width:100%;width:min(100%,760px);height:auto;min-height:180px;object-fit:contain;background:#090d14;border:1px solid #243047;border-radius:12px}
+
+/* Camera-only optional AI companion; no heavy runtime or framework on T23N. */
+.companion-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px}
+.companion-grid .panel{margin-top:0}
+.companion-heading{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.companion-heading h2{margin:5px 0 12px}
+.companion-heading small,.companion-info small{color:#64748b;font-weight:700;letter-spacing:.1em}
+.companion-icon{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:24px}
+.companion-toggle{display:flex;align-items:center;gap:12px;background:#eff6ff;padding:13px 14px;border:1px solid #bfdbfe;border-radius:12px;font-size:15px;font-weight:650;color:#1e40af;cursor:pointer}
+.companion-toggle input{height:22px;width:22px;min-width:22px;margin:0;accent-color:#2563eb;cursor:pointer}
+.companion-card .muted,.companion-info .muted{line-height:1.55}
+.companion-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:900px){.companion-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.companion-status-grid{grid-template-columns:1fr}}
