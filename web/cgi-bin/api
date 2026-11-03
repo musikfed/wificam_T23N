@@ -20,7 +20,7 @@ SSH_PROTECT="${SSH_PROTECT:-0}"
 ASSISTANT_STATE_DIR="${SERVICE_STATE_DIR:-/opt/wificam/services}"
 ASSISTANT_ENABLED_FILE="$ASSISTANT_STATE_DIR/llm_companion.enabled"
 # Runtime heartbeat is volatile; a reboot must never show a stale connection.
-ASSISTANT_HEARTBEAT_FILE=/var/run/wificam-llm-companion.heartbeat
+ASSISTANT_HEARTBEAT_FILE="${ASSISTANT_HEARTBEAT_FILE:-/var/run/wificam-llm-companion.heartbeat}"
 
 REQUEST_DATA=""
 if [ "${REQUEST_METHOD:-GET}" = "POST" ]; then
