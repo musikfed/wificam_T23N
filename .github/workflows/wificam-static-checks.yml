@@ -30,6 +30,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/prepare_wifi_overlay.py
           python3 -m unittest discover -s tests -p test_prepare_wifi_overlay.py -v
+          python3 -m unittest discover -s tests -p test_sd_candidate_build_contract.py -v
           python3 -m unittest discover -s tests -p test_cgi_safety_contract.py -v
           python3 -m unittest discover -s tests -p test_t23n_lean_profile.py -v
           python3 -m unittest discover -s tests -p test_assistant_cgi.py -v
