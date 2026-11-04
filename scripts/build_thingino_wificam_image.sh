@@ -364,7 +364,11 @@ fi
 # If private Wi-Fi provisioning was requested, verify that both the
 # Buildroot target and the ACTUAL ext4 image contain the generated config.
 # Never print it: the derived WPA2 PSK is password-equivalent.
-if [ "$IMAGE_DIR" != "$REPO_DIR/Thingino" ]; then
+# Only an explicitly provisioned private build contains a generated WPA2 PSK.
+# Ordinary PUBLISH=0 builds under out/candidate-sd have NO local/wifi.env;
+# requiring that private file here would make the factory job fail after the
+# expensive cross-compilation despite a valid generic SD image.
+if [ "$IMAGE_DIR" = "$REPO_DIR/out/private-sd" ]; then
     [ -f "$TARGET/etc/wpa_supplicant.conf" ] || die "private Wi-Fi missing from target"
     grep -q '^# PegineLab: generated locally' "$TARGET/etc/wpa_supplicant.conf" || \
         die "Buildroot overwrote private Wi-Fi target configuration"
