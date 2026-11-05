@@ -630,4 +630,3 @@ LBA34 внутри полного disk image, запись целиком с LBA
 
 [**Architecture, translations and contact**](docs/showcase/README.md)
 
-![wificam_T23N workflow](docs/showcase/overview.svg)
