@@ -624,3 +624,10 @@ LBA34 внутри полного disk image, запись целиком с LBA
 Встроенная сеть помогает обойти ручную настройку AP; при неправильном
 пароле камера **не обязана** автоматически переключиться в AP.
 Проверить пароль и диапазон до записи. Не загружать личный образ в Git.
+
+
+## Project showcase · Презентация · 11 languages
+
+[**Architecture, translations and contact**](docs/showcase/README.md)
+
+![wificam_T23N workflow](docs/showcase/overview.svg)
