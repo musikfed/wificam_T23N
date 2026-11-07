@@ -52,14 +52,25 @@ start_httpd() {
     echo $! > "$PIDFILE"
 }
 
+probe_get() {
+    # Both clients are acceptable for the loopback-only CGI execution check.
+    # Some minimal Thingino rootfs builds have BusyBox wget but no curl.
+    if command -v curl >/dev/null 2>&1; then
+        curl --silent --show-error --max-time 5 "$1"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -T 5 -O - "$1"
+    elif busybox --list 2>/dev/null | grep -qx wget; then
+        busybox wget -q -T 5 -O - "$1"
+    else
+        echo "WIFICAM CGI probe requires curl or wget" >&2
+        return 1
+    fi
+}
+
 probe_httpd_cgi() {
     # FAIL CLOSED before binding the LAN port. A CGI-disabled BusyBox returns
     # '#!/bin/sh' literally as HTTP 200, exposing CGI script source. Probe
     # loopback only and reject any response other than actual JSON.
-    command -v curl >/dev/null 2>&1 || {
-        echo "WIFICAM CGI smoke check requires curl" >&2
-        return 1
-    }
     probe_dir="$(mktemp -d /tmp/wificam-httpd-preflight.XXXXXX)" || return 1
     mkdir -p "$probe_dir/www/cgi-bin"
     cat > "$probe_dir/www/cgi-bin/probe" <<'EOF'
@@ -76,7 +87,7 @@ EOF
     sleep 1
     probe_ok=0
     if kill -0 "$probe_pid" 2>/dev/null; then
-        probe_body="$(curl --silent --max-time 4             http://127.0.0.1:18090/cgi-bin/probe 2>/dev/null || true)"
+        probe_body="$(probe_get http://127.0.0.1:18090/cgi-bin/probe 2>/dev/null || true)"
         [ "$probe_body" = '{"ok":true,"cgi":"executed"}' ] && probe_ok=1
     fi
     kill "$probe_pid" 2>/dev/null || true
@@ -154,8 +165,28 @@ start() {
     umask 077
     : > "$BOOTSTRAP_CONF"
 
-    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-        return 0
+    # Do not accept a stale PID pointing to Thingino's different web server.
+    [ -f "$WEBROOT/index.html" ] &&
+        grep -q 'PegineLab WIFICAM T23N' "$WEBROOT/index.html" || {
+        echo "WIFICAM custom index is missing: $WEBROOT/index.html" | tee -a "$LOG" >&2
+        return 1
+    }
+    if [ -s "$AUTH_CONF" ] && ! grep -Fqx "H:$WEBROOT" "$AUTH_CONF"; then
+        echo "WIFICAM auth config has wrong H: webroot; refusing stock Thingino UI" | tee -a "$LOG" >&2
+        return 1
+    fi
+    if [ -f "$PIDFILE" ]; then
+        existing_pid=$(cat "$PIDFILE" 2>/dev/null || true)
+        if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+            # Only reuse the PID when its command line contains our own webroot.
+            # Never kill unrelated processes because of a stale PID file.
+            command_line=$(tr '\000' ' ' < "/proc/$existing_pid/cmdline" 2>/dev/null || true)
+            case "$command_line" in
+                *httpd*"$WEBROOT"*) echo "PegineLab httpd already running on $WEB_PORT"; return 0 ;;
+                *) echo "WIFICAM PID is owned by a different process; refusing reuse" | tee -a "$LOG" >&2; return 1 ;;
+            esac
+        fi
+        rm -f "$PIDFILE"
     fi
 
     if ! httpd_available; then
