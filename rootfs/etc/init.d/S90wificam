@@ -67,6 +67,22 @@ probe_get() {
     fi
 }
 
+authenticated_get() {
+    url="$1"
+    if command -v curl >/dev/null 2>&1; then
+        curl --silent --max-time 5 --user "$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" "$url"
+    elif command -v base64 >/dev/null 2>&1; then
+        encoded=$(printf '%s' "$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" | base64 | tr -d '\r\n')
+        if command -v wget >/dev/null 2>&1; then
+            wget -q -T 5 --header "Authorization: Basic $encoded" -O - "$url"
+        else
+            busybox wget -q -T 5 --header "Authorization: Basic $encoded" -O - "$url"
+        fi
+    else
+        return 1
+    fi
+}
+
 probe_httpd_cgi() {
     # FAIL CLOSED before binding the LAN port. A CGI-disabled BusyBox returns
     # '#!/bin/sh' literally as HTTP 200, exposing CGI script source. Probe
@@ -237,17 +253,20 @@ start() {
     if [ "$AUTO_PROVISION_TEST_WEB_AUTH" = "1" ] &&
        [ -n "$DEFAULT_WEB_PASSWORD" ] &&
        grep -Fqx "/:$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" "$AUTH_CONF" 2>/dev/null; then
-        if ! command -v curl >/dev/null 2>&1; then
-            echo "WIFICAM CGI smoke check requires curl; refusing untested httpd" | tee -a "$LOG" >&2
-            stop
-            return 1
-        fi
-        response="$(curl --silent --max-time 4 --user "$DEFAULT_WEB_USER:$DEFAULT_WEB_PASSWORD" \
-            "http://127.0.0.1:$WEB_PORT/cgi-bin/api?op=status" 2>/dev/null || true)"
+        response="$(authenticated_get "http://127.0.0.1:$WEB_PORT/cgi-bin/api?op=status" 2>/dev/null || true)"
         case "$response" in
             '{"ok":true,'*) echo "WIFICAM CGI: status JSON verified on port $WEB_PORT" ;;
             *)
                 echo "WIFICAM CGI FAILED: /cgi-bin/api did not execute as JSON; refusing to expose CGI source" | tee -a "$LOG" >&2
+                stop
+                return 1
+                ;;
+        esac
+        page="$(authenticated_get "http://127.0.0.1:$WEB_PORT/" 2>/dev/null || true)"
+        case "$page" in
+            *'PegineLab WIFICAM T23N'*) echo "WIFICAM own page verified on $WEB_PORT" ;;
+            *)
+                echo "WIFICAM WRONG WEBROOT: stock or empty page on $WEB_PORT" | tee -a "$LOG" >&2
                 stop
                 return 1
                 ;;
