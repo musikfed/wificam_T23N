@@ -40,7 +40,7 @@ case "${1:-start}" in
   start)
     # Branding runs in background and must never delay camera/network startup.
     show_splash
-    play_jingle
+    # Speaker stack starts later; S94peginelab-audio plays through Raptor rac/play.
     ;;
   stop) ;;
   restart) "$0" start ;;
