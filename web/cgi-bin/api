@@ -89,8 +89,12 @@ status() {
     disk="$(df -k "$RECORDINGS" 2>/dev/null | awk 'NR==2{print $2","$3","$4","$5}')"
     csrf="$(cat "$CSRF_FILE" 2>/dev/null || true)"
     camera="$(wificam-camera-ctl status 2>/dev/null || echo unknown)"
+    reboot_allowed=false
+    [ "$ALLOW_REBOOT" = "1" ] && reboot_allowed=true
+    firmware=wificam
+    [ ! -s /etc/wifcam-helper-release ] || firmware=wifcam_helper
     header
-    printf '{"ok":true,"host":"%s","kernel":"%s","uptime":%s,"ip":"%s","gateway":"%s","dns":"%s","ssid":"%s","signal":"%s","disk":"%s","camera":"%s","csrf":"%s","user":"%s"}\n'       "$(json_escape "$host")" "$(json_escape "$kernel")" "$uptime_s"       "$(json_escape "$ip_addr")" "$(json_escape "$gateway")" "$(json_escape "$dns")"       "$(json_escape "$ssid")" "$(json_escape "$signal")" "$(json_escape "$disk")"       "$(json_escape "$camera")" "$(json_escape "$csrf")" "$(json_escape "${REMOTE_USER:-}")"
+    printf '{"ok":true,"host":"%s","kernel":"%s","uptime":%s,"ip":"%s","gateway":"%s","dns":"%s","ssid":"%s","signal":"%s","disk":"%s","camera":"%s","csrf":"%s","user":"%s","firmware":"%s","reboot_allowed":%s}\n'       "$(json_escape "$host")" "$(json_escape "$kernel")" "$uptime_s"       "$(json_escape "$ip_addr")" "$(json_escape "$gateway")" "$(json_escape "$dns")"       "$(json_escape "$ssid")" "$(json_escape "$signal")" "$(json_escape "$disk")"       "$(json_escape "$camera")" "$(json_escape "$csrf")" "$(json_escape "${REMOTE_USER:-}")" "$firmware" "$reboot_allowed"
 }
 
 wifi_scan() {
@@ -332,10 +336,29 @@ assistant_heartbeat() {
     assistant_status
 }
 
+# A bounded read-only camera log and a firmware identity snapshot for the UI.
+# Both endpoints inherit the web server's HTTP Basic authentication.
+web_log() {
+    require_auth
+    content="$(tail -n 45 /var/log/wificam-httpd.log 2>/dev/null | head -c 4096 || true)"
+    header
+    printf '{"ok":true,"log":"%s"}\n' "$(json_escape "$content")"
+}
+
+firmware_info() {
+    require_auth
+    firmware=wificam
+    if [ -s /etc/wifcam-helper-release ]; then firmware=wifcam_helper; fi
+    header
+    printf '{"ok":true,"firmware":"%s","board":"ingenic_t23n","web_port":8090,"image_update":"yadrokreator_sd"}\n' "$firmware"
+}
+
 op="$(param op)"
 
 case "$op" in
   status) status ;;
+  web_log) web_log ;;
+  firmware_info) firmware_info ;;
   wifi_scan) wifi_scan ;;
   wifi_apply) wifi_apply ;;
   storage) storage ;;
@@ -355,6 +378,7 @@ case "$op" in
   web_password) web_password ;;
   reboot)
     require_post
+    require_auth
     require_csrf
     [ "$ALLOW_REBOOT" = "1" ] || fail "reboot disabled; set ALLOW_REBOOT=1 after validation"
     ok ',"message":"rebooting"'
