@@ -1,0 +1,41 @@
+#!/bin/sh
+# PegineLab camera-native boot melody, after Raptor's audio daemon starts.
+# Audio-only T23N has no framebuffer; splash is in the Web UI.
+CONF=/etc/wificam/wificam.conf
+[ ! -r "$CONF" ] || . "$CONF"
+PCM=/usr/share/wificam-web/assets/boot-jingle.s16le
+LOG=/var/log/wificam-boot-audio.log
+LOCK=/run/wificam-boot-audio-once
+case "${1:-start}" in
+    start)
+        [ "${BOOT_SOUND:-0}" = 1 ] || exit 0
+        [ -s "$PCM" ] || { echo "jingle raw PCM absent" >> "$LOG"; exit 0; }
+        if ! mkdir "$LOCK" 2>/dev/null; then exit 0; fi
+        (
+            # Never delay boot. Upstream Raptor initializes camera audio asynchronously.
+            i=0
+            while [ "$i" -lt 15 ]; do
+                if command -v play >/dev/null 2>&1 &&
+                   { pidof rvd >/dev/null 2>&1 ||
+                     pidof rad >/dev/null 2>&1 ||
+                     pidof rsd >/dev/null 2>&1; }; then
+                    break
+                fi
+                i=$((i + 1))
+                sleep 1
+            done
+            if ! command -v play >/dev/null 2>&1; then
+                echo "boot melody skipped: Raptor play not available" >> "$LOG"
+                exit 0
+            fi
+            if play -s -r 16000 - < "$PCM" >> "$LOG" 2>&1; then
+                echo "PegineLab jingle sent to Raptor speaker; audible output not verified" >> "$LOG"
+            else
+                echo "PegineLab jingle playback failed; verify speaker and codec" >> "$LOG"
+            fi
+        ) >/dev/null 2>&1 </dev/null &
+        ;;
+    stop) ;;
+    restart) ;; # One melody per boot; never replay on an HTTP restart.
+    *) echo "Usage: $0 {start|stop|restart}" >&2; exit 2 ;;
+esac
