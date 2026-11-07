@@ -21,6 +21,7 @@
       <button data-page="image">◫ <span data-i18n="image">Изображение</span></button>
       <button data-page="network">≋ <span data-i18n="network">Сеть / Wi‑Fi</span></button>
       <button data-page="storage">▤ <span data-i18n="storage">SD-карта</span></button>
+      <button id="helperNav" data-page="helper" hidden>◉ <span data-i18n="helperNav">Голова / Помощник</span></button>
       <button data-page="assistant">✦ <span data-i18n="assistant">ИИ / Голос</span></button>
       <button data-page="system">⚙ <span data-i18n="system">Система</span></button>
       <button data-page="firmware">⇧ <span data-i18n="firmware">Обновление</span></button>
@@ -127,6 +128,46 @@
         <p><a href="https://github.com/musikfed/wificam_T23N/blob/mymarrchWFcam/docs/LLM_VOICE_COMPANION_RU.md" target="_blank" rel="noopener noreferrer" data-i18n="assistantGuide">Инструкция по подключению внешнего голосового моста</a></p>
       </div>
     </section>
+    <section id="helper" class="page" hidden>
+      <div class="helper-hero">
+        <div><small>PEGINELAB · WIFCAM HELPER · T23N</small>
+          <h2 data-i18n="helperTitle">Камера как голова робота или голосовой помощник</h2>
+          <p data-i18n="helperIntro">Одна прошивка, два режима. Переключение сохраняется на SD и не прерывает видеопоток Hombo3.</p>
+        </div><div class="helper-chip" id="helperCurrentMode" role="status">—</div>
+      </div>
+      <div class="grid helper-mode-grid" role="group" aria-label="Camera head operation mode">
+        <article class="helper-mode-card" id="helperRobotCard">
+          <div class="helper-symbol" aria-hidden="true">◈</div>
+          <h3 data-i18n="helperRobot">Голова робота Hombo3</h3>
+          <p data-i18n="helperRobotHint">Видео и PTZ для колёсного робота; команды приводов остаются на ESP32-S3 через Acer.</p>
+          <button type="button" id="helperRobotMode" data-i18n="helperSelectRobot" disabled>Выбрать голову робота</button>
+        </article>
+        <article class="helper-mode-card" id="helperVoiceCard">
+          <div class="helper-symbol" aria-hidden="true">✦</div>
+          <h3 data-i18n="helperVoice">Голосовой помощник</h3>
+          <p data-i18n="helperVoiceHint">Камерные микрофон, динамик и наблюдение; STT, TTS, LLM и зрение выполняются на CORE.</p>
+          <button type="button" id="helperVoiceMode" data-i18n="helperSelectVoice" disabled>Выбрать помощника</button>
+        </article>
+      </div>
+      <div class="panel">
+        <div class="helper-row"><div><h2 data-i18n="helperHealth">Диагностика камеры</h2>
+          <p class="muted" data-i18n="helperHealthNote">Доступность программы не доказывает, что микрофон, динамик и сенсор физически работают.</p></div>
+          <button type="button" id="helperRefresh" class="secondary" data-i18n="helperRefresh">Обновить состояние</button>
+        </div>
+        <div class="grid helper-health-grid">
+          <div><small data-i18n="helperMic">Микрофон (rad)</small><b id="helperMicState">—</b></div>
+          <div><small data-i18n="helperSpeaker">Динамик (rac)</small><b id="helperSpeakerState">—</b></div>
+          <div><small data-i18n="helperVideo">Видео (rvd)</small><b id="helperVideoState">—</b></div>
+          <div><small data-i18n="helperHardware">Физическая проверка</small><b id="helperHardwareState">—</b></div>
+        </div>
+        <p class="helper-message" id="helperMessage" aria-live="polite">—</p>
+        <div class="actions helper-actions">
+          <button type="button" id="helperGoLive" data-i18n="helperOpenCamera">Открыть видео / PTZ</button>
+          <button type="button" id="helperGoSystem" class="secondary" data-i18n="helperOpenSystem">Настройки и перезапуск</button>
+        </div>
+      </div>
+    </section>
+
     <section id="storage" class="page"><div class="panel"><h2 data-i18n="storage">SD-карта</h2><p data-i18n="storageLayout">MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.</p><div id="storageInfo">—</div><button onclick="loadStorage()">Refresh</button></div></section>
 
     <section id="system" class="page">
