@@ -14,8 +14,8 @@ try{
 const serviceInfo={};
 
 const tr={
- ru:{assistant:'ИИ / Голос',assistantTitle:'LLM / GPT напарник',assistantEnable:'Включить режим LLM / GPT',assistantHint:'Речь и GPT обрабатывает внешняя программа. На камере сохраняется только переключатель; звук автоматически не передаётся.',assistantArchitecture:'Камера + внешний голосовой сервер',assistantArchitectureHint:'RTSP не зависит от режима ИИ. Для разговора через микрофон и динамик камеры нужен внешний мост и проверка двустороннего аудио.',assistantPageInfo:'Настройка разрешает внешней программе подключаться к голосовому режиму. ИИ не запускается на T23N, аудиопоток не передаётся до подключения моста.',assistantMode:'Режим',assistantBridge:'Внешний мост',assistantBridgeHint:'Подключено означает недавний сигнал от программы, но не проверку микрофона и динамика.',assistantSecrets:'Ключи GPT / LLM хранятся только на внешнем компьютере или сервере, не в прошивке.',assistantGuide:'Инструкция по подключению голосового моста',assistantOn:'включён',assistantOff:'выключен',assistantConnected:'сигнал получен',assistantWaiting:'не подключён',dashboard:'Главная',live:'Видео',recording:'Запись',image:'Изображение',network:'Сеть / Wi‑Fi',storage:'SD-карта',system:'Система',firmware:'Обновление',logs:'Логи',model:'Модель',architecture:'Архитектура',imageHint:'Web UI использует camera service, который ОС подняла при загрузке.',cameraOsHint:'Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.',wifiSafe:'Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.',scan:'Сканировать сети',password:'Пароль',testSwitch:'Проверить и переключить',reboot:'Перезагрузить',fwHint:'Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.',webPassword:'Пароль администратора Web UI',newPassword:'Новый пароль',repeatPassword:'Повторить пароль',changePassword:'Сменить пароль',authHint:'После смены пароля HTTP-аутентификация перезапустится. Используйте 10–64 печатных ASCII-символа без пробелов; кириллица не поддерживается.',gateway:'Шлюз',optionalServices:'Дополнительные сервисы',servicesHint:'Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.',storageLayout:'MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.',enable:'Включить',disable:'Выключить',running:'работает',stopped:'остановлен',unavailable:'не установлен',protected:'защищён',ptzTitle:'Поворот камеры / PTZ',reversePan:'Реверс лево / право',reverseTilt:'Реверс верх / низ',autoFocus:'Автофокус (при наличии)'},
- en:{assistant:'AI / Voice',assistantTitle:'LLM / GPT companion',assistantEnable:'Enable LLM / GPT mode',assistantHint:'Speech and GPT are handled by an external application. The camera saves only a switch; no audio is transmitted automatically.',assistantArchitecture:'Camera + external voice server',assistantArchitectureHint:'RTSP is independent of AI mode. Using the camera microphone and speaker requires an external bridge and bidirectional-audio validation.',assistantPageInfo:'This setting permits an external companion to use the camera. No AI runs on the T23N; no audio is sent until an external bridge is configured.',assistantMode:'Mode',assistantBridge:'External bridge',assistantBridgeHint:'Connected means a recent bridge heartbeat, not proof of functioning microphone or speaker.',assistantSecrets:'Keep GPT / LLM API keys on an external computer or server, never in camera firmware.',assistantGuide:'External voice bridge setup guide',assistantOn:'enabled',assistantOff:'disabled',assistantConnected:'heartbeat received',assistantWaiting:'not connected',dashboard:'Dashboard',live:'Live view',recording:'Recording',image:'Image',network:'Network / Wi‑Fi',storage:'Storage / SD',system:'System',firmware:'Firmware update',logs:'Logs',model:'Model',architecture:'Architecture',imageHint:'The Web UI uses the camera service initialized by the OS at boot.',cameraOsHint:'The OS initializes the sensor and camera during boot; the Web UI operates on top of the system camera service.',wifiSafe:'The new network is tested first. On failure the backend restores the previous known-good profile.',scan:'Scan networks',password:'Password',testSwitch:'Test & switch',reboot:'Reboot',fwHint:'Firmware update will be enabled only after U‑Boot and recovery boot paths are validated.',webPassword:'Web UI administrator password',newPassword:'New password',repeatPassword:'Repeat password',changePassword:'Change password',authHint:'HTTP authentication will restart after changing the password. Use 10–64 printable ASCII characters without spaces.',gateway:'Gateway',optionalServices:'Optional services',servicesHint:'A disabled service is not started and therefore has no persistent userspace CPU/RAM process.',storageLayout:'MEDIA = 20 GiB for photos/video; all remaining card space is assigned to ROOTFS.',enable:'Enable',disable:'Disable',running:'running',stopped:'stopped',unavailable:'not installed',protected:'protected',ptzTitle:'Camera movement / PTZ',reversePan:'Reverse left / right',reverseTilt:'Reverse up / down',autoFocus:'Autofocus (if supported)'}
+ ru:{helperNav:'Голова / Помощник',helperTitle:'Камера как голова робота или голосовой помощник',helperIntro:'Одна прошивка, два режима. Настройка сохраняется на SD и не останавливает видеопоток.',helperRobot:'Голова робота Hombo3',helperRobotHint:'Видео и PTZ для робота. Приводы колёс управляются через ESP32-S3 и Acer.',helperVoice:'Голосовой помощник',helperVoiceHint:'Камерный звук и зрение; STT, TTS и LLM выполняются на CORE.',helperSelectRobot:'Выбрать голову робота',helperSelectVoice:'Выбрать помощника',helperHealth:'Диагностика камеры',helperHealthNote:'Наличие программы не означает, что физический микрофон или динамик проверен.',helperRefresh:'Обновить состояние',helperMic:'Микрофон (rad)',helperSpeaker:'Динамик (rac)',helperVideo:'Видео (rvd)',helperHardware:'Физическая проверка',helperOpenCamera:'Открыть видео / PTZ',helperOpenSystem:'Настройки и перезапуск',helperActive:'Активен',helperDetected:'Команда доступна',helperMissing:'Не обнаружена',helperNotVerified:'Ещё не проверено',helperRoleSet:'Режим сохранён на камере',helperError:'Не удалось переключить режим',helperUnavailable:'Helper отсутствует в этой прошивке',assistant:'ИИ / Голос',assistantTitle:'LLM / GPT напарник',assistantEnable:'Включить режим LLM / GPT',assistantHint:'Речь и GPT обрабатывает внешняя программа. На камере сохраняется только переключатель; звук автоматически не передаётся.',assistantArchitecture:'Камера + внешний голосовой сервер',assistantArchitectureHint:'RTSP не зависит от режима ИИ. Для разговора через микрофон и динамик камеры нужен внешний мост и проверка двустороннего аудио.',assistantPageInfo:'Настройка разрешает внешней программе подключаться к голосовому режиму. ИИ не запускается на T23N, аудиопоток не передаётся до подключения моста.',assistantMode:'Режим',assistantBridge:'Внешний мост',assistantBridgeHint:'Подключено означает недавний сигнал от программы, но не проверку микрофона и динамика.',assistantSecrets:'Ключи GPT / LLM хранятся только на внешнем компьютере или сервере, не в прошивке.',assistantGuide:'Инструкция по подключению голосового моста',assistantOn:'включён',assistantOff:'выключен',assistantConnected:'сигнал получен',assistantWaiting:'не подключён',dashboard:'Главная',live:'Видео',recording:'Запись',image:'Изображение',network:'Сеть / Wi‑Fi',storage:'SD-карта',system:'Система',firmware:'Обновление',logs:'Логи',model:'Модель',architecture:'Архитектура',imageHint:'Web UI использует camera service, который ОС подняла при загрузке.',cameraOsHint:'Сенсор и камера инициализируются ОС при загрузке; Web UI работает поверх системного camera service.',wifiSafe:'Новая сеть сначала тестируется. При ошибке backend возвращает предыдущий рабочий профиль.',scan:'Сканировать сети',password:'Пароль',testSwitch:'Проверить и переключить',reboot:'Перезагрузить',fwHint:'Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.',webPassword:'Пароль администратора Web UI',newPassword:'Новый пароль',repeatPassword:'Повторить пароль',changePassword:'Сменить пароль',authHint:'После смены пароля HTTP-аутентификация перезапустится. Используйте 10–64 печатных ASCII-символа без пробелов; кириллица не поддерживается.',gateway:'Шлюз',optionalServices:'Дополнительные сервисы',servicesHint:'Выключенный сервис не запускается и не занимает CPU/RAM постоянным процессом.',storageLayout:'MEDIA = 20 GiB для фото/видео; всё остальное место карты получает ROOTFS.',enable:'Включить',disable:'Выключить',running:'работает',stopped:'остановлен',unavailable:'не установлен',protected:'защищён',ptzTitle:'Поворот камеры / PTZ',reversePan:'Реверс лево / право',reverseTilt:'Реверс верх / низ',autoFocus:'Автофокус (при наличии)'},
+ en:{helperNav:'Robot head / Assistant',helperTitle:'Camera as a robot head or a voice assistant',helperIntro:'One firmware, two modes. The selected role persists on SD without stopping video.',helperRobot:'Hombo3 robot head',helperRobotHint:'Camera and PTZ for the robot. Wheel motors remain controlled via ESP32-S3 and Acer.',helperVoice:'Voice assistant',helperVoiceHint:'Camera audio and vision; STT, TTS and LLM run on CORE.',helperSelectRobot:'Select robot head',helperSelectVoice:'Select voice assistant',helperHealth:'Camera diagnostics',helperHealthNote:'A command being installed does not prove the physical microphone or speaker works.',helperRefresh:'Refresh state',helperMic:'Microphone (rad)',helperSpeaker:'Speaker (rac)',helperVideo:'Video (rvd)',helperHardware:'Hardware verification',helperOpenCamera:'Open video / PTZ',helperOpenSystem:'Settings and reboot',helperActive:'Active',helperDetected:'Command available',helperMissing:'Not detected',helperNotVerified:'Not tested yet',helperRoleSet:'Role saved on camera',helperError:'Failed to switch mode',helperUnavailable:'Helper is not installed in this firmware',assistant:'AI / Voice',assistantTitle:'LLM / GPT companion',assistantEnable:'Enable LLM / GPT mode',assistantHint:'Speech and GPT are handled by an external application. The camera saves only a switch; no audio is transmitted automatically.',assistantArchitecture:'Camera + external voice server',assistantArchitectureHint:'RTSP is independent of AI mode. Using the camera microphone and speaker requires an external bridge and bidirectional-audio validation.',assistantPageInfo:'This setting permits an external companion to use the camera. No AI runs on the T23N; no audio is sent until an external bridge is configured.',assistantMode:'Mode',assistantBridge:'External bridge',assistantBridgeHint:'Connected means a recent bridge heartbeat, not proof of functioning microphone or speaker.',assistantSecrets:'Keep GPT / LLM API keys on an external computer or server, never in camera firmware.',assistantGuide:'External voice bridge setup guide',assistantOn:'enabled',assistantOff:'disabled',assistantConnected:'heartbeat received',assistantWaiting:'not connected',dashboard:'Dashboard',live:'Live view',recording:'Recording',image:'Image',network:'Network / Wi‑Fi',storage:'Storage / SD',system:'System',firmware:'Firmware update',logs:'Logs',model:'Model',architecture:'Architecture',imageHint:'The Web UI uses the camera service initialized by the OS at boot.',cameraOsHint:'The OS initializes the sensor and camera during boot; the Web UI operates on top of the system camera service.',wifiSafe:'The new network is tested first. On failure the backend restores the previous known-good profile.',scan:'Scan networks',password:'Password',testSwitch:'Test & switch',reboot:'Reboot',fwHint:'Firmware update will be enabled only after U‑Boot and recovery boot paths are validated.',webPassword:'Web UI administrator password',newPassword:'New password',repeatPassword:'Repeat password',changePassword:'Change password',authHint:'HTTP authentication will restart after changing the password. Use 10–64 printable ASCII characters without spaces.',gateway:'Gateway',optionalServices:'Optional services',servicesHint:'A disabled service is not started and therefore has no persistent userspace CPU/RAM process.',storageLayout:'MEDIA = 20 GiB for photos/video; all remaining card space is assigned to ROOTFS.',enable:'Enable',disable:'Disable',running:'running',stopped:'stopped',unavailable:'not installed',protected:'protected',ptzTitle:'Camera movement / PTZ',reversePan:'Reverse left / right',reverseTilt:'Reverse up / down',autoFocus:'Autofocus (if supported)'}
 };
 
 function translate(){
@@ -23,6 +23,7 @@ function translate(){
   document.documentElement.lang=lang;
   renderServices();
   renderAssistant();
+  renderHelper();
 }
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);log(msg)}
 function log(msg){const b=$('#logBox');if(b)b.textContent=new Date().toLocaleTimeString()+'  '+msg+'\n'+b.textContent}
@@ -231,6 +232,79 @@ async function toggleService(name){
 }
 
 
+
+// The Helper firmware uses the SAME WIFICAM navigation and Basic Auth.
+// A generic WIFICAM build has no Helper CGI and keeps this tab invisible.
+// No microphone capture, video streaming, or inference begins on page load.
+const helperInfo={available:false,mode:'',helper_booted:false,
+  microphone_transport:false,speaker_transport:false,video_transport:false,hardware_verified:false};
+let helperBusy=false;
+function renderHelper(){
+  const nav=$('#helperNav'),page=$('#helper');
+  if(!nav||!page)return;
+  nav.hidden=!helperInfo.available;
+  page.hidden=!helperInfo.available;
+  if(!helperInfo.available)return;
+  const t=tr[lang],robot=helperInfo.mode==='robot_head',voice=helperInfo.mode==='voice_assistant';
+  $('#helperCurrentMode').textContent=robot?t.helperRobot:(voice?t.helperVoice:'—');
+  $('#helperRobotCard').classList.toggle('is-selected',robot);
+  $('#helperVoiceCard').classList.toggle('is-selected',voice);
+  $('#helperRobotMode').disabled=helperBusy||robot;
+  $('#helperVoiceMode').disabled=helperBusy||voice;
+  $('#helperRobotMode').textContent=robot?t.helperActive:t.helperSelectRobot;
+  $('#helperVoiceMode').textContent=voice?t.helperActive:t.helperSelectVoice;
+  $('#helperMicState').textContent=helperInfo.microphone_transport?t.helperDetected:t.helperMissing;
+  $('#helperSpeakerState').textContent=helperInfo.speaker_transport?t.helperDetected:t.helperMissing;
+  $('#helperVideoState').textContent=helperInfo.video_transport?t.helperDetected:t.helperMissing;
+  $('#helperHardwareState').textContent=helperInfo.hardware_verified?t.helperDetected:t.helperNotVerified;
+}
+async function helperRequest(mode=''){
+  const options={cache:'no-store',credentials:'same-origin'};
+  if(mode){
+    if(!csrf)await refreshStatus();
+    if(!csrf)throw new Error('WIFICAM CSRF token unavailable');
+    options.method='POST';
+    options.headers={'Content-Type':'application/x-www-form-urlencoded'};
+    options.body=new URLSearchParams({mode,csrf}).toString();
+  }
+  const response=await fetch('/cgi-bin/helper-capabilities',options);
+  const payload=await response.text();
+  if(payload.trimStart().startsWith('#!'))throw new Error('Helper CGI source exposed; check BusyBox httpd');
+  let value;
+  try{value=JSON.parse(payload);}catch{throw new Error('Helper CGI returned non-JSON HTTP '+response.status);}
+  if(!response.ok||value.ok!==true)throw new Error(value.error||'Helper HTTP '+response.status);
+  if(value.schema!=='peginelab.camera-head.v1')throw new Error('Unsupported Helper firmware API');
+  return value;
+}
+async function loadHelper(){
+  try{
+    const data=await helperRequest();
+    Object.assign(helperInfo,data,{available:true});
+    $('#helperMessage').textContent=data.helper_booted
+      ? (lang==='ru'?'Служба Helper запущена. Проверка физического звука — следующий этап.':'Helper booted. Physical audio validation is a separate step.')
+      : (lang==='ru'?'Служба Helper ещё не подтвердила загрузку.':'Helper boot marker not present yet.');
+  }catch(e){
+    // Generic WIFICAM intentionally has no helper endpoint.
+    if(helperInfo.available){$('#helperMessage').textContent=e.message;log(e.message);}
+    else if(String(e.message).includes('source exposed'))log(e.message);
+  }
+  renderHelper();
+}
+async function selectHelperMode(mode){
+  if(helperBusy||!helperInfo.available)return;
+  if(!['robot_head','voice_assistant'].includes(mode))return;
+  helperBusy=true;renderHelper();
+  try{
+    const data=await helperRequest(mode);
+    Object.assign(helperInfo,data,{available:true});
+    $('#helperMessage').textContent=tr[lang].helperRoleSet;
+    toast(tr[lang].helperRoleSet);
+  }catch(e){
+    $('#helperMessage').textContent=tr[lang].helperError+': '+e.message;
+    toast(e.message);
+  }finally{helperBusy=false;renderHelper();}
+}
+
 const assistantInfo={enabled:false,connected:false};
 async function loadAssistant(){
   const toggle=$('#assistantEnabled');
@@ -303,12 +377,18 @@ $$('#nav button').forEach(b=>b.onclick=()=>{
   }
   if(b.dataset.page==='storage')loadStorage();
   if(b.dataset.page==='assistant')loadAssistant();
+  if(b.dataset.page==='helper')loadHelper();
   if(b.dataset.page==='network'){refreshStatus();loadServices();}
   if(b.dataset.page==='dashboard'||b.dataset.page==='system')refreshStatus();
 });
 $('#langBtn').onclick=()=>{lang=lang==='ru'?'en':'ru';translate()};
 $('#scanBtn').onclick=scan;
 $('#assistantEnabled').addEventListener('change',toggleAssistant);
+$('#helperRobotMode').onclick=()=>selectHelperMode('robot_head');
+$('#helperVoiceMode').onclick=()=>selectHelperMode('voice_assistant');
+$('#helperRefresh').onclick=loadHelper;
+$('#helperGoLive').onclick=()=>document.querySelector('[data-page="live"]').click();
+$('#helperGoSystem').onclick=()=>document.querySelector('[data-page="system"]').click();
 $('#wifiForm').addEventListener('submit',applyWifi);
 $('#webPasswordForm').addEventListener('submit',changeWebPassword);
 $('#rebootBtn').onclick=()=>{if(confirm(lang==='ru'?'Перезагрузить камеру?':'Reboot camera?'))apiAction('reboot')};
@@ -322,11 +402,12 @@ $('#previewFlip').checked=previewFlip;
 applyPreviewOrientation();
 refreshStatus();
 loadAssistant();
+loadHelper();
 function visibleStatusPage(){
   const active=$$('.page').find(p=>p.classList.contains('active'));
-  return active&&['dashboard','system','network','assistant'].includes(active.id);
+  return active&&['dashboard','system','network','assistant','helper'].includes(active.id);
 }
-setInterval(()=>{if(!document.hidden&&visibleStatusPage())refreshStatus();},60000);
+setInterval(()=>{if(!document.hidden&&visibleStatusPage()){refreshStatus();if($('#helper').classList.contains('active'))loadHelper();}},60000);
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){stopPreview();}
   else if(visibleStatusPage())refreshStatus(); // never auto-resume video
