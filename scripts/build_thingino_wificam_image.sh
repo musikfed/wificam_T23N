@@ -339,6 +339,15 @@ rm -f "$ROOTFS_EXT"
 [ -f "$KERNEL_IMAGE" ] || die "uImage missing: $KERNEL_IMAGE"
 [ -f "$TARGET/usr/share/wificam-web/index.html" ] || die "WIFICAM index missing from Thingino target rootfs"
 [ -x "$TARGET/etc/init.d/S90wificam" ] || die "S90wificam missing/not executable in target rootfs"
+[ -x "$TARGET/etc/init.d/S94peginelab-audio" ] ||
+    die "PegineLab Raptor boot audio init absent/not executable"
+[ -s "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le" ] ||
+    die "PegineLab camera native PCM jingle absent from final rootfs"
+[ "$(stat -c '%s' "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le")" -eq 224000 ] ||
+    die "PegineLab camera native PCM jingle has unexpected size"
+[ -s "$TARGET/usr/share/wificam-web/assets/boot-jingle.wav" ] ||
+    die "PegineLab original WAV jingle absent from final rootfs"
+
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/api" ] || die "WIFICAM API missing/not executable"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/snapshot.jpg" ] || die "snapshot CGI missing/not executable"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/live.mjpg" ] || die "native MJPEG CGI missing/not executable"
@@ -413,6 +422,14 @@ debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q
     die "WIFICAM index is absent from rootfs.ext2"
 debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "S90wificam is absent from rootfs.ext2"
+for boot_asset in \
+    /etc/init.d/S94peginelab-audio \
+    /usr/share/wificam-web/assets/boot-jingle.s16le \
+    /usr/share/wificam-web/assets/boot-jingle.wav
+do
+    debugfs -R "stat $boot_asset" "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' ||
+        die "PegineLab boot melody missing inside ext4: $boot_asset"
+done
 debugfs -R 'stat /usr/share/wificam-web/cgi-bin/api' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "WIFICAM API is absent from rootfs.ext2"
 debugfs -R 'stat /usr/share/wificam-web/cgi-bin/snapshot.jpg' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
