@@ -12,6 +12,8 @@ from pathlib import Path
 SR = 11025
 DURATION = 7.0
 OUT = Path(__file__).resolve().parents[1] / "web" / "assets" / "boot-jingle.wav"
+PCM_OUT = OUT.with_suffix(".s16le")
+DEVICE_SR = 16000
 
 NOTES = {
     "C5": 523.25, "D5": 587.33, "E5": 659.25, "G5": 783.99,
@@ -54,7 +56,21 @@ def main():
     with wave.open(str(OUT), "wb") as w:
         w.setnchannels(1); w.setsampwidth(1); w.setframerate(SR)
         w.writeframes(bytes(int(128 + max(-.95, min(.95, x))*120) & 0xff for x in s))
+    # Camera's Thingino /usr/sbin/play accepts signed 16-bit mono PCM via stdin,
+    # not RIFF/WAV headers. Produce an additional 16 kHz raw transport asset.
+    # A small deterministic linear resampling is adequate for this 8-bit jingle.
+    import struct
+    frames = int(DEVICE_SR * DURATION)
+    with PCM_OUT.open("wb") as output:
+        for i in range(frames):
+            source = i * SR / DEVICE_SR
+            idx = min(int(source), n - 1)
+            nxt = min(idx + 1, n - 1)
+            sample = s[idx] + (s[nxt] - s[idx]) * (source - idx)
+            signed = int(max(-0.75, min(0.75, sample)) * 16384)
+            output.write(struct.pack("<h", signed))
     print(OUT)
+    print(PCM_OUT)
 
 if __name__ == "__main__":
     main()
