@@ -22,13 +22,16 @@ jobs:
           sh -n rootfs/usr/bin/wificam-ptz-ctl
           sh -n web/cgi-bin/live.mjpg
           sh -n rootfs/etc/init.d/S90wificam
+          sh -n rootfs/etc/init.d/S94peginelab-audio
           sh -n rootfs/usr/bin/wificam-set-web-password
           sh -n web/cgi-bin/api
           sh -n web/cgi-bin/snapshot.jpg
           sh -n web/setup/cgi-bin/claim
       - name: Check local Wi-Fi config generator and no-secret output
         run: |
-          python3 -m py_compile scripts/prepare_wifi_overlay.py
+          python3 -m py_compile scripts/prepare_wifi_overlay.py tools/generate_boot_jingle.py
+          python3 tools/generate_boot_jingle.py
+          python3 -c "from pathlib import Path; p=Path('web/assets/boot-jingle.s16le'); assert p.stat().st_size == 224000, p.stat().st_size"
           python3 -m unittest discover -s tests -p test_prepare_wifi_overlay.py -v
           python3 -m unittest discover -s tests -p test_sd_candidate_build_contract.py -v
           python3 -m unittest discover -s tests -p test_cgi_safety_contract.py -v
