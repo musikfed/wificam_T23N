@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "id": "wificam_T23N",
+  "title": "wificam_T23N",
+  "version": "—",
+  "description": "Этот файл уже хранится в обычном GitHub repository. Его размер около 81 MiB: GitHub предупреждает о файлах больше 50 MiB, но текущий image остаётся ниже жёсткого лимита 100 MiB для одного обычного Git object.",
+  "subtitle": null,
+  "tags": [
+    "Shell"
+  ],
+  "visibility": "public",
+  "publication": "publish_on_merge",
+  "public_private_approved": false,
+  "display_mode": "diagram",
+  "status": "Черновик — ожидает проверки",
+  "repo_url": "https://github.com/musikfed/wificam_T23N",
+  "screenshots": [],
+  "cover": "vitrine/generated/cover.svg",
+  "cover_type": "schematic-not-screenshot",
+  "screenshot_source": "not-available"
+}
