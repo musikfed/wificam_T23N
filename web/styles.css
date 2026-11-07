@@ -43,3 +43,19 @@
 .helper-actions{flex-wrap:wrap}
 @media(max-width:750px){.helper-hero,.helper-row{flex-direction:column;align-items:flex-start}.helper-mode-grid{grid-template-columns:1fr}.helper-health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:420px){.helper-health-grid{grid-template-columns:1fr}.helper-actions button{width:100%}}
+
+/* Headless T23N boot splash: Web UI identity, not a framebuffer promise.
+   CSS animates away on its own even with JavaScript/API failure. */
+.boot-intro{position:fixed;inset:0;z-index:999;background:#0b1628;color:white;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;pointer-events:none;animation:peginelabBootIntro 1.65s ease-out forwards}
+.boot-intro img{width:90px;height:90px;object-fit:contain}
+.boot-intro strong{font-size:30px;letter-spacing:.025em}
+.boot-intro span{color:#8fbcdb;font-size:13px;letter-spacing:.1em}
+@keyframes peginelabBootIntro{
+  0%,50%{opacity:1;visibility:visible}
+  100%{opacity:0;visibility:hidden}
+}
+@media(prefers-reduced-motion:reduce){
+  .boot-intro{animation:none;opacity:0;visibility:hidden}
+}
