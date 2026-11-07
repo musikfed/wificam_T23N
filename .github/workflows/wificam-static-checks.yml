@@ -42,3 +42,4 @@ jobs:
         run: |
           node --check web/app.js
           node scripts/test_web_lazy_preview.js
+          node scripts/test_helper_web_ui.js
