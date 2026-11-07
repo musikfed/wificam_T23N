@@ -6,7 +6,8 @@ OUT="${1:-$REPO_DIR/out/rootfs-overlay}"
 
 # Generate the tiny original chiptune on the build host so binary audio does not
 # need to live in Git.
-if [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] && command -v python3 >/dev/null 2>&1; then
+if { [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] ||
+     [ ! -f "$REPO_DIR/web/assets/boot-jingle.s16le" ]; } && command -v python3 >/dev/null 2>&1; then
     python3 "$REPO_DIR/tools/generate_boot_jingle.py"
 fi
 
@@ -34,7 +35,8 @@ chmod 0755   "$OUT/etc/init.d/S05peginelab-boot"   "$OUT/etc/init.d/S90wificam" 
   "$OUT/usr/bin/wificam-ptz-ctl"   "$OUT/usr/bin/wificam-service-ctl"   "$OUT/usr/bin/wificam-set-web-password"   "$OUT/usr/share/wificam-web/cgi-bin/api" \
   "$OUT/usr/share/wificam-web/cgi-bin/snapshot.jpg" \
   "$OUT/usr/share/wificam-web/cgi-bin/live.mjpg" \
-  "$OUT/usr/share/wificam-web/setup/cgi-bin/claim"
+  "$OUT/usr/share/wificam-web/setup/cgi-bin/claim" \
+  "$OUT/etc/init.d/S94peginelab-audio"
 
 chmod 0644 "$OUT/etc/fw_env.config"
 
