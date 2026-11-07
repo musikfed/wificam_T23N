@@ -93,7 +93,7 @@
       </div>
       </div></section>
     <section id="recording" class="page"><div class="panel"><h2 data-i18n="recording">Запись</h2><p>Video: <code>/mnt/media/recordings</code></p><p>Photos: <code>/mnt/media/snapshots</code></p><div class="actions"><button onclick="apiAction('record_start')">Start recording</button><button class="danger" onclick="apiAction('record_stop')">Stop recording</button></div></div></section>
-    <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Web UI использует camera service, который ОС подняла при загрузке.</p></div></section>
+    <section id="image" class="page"><div class="panel"><h2 data-i18n="image">Изображение</h2><p data-i18n="imageHint">Web UI использует camera service, который ОС подняла при загрузке.</p><p class="muted" id="imageCapabilities">—</p><button type="button" id="openImagePreview" data-i18n="imageOpenCamera">Открыть настройки просмотра и PTZ</button><p class="muted" data-i18n="imageControlsHint">Цифровой zoom, зеркало и переворот работают в браузере. Оптический фокус и разрешение пока не изменяются без проверенного драйвера.</p></div></section>
 
     <section id="network" class="page">
       <div class="panel">
@@ -175,8 +175,8 @@
       <div class="panel"><h2 data-i18n="webPassword">Пароль администратора Web UI</h2><form id="webPasswordForm"><label><span data-i18n="newPassword">Новый пароль</span><input id="newWebPassword" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" required></label><label><span data-i18n="repeatPassword">Повторить пароль</span><input id="repeatWebPassword" type="password" minlength="10" maxlength="64" pattern="[!-~]{10,64}" required></label><button type="submit" data-i18n="changePassword">Сменить пароль</button></form><p class="muted" data-i18n="authHint">После смены пароля HTTP-аутентификация перезапустится.</p></div>
     </section>
 
-    <section id="firmware" class="page"><div class="panel"><h2 data-i18n="firmware">Обновление</h2><p data-i18n="fwHint">Обновление будет добавлено только после проверки схемы загрузки U‑Boot и recovery.</p></div></section>
-    <section id="logs" class="page"><div class="panel"><h2 data-i18n="logs">Логи</h2><pre id="logBox">UI ready.</pre></div></section>
+    <section id="firmware" class="page"><div class="panel"><h2 data-i18n="firmware">Обновление</h2><p data-i18n="fwHint">Сборка и скачивание полного образа microSD выполняются в YadroKreator. Камера не переписывает загрузчик сама.</p><div class="kv"><div><small>Firmware</small><b id="firmwareIdentity">—</b></div><div><small>Board</small><b id="firmwareBoard">—</b></div><div><small>Web UI</small><b id="firmwarePort">:8090</b></div></div><button type="button" id="firmwareRefresh" data-i18n="firmwareRefresh">Обновить информацию</button><p class="muted">Boot: MBR → MSPL LBA34 → FAT16 /uImage → ext4 /dev/mmcblk0p2.</p></div></section>
+    <section id="logs" class="page"><div class="panel"><h2 data-i18n="logs">Логи</h2><p data-i18n="logsHint">Журнал HTTPD камеры. Чтение по кнопке, без фонового опроса и передачи на внешние серверы.</p><button type="button" id="loadCameraLogs" data-i18n="logsLoad">Загрузить журнал камеры</button><pre id="cameraLogBox">—</pre><details><summary data-i18n="logsBrowser">Журнал браузерного интерфейса</summary><pre id="logBox">UI ready.</pre></details></div></section>
 
     <div id="toast"></div>
   </main>
