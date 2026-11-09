@@ -29,7 +29,7 @@ class CgiSafetyContract(unittest.TestCase):
     def test_build_includes_http_client_for_cgi_preflight(self):
         source = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
         self.assertIn("CONFIG_WGET=y",source)
-        self.assertIn("CONFIG_WGET\\n",source)
+        self.assertIn("CONFIG_WGET", source.split('BUSYBOX_REQUIRED_OPTS="', 1)[1].split('"', 1)[0])
         self.assertIn("br-busybox-rebuild",source)
         self.assertIn("BUILD_TARGET=cleanbuild",source)
 
