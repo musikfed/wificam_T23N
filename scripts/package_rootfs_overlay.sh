@@ -6,7 +6,7 @@ OUT="${1:-$REPO_DIR/out/rootfs-overlay}"
 
 # Generate the tiny original chiptune on the build host so binary audio does not
 # need to live in Git.
-if { [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] ||
+if [ "${WIFICAM_HELPER_EDITION:-0}" != 1 ] && { [ ! -f "$REPO_DIR/web/assets/boot-jingle.wav" ] ||
      [ ! -f "$REPO_DIR/web/assets/boot-jingle.s16le" ]; } && command -v python3 >/dev/null 2>&1; then
     python3 "$REPO_DIR/tools/generate_boot_jingle.py"
 fi
@@ -18,6 +18,17 @@ mkdir -p "$OUT/usr/share/wificam-web"
 # /etc/fw_env.config. This avoids silently forgetting future rootfs files.
 cp -R "$REPO_DIR/rootfs/." "$OUT/"
 cp -R "$REPO_DIR/web/." "$OUT/usr/share/wificam-web/"
+
+if [ "${WIFICAM_HELPER_EDITION:-0}" = 1 ]; then
+    # Helper speaks, never plays the former chiptune; the ordinary WIFICAM
+    # image and other Thingino editions are untouched.
+    rm -f "$OUT/usr/share/wificam-web/assets/boot-jingle.wav" \
+          "$OUT/usr/share/wificam-web/assets/boot-jingle.s16le"
+    [ -s "$OUT/usr/share/wificam-web/assets/boot-voice.s16le" ] || {
+        echo "ERROR: Helper spoken boot greeting missing from rootfs overlay" >&2
+        exit 1
+    }
+fi
 
 # Never source or echo private Wi-Fi credentials. This stage uses stdlib Python
 # to create /etc/wpa_supplicant.conf (SSID hex + derived WPA2 PSK). It must run
