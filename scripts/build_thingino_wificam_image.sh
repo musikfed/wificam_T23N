@@ -262,7 +262,9 @@ grep -q '^BR2_TARGET_ROOTFS_EXT2=y$' "$FINAL_CONFIG" || \
     die "BR2_TARGET_ROOTFS_EXT2 is not enabled in final Thingino config"
 grep -q '^BR2_TARGET_ROOTFS_EXT2_4=y$' "$FINAL_CONFIG" || \
     die "BR2_TARGET_ROOTFS_EXT2_4 is not enabled in final Thingino config"
-grep -q '^BR2_PACKAGE_DROPBEAR=ygrep -Fq "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES=\"$BUSYBOX_WIFICAM_FRAGMENT\"" "$FINAL_CONFIG" || \
+grep -q '^BR2_PACKAGE_DROPBEAR=y$' "$FINAL_CONFIG" || \
+    die "Dropbear SSH is not enabled; local recovery access is mandatory"
+grep -Fq "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES=\"$BUSYBOX_WIFICAM_FRAGMENT\"" "$FINAL_CONFIG" || \
     die "WIFICAM BusyBox fragment path did not reach final Buildroot config"
 
 # FAST builds can reuse an older BusyBox .config from before local.fragment
