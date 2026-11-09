@@ -20,6 +20,18 @@ class CgiSafetyContract(unittest.TestCase):
         self.assertIn('{"ok":true,"cgi":"executed"}', init)
         self.assertIn('WIFICAM CGI PRE-FLIGHT FAILED', init)
         self.assertIn('WIFICAM_HTTPD_BIN', init)
+        self.assertIn('WIFICAM CGI PRE-FLIGHT UNAVAILABLE', init)
+        self.assertIn('exec httpd "$@"', init)
+        self.assertIn('exec busybox httpd "$@"', init)
+        self.assertIn('probe_get()', init)
+        self.assertIn('grep -qx wget', init)
+
+    def test_build_includes_http_client_for_cgi_preflight(self):
+        source = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
+        self.assertIn("CONFIG_WGET=y",source)
+        self.assertIn("CONFIG_WGET\\n",source)
+        self.assertIn("br-busybox-rebuild",source)
+        self.assertIn("BUILD_TARGET=cleanbuild",source)
 
     def test_camera_smoke_requires_actual_json_not_http_200_only(self):
         smoke = (ROOT / "scripts/camera_smoke_httpd_cgi.sh").read_text()
