@@ -50,6 +50,39 @@ class CgiSafetyContract(unittest.TestCase):
         self.assertIn("boot-voice.s16le", audio)
         self.assertIn("boot-jingle.s16le", audio)
 
+    def test_audio_validation_is_edition_specific_in_target_and_sd_rootfs(self):
+        # Regression: Helper intentionally removes the original jingle, so
+        # neither target nor ext4 validation may demand it unconditionally.
+        builder = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
+        lines = builder.splitlines()
+        target_start = next(i for i, line in enumerate(lines)
+                            if line.strip().startswith('[ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le" ] ||'))
+        target_end = next(i for i in range(target_start, len(lines))
+                          if lines[i] == "fi")
+        target_branch = lines[target_start:target_end]
+        split_index = target_branch.index("else")
+        helper_target = "\n".join(target_branch[:split_index])
+        normal_target = "\n".join(target_branch[split_index + 1:])
+        self.assertIn('boot-voice.s16le', helper_target)
+        self.assertIn('[ ! -e "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le" ]', helper_target)
+        self.assertIn('boot-jingle.s16le', normal_target)
+        self.assertIn('boot-jingle.wav', normal_target)
+        self.assertIn('224000', normal_target)
+
+        ext_start = next(i for i, line in enumerate(lines)
+                         if line.startswith("    debugfs -R 'stat /usr/share/wificam-web/assets/boot-voice.s16le'"))
+        ext_end = next(i for i in range(ext_start, len(lines))
+                       if lines[i] == "fi")
+        ext_branch = lines[ext_start:ext_end]
+        split_index = ext_branch.index("else")
+        helper_ext = "\n".join(ext_branch[:split_index])
+        normal_ext = "\n".join(ext_branch[split_index + 1:])
+        self.assertIn('boot-voice.s16le', helper_ext)
+        self.assertIn('for old_asset in boot-jingle.s16le boot-jingle.wav', helper_ext)
+        self.assertIn('boot-jingle.s16le', normal_ext)
+        self.assertIn('boot-jingle.wav', normal_ext)
+        self.assertIn("stat /etc/init.d/S94peginelab-audio", builder)
+
     def test_camera_smoke_requires_actual_json_not_http_200_only(self):
         smoke = (ROOT / "scripts/camera_smoke_httpd_cgi.sh").read_text()
         self.assertIn('127.0.0.1:$PORT', smoke)
