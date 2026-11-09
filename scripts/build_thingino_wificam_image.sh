@@ -356,13 +356,6 @@ rm -f "$ROOTFS_EXT"
 [ -x "$TARGET/etc/init.d/S90wificam" ] || die "S90wificam missing/not executable in target rootfs"
 [ -x "$TARGET/etc/init.d/S94peginelab-audio" ] ||
     die "PegineLab Raptor boot audio init absent/not executable"
-[ -s "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le" ] ||
-    die "PegineLab camera native PCM jingle absent from final rootfs"
-[ "$(stat -c '%s' "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le")" -eq 224000 ] ||
-    die "PegineLab camera native PCM jingle has unexpected size"
-[ -s "$TARGET/usr/share/wificam-web/assets/boot-jingle.wav" ] ||
-    die "PegineLab original WAV jingle absent from final rootfs"
-
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/api" ] || die "WIFICAM API missing/not executable"
 if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
     [ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le" ] || \
@@ -375,6 +368,14 @@ if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
         [ ! -e "$TARGET/usr/share/sounds/thingino.$suffix" ] || \
             die "Unwanted Thingino startup voice still included"
     done
+else
+    # The standard WIFICAM edition retains its original boot melody.
+    [ -s "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le" ] ||
+        die "PegineLab camera native PCM jingle absent from final rootfs"
+    [ "$(stat -c '%s' "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le")" -eq 224000 ] ||
+        die "PegineLab camera native PCM jingle has unexpected size"
+    [ -s "$TARGET/usr/share/wificam-web/assets/boot-jingle.wav" ] ||
+        die "PegineLab original WAV jingle absent from final rootfs"
 fi
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/snapshot.jpg" ] || die "snapshot CGI missing/not executable"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/live.mjpg" ] || die "native MJPEG CGI missing/not executable"
@@ -449,21 +450,25 @@ debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q
     die "WIFICAM index is absent from rootfs.ext2"
 debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "S90wificam is absent from rootfs.ext2"
+debugfs -R 'stat /etc/init.d/S94peginelab-audio' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+    die "PegineLab boot audio init missing inside ext4"
 if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
     debugfs -R 'stat /usr/share/wificam-web/assets/boot-voice.s16le' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
         die "Helper startup speech missing INSIDE ext4 SD rootfs"
-    if debugfs -R 'stat /usr/share/wificam-web/assets/boot-jingle.s16le' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:'; then
-        die "Old chiptune still included INSIDE Helper SD rootfs"
-    fi
+    for old_asset in boot-jingle.s16le boot-jingle.wav; do
+        if debugfs -R "stat /usr/share/wificam-web/assets/$old_asset" "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:'; then
+            die "Old chiptune still included INSIDE Helper SD rootfs: $old_asset"
+        fi
+    done
+else
+    for boot_asset in \
+        /usr/share/wificam-web/assets/boot-jingle.s16le \
+        /usr/share/wificam-web/assets/boot-jingle.wav
+    do
+        debugfs -R "stat $boot_asset" "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' ||
+            die "PegineLab boot melody missing inside ext4: $boot_asset"
+    done
 fi
-for boot_asset in \
-    /etc/init.d/S94peginelab-audio \
-    /usr/share/wificam-web/assets/boot-jingle.s16le \
-    /usr/share/wificam-web/assets/boot-jingle.wav
-do
-    debugfs -R "stat $boot_asset" "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' ||
-        die "PegineLab boot melody missing inside ext4: $boot_asset"
-done
 debugfs -R 'stat /usr/share/wificam-web/cgi-bin/api' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "WIFICAM API is absent from rootfs.ext2"
 debugfs -R 'stat /usr/share/wificam-web/cgi-bin/snapshot.jpg' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
