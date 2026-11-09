@@ -56,7 +56,7 @@ class CgiSafetyContract(unittest.TestCase):
         builder = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
         lines = builder.splitlines()
         target_start = next(i for i, line in enumerate(lines)
-                            if line.strip() == '[ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le" ] ||')
+                            if line.strip().startswith('[ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le" ] ||'))
         target_end = next(i for i in range(target_start, len(lines))
                           if lines[i] == "fi")
         target_branch = lines[target_start:target_end]
