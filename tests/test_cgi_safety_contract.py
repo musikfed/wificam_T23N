@@ -50,6 +50,32 @@ class CgiSafetyContract(unittest.TestCase):
         self.assertIn("boot-voice.s16le", audio)
         self.assertIn("boot-jingle.s16le", audio)
 
+    def test_audio_validation_is_edition_specific_in_target_and_sd_rootfs(self):
+        # Regression: Helper intentionally removes the original jingle, so
+        # neither target nor ext4 validation may demand it unconditionally.
+        builder = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
+        target_start = builder.index('if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then\\n    [ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le"'.replace('\\n', '\\n'))
+        target_end = builder.index('\\nfi', target_start)
+        target_branch = builder[target_start:target_end]
+        self.assertIn('\\nelse\\n', target_branch)
+        helper_target, normal_target = target_branch.split('\\nelse\\n', 1)
+        self.assertIn('boot-voice.s16le', helper_target)
+        self.assertIn('[ ! -e "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le" ]', helper_target)
+        self.assertIn('boot-jingle.s16le', normal_target)
+        self.assertIn('boot-jingle.wav', normal_target)
+        self.assertIn('224000', normal_target)
+
+        ext_start = builder.index('if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then\\n    debugfs -R')
+        ext_end = builder.index('\\nfi', ext_start)
+        ext_branch = builder[ext_start:ext_end]
+        self.assertIn('\\nelse\\n', ext_branch)
+        helper_ext, normal_ext = ext_branch.split('\\nelse\\n', 1)
+        self.assertIn('boot-voice.s16le', helper_ext)
+        self.assertIn('for old_asset in boot-jingle.s16le boot-jingle.wav', helper_ext)
+        self.assertIn('boot-jingle.s16le', normal_ext)
+        self.assertIn('boot-jingle.wav', normal_ext)
+        self.assertIn("stat /etc/init.d/S94peginelab-audio", builder)
+
     def test_camera_smoke_requires_actual_json_not_http_200_only(self):
         smoke = (ROOT / "scripts/camera_smoke_httpd_cgi.sh").read_text()
         self.assertIn('127.0.0.1:$PORT', smoke)
