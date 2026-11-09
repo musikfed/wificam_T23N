@@ -15,6 +15,7 @@ FAST="${THINGINO_FAST:-0}"
 # Optional build-time WebRTC for future low-latency camera talkback.
 # Off in the smallest profile; never confuse it with the runtime LLM checkbox.
 WIFICAM_WEBRTC="${WIFICAM_WEBRTC:-0}"
+WIFICAM_HELPER_EDITION="${WIFICAM_HELPER_EDITION:-0}"
 
 # A personalized image contains a Wi-Fi network key (WPA2 derived PSK).
 # Keep it in gitignored out/private-sd, never overwrite the versioned
@@ -32,6 +33,12 @@ IMAGE_PATH="$IMAGE_DIR/thingino-t23-sd.bin"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 case "$WIFICAM_WEBRTC" in 0|1) ;; *) die "WIFICAM_WEBRTC must be 0 or 1" ;; esac
+case "$WIFICAM_HELPER_EDITION" in 0|1) ;; *) die "WIFICAM_HELPER_EDITION must be 0 or 1" ;; esac
+HELPER_SOUND_FRAGMENT=
+if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
+    HELPER_SOUND_FRAGMENT='# BR2_PACKAGE_THINGINO_SOUNDS_STARTUP is not set'
+    echo "HELPER: disabling Thingino spoken startup, preserving other OS sounds"
+fi
 WEBRTC_FRAGMENT='# BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC is not set'
 if [ "$WIFICAM_WEBRTC" = 1 ]; then
     WEBRTC_FRAGMENT='BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC=y
@@ -177,6 +184,7 @@ BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
 BR2_PACKAGE_THINGINO_RAPTOR_RMR=y
 BR2_PACKAGE_THINGINO_RAPTOR_RMD=y
 $WEBRTC_FRAGMENT
+$HELPER_SOUND_FRAGMENT
 # BR2_PACKAGE_THINGINO_RAPTOR_WEBTORRENT is not set
 # BR2_PACKAGE_THINGINO_RAPTOR_RSP is not set
 # BR2_PACKAGE_THINGINO_RAPTOR_RSR is not set
@@ -266,6 +274,10 @@ grep -q '^BR2_PACKAGE_DROPBEAR=y$' "$FINAL_CONFIG" || \
     die "Dropbear SSH is not enabled; local recovery access is mandatory"
 grep -Fq "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES=\"$BUSYBOX_WIFICAM_FRAGMENT\"" "$FINAL_CONFIG" || \
     die "WIFICAM BusyBox fragment path did not reach final Buildroot config"
+if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
+    grep -Fqx '# BR2_PACKAGE_THINGINO_SOUNDS_STARTUP is not set' "$FINAL_CONFIG" || \
+        die "Helper release has upstream Thingino startup sound ENABLED"
+fi
 
 # FAST builds can reuse an older BusyBox .config from before local.fragment
 # selected BusyBox httpd. The config is not "missing" in that case; it is
@@ -352,6 +364,18 @@ rm -f "$ROOTFS_EXT"
     die "PegineLab original WAV jingle absent from final rootfs"
 
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/api" ] || die "WIFICAM API missing/not executable"
+if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
+    [ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le" ] || \
+        die "Helper speech PCM is absent from Buildroot target"
+    [ ! -e "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le" ] || \
+        die "Helper must not contain old 8-bit chiptune"
+    [ ! -e "$TARGET/usr/share/wificam-web/assets/boot-jingle.wav" ] || \
+        die "Helper must not contain old 8-bit WAV"
+    for suffix in opus ulaw; do
+        [ ! -e "$TARGET/usr/share/sounds/thingino.$suffix" ] || \
+            die "Unwanted Thingino startup voice still included"
+    done
+fi
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/snapshot.jpg" ] || die "snapshot CGI missing/not executable"
 [ -x "$TARGET/usr/share/wificam-web/cgi-bin/live.mjpg" ] || die "native MJPEG CGI missing/not executable"
 [ -x "$TARGET/usr/bin/wificam-ptz-ctl" ] || die "Thingino PTZ controller missing/not executable"
@@ -425,6 +449,12 @@ debugfs -R 'stat /usr/share/wificam-web/index.html' "$ROOTFS_EXT" 2>&1 | grep -q
     die "WIFICAM index is absent from rootfs.ext2"
 debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
     die "S90wificam is absent from rootfs.ext2"
+if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
+    debugfs -R 'stat /usr/share/wificam-web/assets/boot-voice.s16le' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
+        die "Helper startup speech missing INSIDE ext4 SD rootfs"
+    debugfs -R 'stat /usr/share/wificam-web/assets/boot-jingle.s16le' "$ROOTFS_EXT" 2>&1 | grep -q 'File not found' || \
+        die "Old chiptune still included INSIDE Helper SD rootfs"
+fi
 for boot_asset in \
     /etc/init.d/S94peginelab-audio \
     /usr/share/wificam-web/assets/boot-jingle.s16le \
