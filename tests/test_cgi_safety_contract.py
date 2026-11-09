@@ -25,6 +25,9 @@ class CgiSafetyContract(unittest.TestCase):
         self.assertIn('exec busybox httpd "$@"', init)
         self.assertIn('probe_get()', init)
         self.assertIn('grep -qx wget', init)
+        self.assertIn('chmod 0755 "$probe_dir"', init)
+        self.assertIn('chmod 0755 "$probe_dir/www/cgi-bin/probe"', init)
+        self.assertIn('WIFICAM CGI PROBE:', init)
 
     def test_build_includes_http_client_for_cgi_preflight(self):
         source = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
@@ -32,6 +35,20 @@ class CgiSafetyContract(unittest.TestCase):
         self.assertIn("CONFIG_WGET", source.split('BUSYBOX_REQUIRED_OPTS="', 1)[1].split('"', 1)[0])
         self.assertIn("br-busybox-rebuild",source)
         self.assertIn("BUILD_TARGET=cleanbuild",source)
+
+    def test_helper_edition_disables_stock_voice_and_includes_speech_pcm(self):
+        builder = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
+        packager = (ROOT / "scripts/package_rootfs_overlay.sh").read_text()
+        audio = (ROOT / "rootfs/etc/init.d/S94peginelab-audio").read_text()
+        self.assertIn("WIFICAM_HELPER_EDITION", builder)
+        self.assertIn("BR2_PACKAGE_THINGINO_SOUNDS_STARTUP is not set", builder)
+        self.assertIn("boot-voice.s16le", builder)
+        self.assertIn("boot-jingle.s16le", builder)
+        self.assertIn('WIFICAM_HELPER_EDITION:-0', packager)
+        self.assertIn("boot-voice.s16le", packager)
+        self.assertIn("if [ -f /etc/wifcam-helper-release ]; then", audio)
+        self.assertIn("boot-voice.s16le", audio)
+        self.assertIn("boot-jingle.s16le", audio)
 
     def test_camera_smoke_requires_actual_json_not_http_200_only(self):
         smoke = (ROOT / "scripts/camera_smoke_httpd_cgi.sh").read_text()
