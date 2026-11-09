@@ -452,8 +452,9 @@ debugfs -R 'stat /etc/init.d/S90wificam' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' |
 if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then
     debugfs -R 'stat /usr/share/wificam-web/assets/boot-voice.s16le' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:' || \
         die "Helper startup speech missing INSIDE ext4 SD rootfs"
-    debugfs -R 'stat /usr/share/wificam-web/assets/boot-jingle.s16le' "$ROOTFS_EXT" 2>&1 | grep -q 'File not found' || \
+    if debugfs -R 'stat /usr/share/wificam-web/assets/boot-jingle.s16le' "$ROOTFS_EXT" 2>&1 | grep -q 'Inode:'; then
         die "Old chiptune still included INSIDE Helper SD rootfs"
+    fi
 fi
 for boot_asset in \
     /etc/init.d/S94peginelab-audio \
