@@ -54,22 +54,29 @@ class CgiSafetyContract(unittest.TestCase):
         # Regression: Helper intentionally removes the original jingle, so
         # neither target nor ext4 validation may demand it unconditionally.
         builder = (ROOT / "scripts/build_thingino_wificam_image.sh").read_text()
-        target_start = builder.index('if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then\\n    [ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le"'.replace('\\n', '\\n'))
-        target_end = builder.index('\\nfi', target_start)
-        target_branch = builder[target_start:target_end]
-        self.assertIn('\\nelse\\n', target_branch)
-        helper_target, normal_target = target_branch.split('\\nelse\\n', 1)
+        lines = builder.splitlines()
+        target_start = next(i for i, line in enumerate(lines)
+                            if line.strip() == '[ -s "$TARGET/usr/share/wificam-web/assets/boot-voice.s16le" ] ||')
+        target_end = next(i for i in range(target_start, len(lines))
+                          if lines[i] == "fi")
+        target_branch = lines[target_start:target_end]
+        split_index = target_branch.index("else")
+        helper_target = "\n".join(target_branch[:split_index])
+        normal_target = "\n".join(target_branch[split_index + 1:])
         self.assertIn('boot-voice.s16le', helper_target)
         self.assertIn('[ ! -e "$TARGET/usr/share/wificam-web/assets/boot-jingle.s16le" ]', helper_target)
         self.assertIn('boot-jingle.s16le', normal_target)
         self.assertIn('boot-jingle.wav', normal_target)
         self.assertIn('224000', normal_target)
 
-        ext_start = builder.index('if [ "$WIFICAM_HELPER_EDITION" = 1 ]; then\\n    debugfs -R')
-        ext_end = builder.index('\\nfi', ext_start)
-        ext_branch = builder[ext_start:ext_end]
-        self.assertIn('\\nelse\\n', ext_branch)
-        helper_ext, normal_ext = ext_branch.split('\\nelse\\n', 1)
+        ext_start = next(i for i, line in enumerate(lines)
+                         if line.startswith("    debugfs -R 'stat /usr/share/wificam-web/assets/boot-voice.s16le'"))
+        ext_end = next(i for i in range(ext_start, len(lines))
+                       if lines[i] == "fi")
+        ext_branch = lines[ext_start:ext_end]
+        split_index = ext_branch.index("else")
+        helper_ext = "\n".join(ext_branch[:split_index])
+        normal_ext = "\n".join(ext_branch[split_index + 1:])
         self.assertIn('boot-voice.s16le', helper_ext)
         self.assertIn('for old_asset in boot-jingle.s16le boot-jingle.wav', helper_ext)
         self.assertIn('boot-jingle.s16le', normal_ext)
