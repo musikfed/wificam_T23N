@@ -96,7 +96,11 @@ probe_httpd_cgi() {
 printf 'Content-Type: application/json\r\n\r\n'
 printf '{"ok":true,"cgi":"executed"}\n'
 EOF
-    chmod 0700 "$probe_dir/www/cgi-bin/probe"
+    # BusyBox httpd can execute CGI as an unprivileged account.
+    # mktemp -d starts 0700; the private test path/script MUST be searchable
+    # and executable by that account. The probe contains no credentials.
+    chmod 0755 "$probe_dir" "$probe_dir/www" "$probe_dir/www/cgi-bin"
+    chmod 0755 "$probe_dir/www/cgi-bin/probe"
     : > "$probe_dir/httpd.conf"
     # If port 18090 is already in use, do not mistake another service's
     # response for this probe: the child must stay running until inspected.
@@ -104,9 +108,23 @@ EOF
     probe_pid=$!
     sleep 1
     probe_ok=0
+    probe_body=""
     if kill -0 "$probe_pid" 2>/dev/null; then
         probe_body="$(probe_get http://127.0.0.1:18090/cgi-bin/probe 2>/dev/null || true)"
         [ "$probe_body" = '{"ok":true,"cgi":"executed"}' ] && probe_ok=1
+    fi
+    if [ "$probe_ok" != 1 ]; then
+        # Private local diagnostic only: never echo credentials or API output.
+        # A returned '#!/bin/sh' means CGI source was exposed by httpd.
+        case "$probe_body" in
+            '#!'*) echo "WIFICAM CGI PROBE: HTTPD SERVED SCRIPT SOURCE, CGI IS NOT EXECUTING" >> "$LOG" ;;
+            "") echo "WIFICAM CGI PROBE: no HTTP JSON (client, listener, permissions or CGI failure)" >> "$LOG" ;;
+            *) echo "WIFICAM CGI PROBE: unexpected HTTP response, not expected JSON" >> "$LOG" ;;
+        esac
+        if [ -s "$probe_dir/httpd.log" ]; then
+            echo "WIFICAM CGI PROBE: loopback httpd diagnostics:" >> "$LOG"
+            tail -n 8 "$probe_dir/httpd.log" >> "$LOG" 2>/dev/null || true
+        fi
     fi
     kill "$probe_pid" 2>/dev/null || true
     wait "$probe_pid" 2>/dev/null || true
