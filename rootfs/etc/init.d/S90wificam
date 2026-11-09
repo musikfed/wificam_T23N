@@ -38,12 +38,14 @@ httpd_available() {
 }
 
 run_httpd() {
+    # exec makes the background PID belong to the actual httpd rather than
+    # a shell wrapper, so the loopback probe can stop its own listener.
     if [ -n "$WIFICAM_HTTPD_BIN" ]; then
-        "$WIFICAM_HTTPD_BIN" httpd "$@"
+        exec "$WIFICAM_HTTPD_BIN" httpd "$@"
     elif command -v httpd >/dev/null 2>&1; then
-        httpd "$@"
+        exec httpd "$@"
     else
-        busybox httpd "$@"
+        exec busybox httpd "$@"
     fi
 }
 
@@ -214,8 +216,13 @@ start() {
     # Hardware bug 2026-11-02: target BusyBox exposed CGI sources
     # despite CONFIG_FEATURE_HTTPD_CGI=y in build-time .config.
     # Always prove actual execution *before* starting the LAN listener.
+    if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1 &&
+       ! busybox --list 2>/dev/null | grep -qx wget; then
+        echo "WIFICAM CGI PRE-FLIGHT UNAVAILABLE: no curl/wget client installed. Port $WEB_PORT stays closed." | tee -a "$LOG" >&2
+        return 1
+    fi
     if ! probe_httpd_cgi; then
-        echo "WIFICAM CGI PRE-FLIGHT FAILED: this httpd serves scripts as files. Port $WEB_PORT stays closed." | tee -a "$LOG" >&2
+        echo "WIFICAM CGI PRE-FLIGHT FAILED: HTTP CGI did not return expected JSON (CGI, HTTP client or listener issue). Port $WEB_PORT stays closed." | tee -a "$LOG" >&2
         return 1
     fi
 
